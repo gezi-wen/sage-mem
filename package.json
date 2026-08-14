@@ -1,15 +1,17 @@
 {
   "name": "sage-mem",
   "description": "Memory plugin for DeepSeek Harness (DSH) — cross-session memory with Chinese-first full-text search",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
+    "./client": "./lib/client.js",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
+    "lib/client.js",
     "cordis.patch.yml",
     "NOTICE"
   ],
@@ -17,10 +19,17 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
     }
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1"
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-tools": ">=0.1.0-rc.6"
   },
   "repository": {
     "type": "git",
