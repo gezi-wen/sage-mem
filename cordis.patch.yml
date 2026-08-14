@@ -1,0 +1,4 @@
+# sage-mem bundle patch — injects the memory bridge plugin into the profile tree.
+- insert:
+    - id: sage-mem
+      name: 'sage-mem'

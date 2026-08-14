@@ -1,0 +1,33 @@
+{
+  "name": "sage-mem",
+  "description": "Sage memory plugin: bridges DSH session events to the sage-mem worker (forked claude-mem) for cross-session memory",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "cordis.patch.yml"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gezi-wen/sage-mem.git"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin"
+  ]
+}
