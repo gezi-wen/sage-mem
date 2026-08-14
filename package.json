@@ -1,7 +1,7 @@
 {
   "name": "sage-mem",
   "description": "Memory plugin for DeepSeek Harness (DSH) — cross-session memory with Chinese-first full-text search",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -10,9 +10,10 @@
   },
   "files": [
     "lib/index.js",
-    "cordis.patch.yml"
+    "cordis.patch.yml",
+    "NOTICE"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
