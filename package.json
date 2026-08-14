@@ -1,7 +1,7 @@
 {
   "name": "sage-mem",
-  "description": "Sage memory plugin: bridges DSH session events to the sage-mem worker (forked claude-mem) for cross-session memory",
-  "version": "0.1.0",
+  "description": "Memory plugin for DeepSeek Harness (DSH) — cross-session memory with Chinese-first full-text search",
+  "version": "0.1.1",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
