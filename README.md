@@ -16,6 +16,8 @@ sage-mem 补上这一块。它监听 DSH 的事件流，把会话内容沉淀到
 - **AI 压缩**：会话内容由 LLM 压缩成结构化记忆（事实、摘要），中文输出
 - **跨会话注入**：新会话启动时自动检索并注入历史记忆，agent 不用自己翻
 - **中文检索**：trigram 分词（≥3 字查询）+ LIKE 兜底（<3 字短词如「猫」「芝麻」）
+- **Web 记忆管理**（v0.2）：DSH 设置页新增「记忆管理」，可视化查看/编辑/删除全部跨会话记忆，支持自定义记忆与偏好记忆
+- **get_observations 工具**（v0.2）：补齐注入头承诺却缺失的按 ID 取回记忆正文通道
 
 ## 架构
 
@@ -111,6 +113,8 @@ bun src/services/worker-service.ts --daemon
 - trigram 分词对 `<3` 字符查询无效，worker 已加 LIKE 兜底
 - worker 不可用时插件静默跳过（不阻塞 DSH），记忆功能暂缺
 - MVP 存储统一在 `project=sage` 空间，按工作区分项目是后续计划
+- worker 的 `/api/memory/save` 会写入空 `concepts`，导致手动记忆被上下文生成的 concepts 白名单过滤、对新会话不可见 —— v0.2 的保存路径改走 `/api/import` 规避（详见 lib/index.js 注释），治本需修 worker
+- 注入时间线只携带记忆标题（`CLAUDE_MEM_CONTEXT_FULL_COUNT` 默认 0），v0.2 保存手动记忆时生成「自包含标题」并把事实写进标题，保证新会话直接可见
 
 ## License
 
