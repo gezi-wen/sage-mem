@@ -7,11 +7,13 @@
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
+    "./typert": "./lib/typert.host.js",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
     "lib/client.js",
+    "lib/typert.host.js",
     "cordis.patch.yml",
     "NOTICE"
   ],
@@ -27,6 +29,9 @@
         "@deepseek-ai/dsh-client-runtime"
       ]
     }
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
