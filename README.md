@@ -4,6 +4,15 @@
 
 记忆存在**本地 markdown 文件**里（frontmatter + 正文），不是数据库。透明、可检查、防膨胀。
 
+## 从 Claude Code 无损迁移
+
+你已经在 Claude Code（CC）里养了一个 agent，舍不得它的记忆和人格？sage-mem 是「CC → DSH」迁移方案的一部分，**记忆与人格都能无损搬过来**：
+
+- **人格**：CC 的 `CLAUDE.md` → DSH 的 `AGENTS.md`，DSH 原生加载，纯文本一字不改就能用。
+- **记忆**：CC 沉淀的跨会话记忆 → sage-mem 的 `memory/` 目录（markdown + frontmatter，四类）。
+
+没有数据库、没有私有格式——全都是 markdown 文本，**直接拷文件就完成迁移**。agent 换了身体，但依然记得你是谁、记得你们聊过什么、记得进行中的项目。
+
 ## 为什么用文件
 
 DSH 原生没有记忆系统，每个会话都是白纸。市面上的记忆方案大多走 SQLite + 常驻 worker：
@@ -101,10 +110,7 @@ metadata:
 
 ## 相关项目
 
-- [sage-persona](https://github.com/gezi-wen/sage-persona) — 人格（我是谁）
-- [sage-meta](https://github.com/gezi-wen/sage-meta) — 自检（我做得对吗）
-
-sage-mem 是第三道：**我下次应该怎么想**——跨会话沉淀事实与教训。
+- [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — DSH 本体，一切皆插件
 
 ## 旧版
 
