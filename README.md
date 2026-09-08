@@ -77,6 +77,23 @@ memory/ 目录（markdown 文件，4 类）
 
 然后 `pnpm install` 重启 DSH。
 
+## DSH 兼容性
+
+sage-mem 是纯 DSH 插件，在 `package.json` 的 `dsh.compatibility.dshReleases` 里逐版本声明兼容状态：
+
+| DSH 版本 | 状态 |
+| --- | --- |
+| 0.1.2-rc.1 | compatible |
+| 0.1.3-alpha.1 | compatible |
+| 0.1.3-alpha.2 | compatible |
+
+Node.js 要求 `>= 18`（见 `engines.node`）。
+
+## 卸载
+
+在 profile 的 `package.json` 里删掉 `sage-mem` 依赖，并从 `dsh.profile.bundles` 移除 `"sage-mem"`；
+`pnpm install` 后重启 DSH 即可。记忆 markdown 文件留在原目录，不受影响。
+
 ## 配置
 
 用环境变量 `SAGE_MEM_DIR` 指定记忆目录，默认 `~/.sage-mem/memory`：

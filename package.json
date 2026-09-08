@@ -1,7 +1,7 @@
 {
   "name": "sage-mem",
   "description": "File-based memory plugin for DeepSeek Harness (DSH) — cross-session memory in transparent markdown files",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -18,6 +18,9 @@
     "NOTICE"
   ],
   "license": "Apache-2.0",
+  "engines": {
+    "node": ">=18"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -28,6 +31,14 @@
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-runtime"
       ]
+    },
+    "compatibility": {
+      "dsh": ">=0.1.2-rc.1",
+      "dshReleases": {
+        "0.1.2-rc.1": "compatible",
+        "0.1.3-alpha.1": "compatible",
+        "0.1.3-alpha.2": "compatible"
+      }
     }
   },
   "dependencies": {
@@ -45,8 +56,15 @@
     "url": "https://github.com/gezi-wen/sage-mem.git"
   },
   "keywords": [
+    "memory",
+    "ai-memory",
+    "long-term-memory",
+    "markdown",
     "dsh",
     "deepseek-harness",
-    "plugin"
+    "plugin",
+    "ai-agent",
+    "agent",
+    "claude-code"
   ]
 }
