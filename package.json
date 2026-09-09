@@ -1,7 +1,7 @@
 {
   "name": "sage-mem",
-  "description": "File-based memory plugin for DeepSeek Harness (DSH) — cross-session memory in transparent markdown files",
-  "version": "0.4.2",
+  "description": "File-based memory plugin for DeepSeek Harness (DSH) — cross-session memory in transparent markdown files, with a memory star-map view",
+  "version": "0.4.3",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

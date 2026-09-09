@@ -3,3 +3,6 @@ Copyright 2026 gezi-wen
 
 This product includes software developed by the Sage project
 (https://github.com/gezi-wen/sage-mem).
+
+The memory star-map view is derived from sage-starmap
+(https://github.com/gezi-wen/sage-starmap), MIT licensed.
