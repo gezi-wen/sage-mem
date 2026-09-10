@@ -25,7 +25,8 @@ sage-mem 换成文件式：每条记忆一个 markdown 文件，直接用编辑�
 
 ## 功能
 
-- **按问题检索注入**：每次提问，插件扫记忆目录，按相关性把记忆注入 system prompt，agent 第一轮就「想起来」
+- **按问题检索注入**：每次提问，插件扫记忆目录，用 frontmatter 的 `description` 和文件名做匹配，把相关记忆注入上下文，agent 第一轮就「想起来」
+- **每次会话必读**（v0.5）：frontmatter 标了 `baseline: true` 的记忆，在新会话第一步无条件注入——给「待办清单」「你是谁」这类每次开场都该在场的记忆用（上限 5 条）
 - **四类记忆**：`user`（用户是谁）/ `feedback`（工作方式指导）/ `project`（项目状态）/ `reference`（外部信息指针）
 - **文件透明**：记忆就是 `*.md` 文件，frontmatter 存元数据，正文存内容
 - **防膨胀**：写入靠规则引导 agent 判断「存不存」，无实质内容、能靠代码/git 推导的不存
@@ -86,6 +87,7 @@ sage-mem 是纯 DSH 插件，在 `package.json` 的 `dsh.compatibility.dshReleas
 | 0.1.2-rc.1 | compatible |
 | 0.1.3-alpha.1 | compatible |
 | 0.1.3-alpha.2 | compatible |
+| 0.1.5-rc.1 | compatible |
 
 Node.js 要求 `>= 18`（见 `engines.node`）。
 
@@ -107,9 +109,10 @@ SAGE_MEM_DIR=/path/to/your/memory
 ```markdown
 ---
 name: 可选的短名
-description: 一句话说清这条记忆是什么（检索与列表都靠它）
+description: 一句话说清这条记忆是什么（检索靠它，务必写准）
 metadata:
   type: user        # user / feedback / project / reference
+baseline: true      # 可选：新会话第一步无条件注入（上限 5 条）
 ---
 
 记忆正文。
