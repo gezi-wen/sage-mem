@@ -88,6 +88,13 @@ sage-mem 是纯 DSH 插件，在 `package.json` 的 `dsh.compatibility.dshReleas
 | 0.1.3-alpha.1 | compatible |
 | 0.1.3-alpha.2 | compatible |
 | 0.1.5-rc.1 | compatible |
+| 0.1.6-alpha.1 | compatible |
+| 0.1.6-alpha.2 | compatible |
+
+自 DSH `0.1.6-alpha.2` 起，TypertCodec 契约从「读 `schema`」改为「读 `create()` 工厂」——
+仍只写 `schema:` 的插件会在注册阶段直接抛错，导致整棵插件树加载失败。自 0.5.2 起每个 codec
+同时带 `schema` 与 `create: () => schema`，因此**同一份构建同时兼容 alpha.1 及更早（读
+schema）与 alpha.2 及以后（读 create）**，升级 DSH 时不需要换插件版本。
 
 Node.js 要求 `>= 18`（见 `engines.node`）。
 
