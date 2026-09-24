@@ -4,6 +4,10 @@
 
 记忆存在**本地 markdown 文件**里（frontmatter + 正文），不是数据库。透明、可检查、防膨胀。
 
+> **DSH 版本兼容性（0.5.3 核对于 `0.1.7-rc.1`）**
+> `session.deriveMessages()`（仍是同步）、`system-prompt/assemble` 事件、以及 `context.agent.session` 这条链，在 0.1.6 → 0.1.7 之间**均未改变**，本插件在 0.1.7 上无需改动即可工作。
+> 0.5.3 另加了一层防御：`deriveMessages()` 若哪天被改成异步，或 `Session` 上的历史读取接口被改名（0.1.7 起 `snapshotEvents` / `eventAt` / `ownEvents` 已标记弃用），插件会在**日志里报警**，而不是像以前那样静默地不再注入记忆。0.1.6 上的行为与 0.5.2 完全一致。
+
 ## 从 Claude Code 无损迁移
 
 你已经在 Claude Code（CC）里养了一个 agent，舍不得它的记忆和人格？sage-mem 是「CC → DSH」迁移方案的一部分，**记忆与人格都能无损搬过来**：
