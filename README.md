@@ -1,26 +1,19 @@
-# dsh-mem · DSH 的文件式记忆插件
+# sage-mem · DSH 的文件式记忆插件
 
 给 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）装上**跨会话记忆**——agent 今天记住的事，明天的新会话自动想起来。
 
 记忆存在**本地 markdown 文件**里（frontmatter + 正文），不是数据库。透明、可检查、防膨胀。
 
-> ### 包名变更（v0.5.5）
->
-> 本插件原名 `sage-mem`，自 **v0.5.5** 起改名为 **`@gezi-wen/dsh-mem`**。
->
-> 迁移只需改 profile：`dependencies` 与 `dsh.profile.bundles` 里把 `sage-mem` 换成 `@gezi-wen/dsh-mem`，`pnpm install` 后重启 DSH。
-> **记忆数据原地不动** —— 目录仍是 `~/.sage-mem/memory`（可用 `SAGE_MEM_DIR` 覆盖）。换名字不丢记忆。
-
-> **DSH 版本兼容性（0.5.5 核对于 `0.1.7-rc.2`）**
+> **DSH 版本兼容性（0.5.3 核对于 `0.1.7-rc.1`）**
 > `session.deriveMessages()`（仍是同步）、`system-prompt/assemble` 事件、以及 `context.agent.session` 这条链，在 0.1.6 → 0.1.7 之间**均未改变**，本插件在 0.1.7 上无需改动即可工作。
-> 0.5.3 另加了一层防御：`deriveMessages()` 若哪天被改成异步，或 `Session` 上的历史读取接口被改名（0.1.7 起 `snapshotEvents` / `eventAt` / `ownEvents` 已标记弃用），插件会在**日志里报警**，而不是像以前那样静默地不再注入记忆。
+> 0.5.3 另加了一层防御：`deriveMessages()` 若哪天被改成异步，或 `Session` 上的历史读取接口被改名（0.1.7 起 `snapshotEvents` / `eventAt` / `ownEvents` 已标记弃用），插件会在**日志里报警**，而不是像以前那样静默地不再注入记忆。0.1.6 上的行为与 0.5.2 完全一致。
 
 ## 从 Claude Code 无损迁移
 
-你已经在 Claude Code（CC）里养了一个 agent，舍不得它的记忆和人格？dsh-mem 是「CC → DSH」迁移方案的一部分，**记忆与人格都能无损搬过来**：
+你已经在 Claude Code（CC）里养了一个 agent，舍不得它的记忆和人格？sage-mem 是「CC → DSH」迁移方案的一部分，**记忆与人格都能无损搬过来**：
 
 - **人格**：CC 的 `CLAUDE.md` → DSH 的 `AGENTS.md`，DSH 原生加载，纯文本一字不改就能用。
-- **记忆**：CC 沉淀的跨会话记忆 → dsh-mem 的 `memory/` 目录（markdown + frontmatter，四类）。
+- **记忆**：CC 沉淀的跨会话记忆 → sage-mem 的 `memory/` 目录（markdown + frontmatter，四类）。
 
 没有数据库、没有私有格式——全都是 markdown 文本，**直接拷文件就完成迁移**。agent 换了身体，但依然记得你是谁、记得你们聊过什么、记得进行中的项目。
 
@@ -32,7 +25,7 @@ DSH 原生没有记忆系统，每个会话都是白纸。市面上的记忆方�
 - 事件自动捕获会**膨胀**——"用户打了个招呼"这种无实质内容也被存进去
 - 需要一个**常驻 worker 进程** + 端口，多一份运维负担
 
-dsh-mem 换成文件式：每条记忆一个 markdown 文件，直接用编辑器打开就能看、能改、能删。存不存由 agent 按规则判断，不是事件全捕获。没有 worker、没有 SQLite、没有端口。
+sage-mem 换成文件式：每条记忆一个 markdown 文件，直接用编辑器打开就能看、能改、能删。存不存由 agent 按规则判断，不是事件全捕获。没有 worker、没有 SQLite、没有端口。
 
 ## 功能
 
@@ -42,13 +35,12 @@ dsh-mem 换成文件式：每条记忆一个 markdown 文件，直接用编辑�
 - **文件透明**：记忆就是 `*.md` 文件，frontmatter 存元数据，正文存内容
 - **防膨胀**：写入靠规则引导 agent 判断「存不存」，无实质内容、能靠代码/git 推导的不存
 - **Web 文件管理器**（v0.4）：DSH 设置页「记忆管理」，浏览/查看/编辑/删除记忆文件，添加新记忆
-- **记忆星图**（v0.4.3 起并入）：把记忆画成一片星空，按类型和大小分布
 
 ## 架构
 
 ```
 DSH（Cordis 插件）
-  └─ dsh-mem 插件（按问题检索 + 注入）← 本仓库
+  └─ sage-mem 插件（按问题检索 + 注入）← 本仓库
        │  Node fs 直读
        ▼
 memory/ 目录（markdown 文件，4 类）
@@ -63,31 +55,16 @@ memory/ 目录（markdown 文件，4 类）
 
 ## 安装
 
-从 npm：
+在你的 DSH profile 的 `package.json` 里加：
 
 ```json
 {
   "dependencies": {
-    "@gezi-wen/dsh-mem": "^0.5.5"
+    "sage-mem": "github:gezi-wen/sage-mem"
   },
   "dsh": {
     "profile": {
-      "bundles": ["@gezi-wen/dsh-mem"]
-    }
-  }
-}
-```
-
-或直接从 GitHub：
-
-```json
-{
-  "dependencies": {
-    "@gezi-wen/dsh-mem": "github:gezi-wen/dsh-mem"
-  },
-  "dsh": {
-    "profile": {
-      "bundles": ["@gezi-wen/dsh-mem"]
+      "bundles": ["sage-mem"]
     }
   }
 }
@@ -98,7 +75,7 @@ memory/ 目录（markdown 文件，4 类）
 ```json
 {
   "dependencies": {
-    "@gezi-wen/dsh-mem": "link:../dsh-mem"
+    "sage-mem": "link:../sage-mem"
   }
 }
 ```
@@ -107,7 +84,7 @@ memory/ 目录（markdown 文件，4 类）
 
 ## DSH 兼容性
 
-dsh-mem 是纯 DSH 插件，在 `package.json` 的 `dsh.compatibility.dshReleases` 里逐版本声明兼容状态：
+sage-mem 是纯 DSH 插件，在 `package.json` 的 `dsh.compatibility.dshReleases` 里逐版本声明兼容状态：
 
 | DSH 版本 | 状态 |
 | --- | --- |
@@ -117,8 +94,6 @@ dsh-mem 是纯 DSH 插件，在 `package.json` 的 `dsh.compatibility.dshRelease
 | 0.1.5-rc.1 | compatible |
 | 0.1.6-alpha.1 | compatible |
 | 0.1.6-alpha.2 | compatible |
-| 0.1.7-rc.1 | compatible |
-| 0.1.7-rc.2 | compatible |
 
 自 DSH `0.1.6-alpha.2` 起，TypertCodec 契约从「读 `schema`」改为「读 `create()` 工厂」——
 仍只写 `schema:` 的插件会在注册阶段直接抛错，导致整棵插件树加载失败。自 0.5.2 起每个 codec
@@ -129,8 +104,8 @@ Node.js 要求 `>= 18`（见 `engines.node`）。
 
 ## 卸载
 
-在 profile 的 `package.json` 里删掉 `@gezi-wen/dsh-mem` 依赖，并从 `dsh.profile.bundles` 移除
-`"@gezi-wen/dsh-mem"`；`pnpm install` 后重启 DSH 即可。记忆 markdown 文件留在原目录，不受影响。
+在 profile 的 `package.json` 里删掉 `sage-mem` 依赖，并从 `dsh.profile.bundles` 移除 `"sage-mem"`；
+`pnpm install` 后重启 DSH 即可。记忆 markdown 文件留在原目录，不受影响。
 
 ## 配置
 
@@ -139,8 +114,6 @@ Node.js 要求 `>= 18`（见 `engines.node`）。
 ```
 SAGE_MEM_DIR=/path/to/your/memory
 ```
-
-> 变量名与默认目录沿用了旧包名，**刻意不改**：它们是既有用户的记忆所在路径，改名会导致记忆「消失」。
 
 记忆文件格式：
 
@@ -173,7 +146,6 @@ baseline: true      # 可选：新会话第一步无条件注入（上限 5 条�
 ## 旧版
 
 本仓库早期是 SQLite + worker 架构，已归档到 [`sqlite-worker`](../../tree/sqlite-worker) 分支。文件式是继任实现。
-更早还用过 `sage-mem` 这个名字（0.1.0 – 0.5.4），v0.5.5 起改名为 `@gezi-wen/dsh-mem`。
 
 ## License
 

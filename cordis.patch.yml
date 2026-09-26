@@ -1,4 +1,4 @@
-# dsh-mem bundle patch — injects the memory bridge plugin into the profile tree.
+# sage-mem bundle patch — injects the memory bridge plugin into the profile tree.
 - insert:
-    - id: dsh-mem
-      name: '@gezi-wen/dsh-mem'
+    - id: sage-mem
+      name: 'sage-mem'
