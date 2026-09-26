@@ -1,7 +1,7 @@
 {
-  "name": "sage-mem",
-  "description": "File-based memory plugin for DeepSeek Harness (DSH) — cross-session memory in transparent markdown files, with a memory star-map view",
-  "version": "0.5.4",
+  "name": "@gezi-wen/dsh-mem",
+  "description": "Cross-session memory plugin for DeepSeek Harness (dsh) — transparent markdown memory files with question-based recall and a memory star-map view in the web UI",
+  "version": "0.5.5",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -56,15 +56,27 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gezi-wen/sage-mem.git"
+    "url": "git+https://github.com/gezi-wen/dsh-mem.git"
+  },
+  "homepage": "https://github.com/gezi-wen/dsh-mem#readme",
+  "bugs": {
+    "url": "https://github.com/gezi-wen/dsh-mem/issues"
   },
   "keywords": [
     "memory",
     "ai-memory",
+    "agent-memory",
     "long-term-memory",
+    "cross-session-memory",
+    "context-management",
+    "knowledge-management",
     "markdown",
     "dsh",
+    "dsh-plugin",
+    "deepseek",
     "deepseek-harness",
+    "cordis",
+    "typert",
     "plugin",
     "ai-agent",
     "agent",
