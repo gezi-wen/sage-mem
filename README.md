@@ -4,7 +4,8 @@
 
 记忆存在**本地 markdown 文件**里（frontmatter + 正文），不是数据库。透明、可检查、防膨胀。
 
-> **DSH 版本兼容性（0.5.3 核对于 `0.1.7-rc.1`）**
+> **DSH 版本兼容性（0.6.2 核对于 `0.2.0-rc.1`；0.5.3 核对于 `0.1.7-rc.1`）**
+> `@deepseek-ai/dsh-typert-protocol` 与 `@deepseek-ai/dsh-client-locale` 的 `lib/` 在 `0.1.7-rc.2` → `0.2.0-rc.1` 之间**逐字节未变**（导出符号零增删、签名零变化），peer 范围随之放宽为 `^0.1.2-rc.1 || ^0.2.0-rc.1`，同时覆盖两条版本线；插件在 0.2.0 上无需改动即可工作。
 > `session.deriveMessages()`（仍是同步）、`system-prompt/assemble` 事件、以及 `context.agent.session` 这条链，在 0.1.6 → 0.1.7 之间**均未改变**，本插件在 0.1.7 上无需改动即可工作。
 > 0.5.3 另加了一层防御：`deriveMessages()` 若哪天被改成异步，或 `Session` 上的历史读取接口被改名（0.1.7 起 `snapshotEvents` / `eventAt` / `ownEvents` 已标记弃用），插件会在**日志里报警**，而不是像以前那样静默地不再注入记忆。0.1.6 上的行为与 0.5.2 完全一致。
 
