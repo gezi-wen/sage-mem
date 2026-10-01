@@ -37,6 +37,10 @@ sage-mem 换一条路：**每条记忆就是一个 Markdown 文件**。用编辑
 - **类型与标签筛选**（v0.6）——文件列表顶部一排 chip，按四类 + 自定义标签筛；标签从全库自动聚合计数，与搜索框是 AND 关系
 - **记忆星图**（v0.4 起，v0.6 重做）——把记忆画成星空：按类型着色、按体积分级、按新鲜度分亮度，还支持时间线与「诞生回放」。渲染是**按需重绘**，画面静止时不发起任何绘制
 
+![记忆星图](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/starmap.png)
+
+*记忆星图：每颗星是一条记忆 —— 颜色对应类型、大小对应体积、亮度对应新鲜度，底部是四类计数与库总体积。全部 94 条记忆的文件名不会出现在图里，星图只画关系与分布。*
+
 ## 快速开始
 
 需要 DSH `0.1.2-rc.1` 或更高（见[兼容性](#dsh-兼容性)），Node.js `>= 18`。
@@ -205,7 +209,7 @@ sage-mem 只做三件事，全都在你本机：
 
 ## DSH 兼容性
 
-sage-mem 是纯 DSH 插件，在 `package.json` 的 `dsh.compatibility.dshReleases` 里逐版本声明兼容状态：
+sage-mem 是纯 DSH 插件，用 `package.json` 的 **`engines.dsh`** 声明宿主要求：`>=0.1.2-rc.1` —— **单边开区间、不设上界**，所以任何未来的 DSH 版本都不会被这道声明挡住。逐版本核对记录如下：
 
 | DSH 版本 | 状态 |
 | --- | --- |
@@ -218,10 +222,11 @@ sage-mem 是纯 DSH 插件，在 `package.json` 的 `dsh.compatibility.dshReleas
 | 0.1.7-rc.1 | compatible |
 | 0.1.7-rc.2 | compatible |
 | 0.2.0-rc.1 | compatible |
+| 0.2.0-rc.2 | compatible |
 
 两点值得说明：
 
-- **同一份构建同时覆盖 `0.1.x` 与 `0.2.x` 两条线。** 自 DSH `0.1.6-alpha.2` 起，TypertCodec 契约从「读 `schema`」改为「读 `create()` 工厂」——仍只写 `schema:` 的插件会在注册阶段直接抛错，把整棵插件树拖垮。自 0.5.2 起每个 codec 同时带 `schema` 与 `create: () => schema`，因此两个时代的 DSH 都能加载。peer 范围也随之放宽为 `^0.1.2-rc.1 || ^0.2.0-rc.1`（已逐字节核对 `dsh-typert-protocol` 与 `dsh-client-locale` 在 `0.1.7-rc.2 → 0.2.0-rc.1` 之间导出符号零增删）
+- **同一份构建同时覆盖 `0.1.x` 与 `0.2.x` 两条线。** 自 DSH `0.1.6-alpha.2` 起，TypertCodec 契约从「读 `schema`」改为「读 `create()` 工厂」——仍只写 `schema:` 的插件会在注册阶段直接抛错，把整棵插件树拖垮。自 0.5.2 起每个 codec 同时带 `schema` 与 `create: () => schema`，因此两个时代的 DSH 都能加载。peer 范围自 0.6.4 起写 `>=0.1.2-rc.1` —— 去掉上界，避免以后某个大版本被这道声明误挡（已逐字节核对 `dsh-typert-protocol` 与 `dsh-client-locale` 在 `0.1.7-rc.2 → 0.2.0-rc.1` 之间导出符号零增删）
 - **0.5.3 起带一层防御留痕。** `deriveMessages()`（仍是同步）、`system-prompt/assemble` 事件、`context.agent.session` 这条链在升级中都没变；但如果哪天 DSH 把它们改成异步或改了名，插件会在**日志里报警**，而不是像以前那样静默地不再注入记忆
 
 ## 卸载

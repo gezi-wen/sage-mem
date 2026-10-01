@@ -1,7 +1,7 @@
 {
   "name": "sage-mem",
   "description": "File-based memory plugin for DeepSeek Harness (DSH) — cross-session memory in transparent markdown files, with a memory star-map view, type/tag filtering, and an optional dream pass that consolidates memories on demand or on a schedule",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -17,7 +17,8 @@
   ],
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=18"
+    "node": ">=18",
+    "dsh": ">=0.1.2-rc.1"
   },
   "dsh": {
     "bundle": {
@@ -40,7 +41,8 @@
         "0.1.6-alpha.2": "compatible",
         "0.1.7-rc.1": "compatible",
         "0.1.7-rc.2": "compatible",
-        "0.2.0-rc.1": "compatible"
+        "0.2.0-rc.1": "compatible",
+        "0.2.0-rc.2": "compatible"
       }
     }
   },
@@ -52,8 +54,8 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-typert-protocol": "^0.1.2-rc.1 || ^0.2.0-rc.1",
-    "@deepseek-ai/dsh-client-locale": "^0.1.2-rc.1 || ^0.2.0-rc.1",
+    "@deepseek-ai/dsh-typert-protocol": ">=0.1.2-rc.1",
+    "@deepseek-ai/dsh-client-locale": ">=0.1.2-rc.1",
     "react": "^18.0.0"
   },
   "repository": {
