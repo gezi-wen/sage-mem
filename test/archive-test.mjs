@@ -304,6 +304,83 @@ group('9. reason 含换行：显式折叠成一行（不截断、不注入键、
     'archived_at 与 reason 共用同一个 yamlScalar（换行同样折叠）')
 }
 
+// ── 10. 归档文件的读 / 写 remote（readArchived / writeArchived）──
+group('10. 归档文件的读 / 写：改正文但留痕不许丢')
+{
+  const NAME = 'project_beta.md' // 第 6 节归档的那份（留痕理由「先归档乙」）
+  const before = await gw.readArchived(NAME)
+  ok(before.name === NAME && before.content.includes('# project_beta.md'), 'readArchived 能读到归档文件全文')
+  ok(/^archived_at: /m.test(before.content) && /^archived_reason: /m.test(before.content), '读到的内容里带着归档留痕')
+  const metaBefore = scan.readArchivedMeta(before.content)
+
+  // ① 整份回写（面板把 readArchived 的内容改完正文再写回来）
+  const edited = before.content.replace('档案测试用乙', '档案测试用乙（改过）')
+  const w = await gw.writeArchived(NAME, edited)
+  ok(w.ok === true && w.file === NAME, 'writeArchived 返回 { ok: true, file }', JSON.stringify(w))
+  const after = await gw.readArchived(NAME)
+  ok(after.content.includes('改过') && after.content !== before.content, '再 readArchived 拿到的是新正文')
+  const metaAfter = scan.readArchivedMeta(after.content)
+  ok(metaAfter.archivedAt === metaBefore.archivedAt && metaAfter.archivedReason === metaBefore.archivedReason,
+    '**archived_at / archived_reason 一条没被抹掉**', JSON.stringify({ before: metaBefore, after: metaAfter }))
+  ok((after.content.match(/^archived_reason:/gm) || []).length === 1, '留痕没有被重复写成两份')
+  const listed = (await gw.listArchived()).files.find((f) => f.file === NAME)
+  ok(listed && listed.size === after.content.length, 'listArchived 的 size 随正文更新', `${listed?.size} vs ${after.content.length}`)
+  ok(listed?.archivedReason === metaBefore.archivedReason, 'listArchived 的留痕仍是原来那条')
+  const disk = readFileSync(archivedPath(NAME), 'utf8')
+  ok(/^archived_at: /m.test(disk) && /^archived_reason: /m.test(disk), '盘上那份文件本身也留着两行留痕')
+
+  // ② 最狠的一种：调用方交回一份**连留痕都没有**的内容（「重建 frontmatter」式编辑器）
+  const bare = '---\nname: project_beta\ntype: project\ndescription: 档案测试用乙\n---\n\n# project_beta\n\n只改了正文\n'
+  const w2 = await gw.writeArchived(NAME, bare)
+  ok(w2.ok === true, 'writeArchived 接受不含留痕的内容', JSON.stringify(w2))
+  const after2 = await gw.readArchived(NAME)
+  ok(/^archived_at: /m.test(after2.content) && /^archived_reason: /m.test(after2.content),
+    '留痕被按盘上原值补回（改正文抹不掉归档凭据）')
+  ok(scan.readArchivedMeta(after2.content).archivedReason === metaBefore.archivedReason, '补回的正是原来那条理由')
+
+  // ③ 拒绝矩阵：不许静默成功
+  // 非法名字这一路与 writeFile 一致是**抛错**（不是 {ok:false}），其余闸门回 {ok:false}。
+  const throws = async (label, fn, needle = '') => {
+    let threw = null
+    let res = null
+    try { res = await fn() } catch (e) { threw = e }
+    ok(threw !== null && String(threw.message).includes(needle),
+      label, threw ? `抛错信息不对：${threw.message}` : `没抛，返回 ${JSON.stringify(res)}`)
+  }
+  const contentBefore = after2.content
+  await rejects('writeArchived 归档区没有的名字 → {ok:false}', () => gw.writeArchived('nope.md', 'x'), 'not found')
+  await throws('writeArchived 带路径成分 → 抛错', () => gw.writeArchived('../evil.md', 'x'), 'invalid file name')
+  await throws('writeArchived 非 .md → 抛错', () => gw.writeArchived('notes.txt', 'x'), 'invalid file name')
+  await rejects('writeArchived 保留名 → {ok:false}', () => gw.writeArchived('memory.md', 'x'), 'reserved')
+  await rejects('writeArchived 内容不是字符串 → {ok:false}', () => gw.writeArchived(NAME, 123), 'must be a string')
+  await rejects('writeArchived 超体积 → {ok:false}', () => gw.writeArchived(NAME, 'x'.repeat(512 * 1024 + 1)), 'too large')
+  ok((await gw.readArchived(NAME)).content === contentBefore, '被拒绝的那几次一个字节都没写进去')
+
+  let readThrew = null
+  try { await gw.readArchived('nope.md') } catch (e) { readThrew = e }
+  ok(readThrew !== null && /not found/.test(readThrew.message), 'readArchived 找不到 → 抛错（不静默返回空串）', String(readThrew?.message))
+  let readInvalid = null
+  try { await gw.readArchived('../evil.md') } catch (e) { readInvalid = e }
+  ok(readInvalid !== null && /invalid file name/.test(readInvalid.message), 'readArchived 带路径成分 → 抛错', String(readInvalid?.message))
+
+  // ④ 「归档 = 不删」：这两条 remote 之外不许有删除/出档的入口
+  const methods = Object.getOwnPropertyNames(mod.MemoryGateway.prototype).filter((n) => n !== 'constructor' && !n.startsWith('@')).sort()
+  ok(JSON.stringify(methods) === JSON.stringify(
+    ['archive', 'deleteFile', 'listArchived', 'listFiles', 'readArchived', 'readFile', 'restore', 'writeArchived', 'writeFile']),
+    'memory 面恰好 9 个方法，没有 deleteArchived 之类的新入口', methods.join(','))
+
+  // ⑤ 真实输出过一遍 manifest schema
+  const { TYPERT } = await import(new URL('typert.host.js', LIB).href)
+  const schemaOf = (id) => TYPERT.invocations.find((i) => i.id === id)?.result?.schema
+  const shape = (label, id, value) => {
+    const r = schemaOf(id).safeParse(value)
+    ok(r.success, label, r.success ? '' : JSON.stringify((r.error?.issues ?? []).slice(0, 3)))
+  }
+  shape('readArchived 的真实输出符合 #ArchivedFileContent', 'sage-mem#memory/readArchived', after2)
+  shape('writeArchived 成功分支符合 #ArchivedWriteResult', 'sage-mem#memory/writeArchived', w2)
+  shape('writeArchived 失败分支符合 #ArchivedWriteResult', 'sage-mem#memory/writeArchived', await gw.writeArchived('nope.md', 'x'))
+}
+
 rmSync(sandbox, { recursive: true, force: true })
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
