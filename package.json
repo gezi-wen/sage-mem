@@ -15,6 +15,9 @@
     "cordis.patch.yml",
     "NOTICE"
   ],
+  "scripts": {
+    "test": "node test/run.mjs"
+  },
   "license": "Apache-2.0",
   "engines": {
     "node": ">=18",
