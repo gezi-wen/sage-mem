@@ -41,6 +41,34 @@ sage-mem 换一条路：**每条记忆就是一个 Markdown 文件**。用编辑
 
 *记忆星图：每颗星是一条记忆 —— 颜色对应类型、大小对应体积、亮度对应新鲜度，底部是四类计数与库总体积。画布上只画关系与分布；悬停或点开某颗星时才会显示那一条的文件名。*
 
+## 界面预览
+
+下面每张图都是**从仓库里的界面代码渲染出来的**（同一份 CSS、同一棵组件树，数据是演示用的假数据，不是真实记忆目录）。
+
+![文件列表：每条记忆一个 Markdown 文件，灰底的是已归档](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/files-list.png)
+
+*文件列表 —— 头部带常显「体检 N 个问题」与「待重启生效」，不用点开就知道该不该处理；灰底条目是已归档，随时可以恢复。*
+
+![工具抽屉：体检 / 归档候选 / 保留名编辑，关着时零占位](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/tools-drawer.png)
+
+*工具抽屉 —— 关着时只占一个按钮，展开后三项各带状态：体检 4 个问题 / 归档候选 2 条 / 保留名 3 个。*
+
+![体检：硬问题按类报红分节，「指向已归档」只作提示](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/audit.png)
+
+*体检 —— 索引悬空、漏索引、断链这类硬问题按类报红；「指向已归档」只作提示、不计入问题，也不提供一键修补按钮（改哪条由你决定）。*
+
+![归档候选：每条写清「为什么建议归档」，确认后才执行](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/archive-candidates.png)
+
+*归档候选 —— 每条都写清「为什么建议归档」（闲置天数 vs 该类型阈值），逐条或全选后确认才动文件；归档是把文件移进 `archive/`，不删除。*
+
+![记忆星图：暗星是已归档的记忆，可查看归档时间与理由](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/starmap-archive.png)
+
+*记忆星图 —— 暗星是已归档的记忆；点开看归档时间、理由与「恢复到活动记忆」。*
+
+![自动做梦 · 设置：运行 / 设置 / 记录 二级分组，参数两列并写清「当前 → 重启后」](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/autodream-settings.png)
+
+*自动做梦 · 设置 —— 运行 / 设置 / 记录 二级分组；五个注入参数两列排开，并写清「当前生效」与「重启后」，不会让人误以为改完立刻生效。*
+
 ## 快速开始
 
 需要 DSH `0.1.2-rc.1` 或更高（见[兼容性](#dsh-兼容性)），Node.js `>= 18`。
