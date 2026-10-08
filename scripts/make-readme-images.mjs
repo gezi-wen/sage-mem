@@ -238,9 +238,20 @@ if (has('--html-only')) {
 const rows = []
 for (const p of published) {
   const shot = join(tmp, p.id + '.png')
+  // 这些参数都为了**可复现**，不碰任何渲染参数：
+  //  - user-data-dir 每跑一次都是全新的空 profile → 冷启动与热启动走同一条路，不会"第一次不一样"；
+  //  - run-all-compositor-stages-before-draw + 充裕的虚拟时间 → 抓到的是提交之后的那一帧；
+  //  - 动画相位已在 harness 侧钉死（见 test/client-render-test.mjs 的 FIXED_NOW）。
+  // 试过再加 --disable-lcd-text / --force-color-profile=srgb：确实更"机器无关"，但会把**文字
+  // 栅格化**也改掉 —— 那 6 张 DOM 图本来就已经 3 连跑全稳定、且与已提交版本逐像素相同，
+  // 为了不白白换掉它们的像素，这两条不加。
+  const profile = join(tmp, 'profile-' + p.id)
+  mkdirSync(profile, { recursive: true })
   const s = spawnSync(browser, [
     '--headless=new', '--disable-gpu', '--hide-scrollbars', '--force-device-scale-factor=1',
-    '--virtual-time-budget=3000', `--window-size=${WIDTH},${WINDOW_HEIGHT}`,
+    '--run-all-compositor-stages-before-draw',
+    '--virtual-time-budget=5000', `--user-data-dir=${profile}`,
+    `--window-size=${WIDTH},${WINDOW_HEIGHT}`,
     `--screenshot=${shot}`, 'file:///' + p.readmeFile.split('\\').join('/'),
   ], { encoding: 'utf8' })
   if (!existsSync(shot)) {

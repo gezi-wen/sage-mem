@@ -31,6 +31,22 @@ const ok = (cond, name, extra = '') => {
 }
 const group = (t) => console.log('\n── ' + t + ' ──')
 
+/**
+ * 固定的「现在」。
+ *
+ * 渲染器把 `(Date.now() - t0) / 1000` 当**动画相位**用：活星的辉光 alpha 与脉冲环半径
+ * 都带 `Math.sin(phase …)` —— 也就是说同一份数据、同一个界面，**墙钟不同画出来的像素就不同**。
+ * 出图要求逐字节可复现，所以在 harness 这一侧把时间钉死：相位恒为 0，渲染参数一个没动
+ * （归档星 alpha 0.52、星核颜色/半径都照旧），只是让「哪一帧」这件事不再随机。
+ * 假数据的时间基准也用它，freshness 的算法与实测值完全不变。
+ */
+const FIXED_NOW = Date.UTC(2026, 9, 8, 12, 0, 0)
+/** 冻结的 Date：沙箱里 `Date.now()` 恒为 FIXED_NOW，`new Date()` 也落在同一时刻。 */
+const FrozenDate = class extends Date {
+  constructor(...a) { super(...(a.length ? a : [FIXED_NOW])) }
+  static now() { return FIXED_NOW }
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // 迷你 react：hooks 按调用序存，effect 带依赖比对；setState 让调和循环再跑一轮。
 // ════════════════════════════════════════════════════════════════════════════
@@ -108,7 +124,7 @@ function makeReact(nodeFactory = makeFakeNode) {
   const rafQueue = []
   const flushRaf = () => {
     const q = rafQueue.splice(0, rafQueue.length)
-    for (const fn of q) fn(Date.now())
+    for (const fn of q) fn(FIXED_NOW)
   }
 
   /** 反复「渲染 → 跑 effect → 让 promise 落地」，直到没有新的 setState。 */
@@ -350,7 +366,7 @@ function makeStarmapRemote(mem, meta) {
       title: m.title || f.file,
       desc: m.desc || '',
       bytes: f.size || 0,
-      mtimeMs: m.mtimeMs || Date.now(),
+      mtimeMs: m.mtimeMs || FIXED_NOW,
       archived: archived === true,
     }
     // 归档留痕只对归档星出现 —— 与宿主 listStars 的形状一致
@@ -419,7 +435,7 @@ async function loadClient(rt, remotes) {
     document: fakeDoc,
     console: { log() {}, warn() {}, error() {} },
     setTimeout, clearTimeout, setInterval, clearInterval,
-    Symbol, Object, Array, JSON, Math, Date, Map, Set, Promise, Error,
+    Symbol, Object, Array, JSON, Math, Date: FrozenDate, Map, Set, Promise, Error,
     String, Number, Boolean, RegExp, isNaN, parseInt, parseFloat,
   }
   sandbox.globalThis = sandbox
@@ -606,11 +622,11 @@ const LIMITS_FIXTURE = {
   reservedExtra: ['project_notes.md'],
 }
 
-const STAR_META = {  'user_alpha.md': { kind: 'user', title: '甲', desc: '用户偏好', mtimeMs: Date.now() - 86400000 },
-  'project_beta.md': { kind: 'project', title: '乙', desc: '项目', mtimeMs: Date.now() - 3 * 86400000 },
-  'reference_gamma.md': { kind: 'reference', title: '丙', desc: '资料', mtimeMs: Date.now() - 5 * 86400000 },
-  'feedback_old.md': { kind: 'feedback', title: '丁', desc: '旧反馈', mtimeMs: Date.now() - 30 * 86400000 },
-  'project_dead.md': { kind: 'project', title: '戊', desc: '停掉的项目', mtimeMs: Date.now() - 40 * 86400000 },
+const STAR_META = {  'user_alpha.md': { kind: 'user', title: '甲', desc: '用户偏好', mtimeMs: FIXED_NOW - 86400000 },
+  'project_beta.md': { kind: 'project', title: '乙', desc: '项目', mtimeMs: FIXED_NOW - 3 * 86400000 },
+  'reference_gamma.md': { kind: 'reference', title: '丙', desc: '资料', mtimeMs: FIXED_NOW - 5 * 86400000 },
+  'feedback_old.md': { kind: 'feedback', title: '丁', desc: '旧反馈', mtimeMs: FIXED_NOW - 30 * 86400000 },
+  'project_dead.md': { kind: 'project', title: '戊', desc: '停掉的项目', mtimeMs: FIXED_NOW - 40 * 86400000 },
 }
 
 /**
@@ -629,7 +645,7 @@ const STAR_DEMO = (() => {
   let i = 0
   const mk = (kind, k, isArch) => {
     const file = 'demo_' + kind + '_' + String(k).padStart(2, '0') + '.md'
-    const it = { file, size: BYTES[i % BYTES.length], mtimeMs: Date.now() - i * 86400000 }
+    const it = { file, size: BYTES[i % BYTES.length], mtimeMs: FIXED_NOW - i * 86400000 }
     if (isArch) { it.archivedAt = '2026-10-01 09:30'; it.archivedReason = '演示：结论已被新条目取代' }
     i++
     meta[file] = { kind, title: '演示 ' + k, desc: '演示条目', mtimeMs: it.mtimeMs }
