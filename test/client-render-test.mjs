@@ -613,15 +613,85 @@ const STAR_META = {  'user_alpha.md': { kind: 'user', title: '甲', desc: '用�
   'project_dead.md': { kind: 'project', title: '戊', desc: '停掉的项目', mtimeMs: Date.now() - 40 * 86400000 },
 }
 
+/**
+ * 星图 demo 用的假数据（**只有静态稿用它**，不参与任何断言）。
+ *
+ * 为什么单独一份：星位是渲染器按数据算的，星星太少时右侧详情面板会把它们全遮住 ——
+ * 9 活 + 4 归档时左侧可见区有 3 颗亮星（亮像素约 115），星野才撑得起来。
+ * 位置一个都没手挑，全是渲染器的输出。
+ */
+const STAR_DEMO = (() => {
+  const KINDS = ['user', 'project', 'reference', 'feedback']
+  const BYTES = [2600, 3400, 1800, 6200, 4200, 3000, 5100, 2400, 4600, 2900, 5800, 3300, 4400]
+  const active = []
+  const archived = []
+  const meta = {}
+  let i = 0
+  const mk = (kind, k, isArch) => {
+    const file = 'demo_' + kind + '_' + String(k).padStart(2, '0') + '.md'
+    const it = { file, size: BYTES[i % BYTES.length], mtimeMs: Date.now() - i * 86400000 }
+    if (isArch) { it.archivedAt = '2026-10-01 09:30'; it.archivedReason = '演示：结论已被新条目取代' }
+    i++
+    meta[file] = { kind, title: '演示 ' + k, desc: '演示条目', mtimeMs: it.mtimeMs }
+    return it
+  }
+  for (let k = 0; k < 9; k++) active.push(mk(KINDS[k % KINDS.length], k, false))
+  for (let k = 0; k < 4; k++) archived.push(mk(KINDS[(k + 1) % KINDS.length], k, true))
+  return { active, archived, meta }
+})()
+
+/**
+ * 把**真渲染器**最后一帧画过的星抓出来（同心的多条 arc 取最小半径那条为核心），
+ * 交给预览页回放 —— 星位/半径/颜色都是产品算的，不是手挑的。
+ */
+function starReplay(rt) {
+  rt.flushRaf()
+  const node = [...rt.nodeCache.values()].find((nd) => nd.ctx2d)
+  const arcs = node ? node.ctx2d.arcs : []
+  const last = arcs.reduce((m, a) => Math.max(m, a.render), 0)
+  const byCenter = new Map()
+  for (const a of arcs) {
+    if (a.render !== last || !/^#|^rgb\(/.test(String(a.fill)) || !(a.r >= 1)) continue
+    const k = Math.round(a.x) + ',' + Math.round(a.y)
+    if (!byCenter.has(k) || a.r < byCenter.get(k).r) byCenter.set(k, a)
+  }
+  return [...byCenter.values()].map((a) => ({
+    x: Math.round(a.x), y: Math.round(a.y), r: Number(a.r.toFixed(2)),
+    f: String(a.fill), a: Number(Number(a.alpha).toFixed(2)),
+  }))
+}
+
+/** 把回放数据塞进那一屏的 HTML（只有星图两屏有）。 */
+function replayTag(replay) {
+  return '<script>window.__SMAP_REPLAY__ = ' + JSON.stringify(replay) + ';</script>'
+}
+
+/**
+ * 图**里面**那行短说明（README 里图下的长说明另有一份，在 manifest 的 caption 里）。
+ * 图上放短句、README 放解释，两边不重复；这也让「重出」与已提交的图逐像素对得上。
+ */
+const README_HEADLINE = {
+  'files-list': '文件列表：每条记忆是一个 Markdown 文件；灰底的那几条是已归档',
+  'tools-drawer': '工具抽屉：体检 / 归档候选 / 保留名编辑 —— 关着时零占位，开了各带状态',
+  audit: '体检：硬问题按类报红分节；「指向已归档」只作提示，不计入问题',
+  'archive-candidates': '归档候选：每条都写清「为什么建议归档」，确认后才动文件',
+  'starmap-archive': '记忆星图：暗星是已归档的记忆，点开看归档时间、理由与恢复入口',
+  'autodream-settings': '自动做梦 · 设置：运行 / 设置 / 记录 二级分组，参数两列并写清「当前 → 重启后」',
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // 静态预览（--preview）：把真渲染出来的树写成 HTML，配上面板与星图自己的 CSS
 // ════════════════════════════════════════════════════════════════════════════
 async function emitPreview() {
   const outDir = process.env.SAGE_MEM_PREVIEW_DIR || join(tmpdir(), 'sage-mem-preview')
   mkdirSync(outDir, { recursive: true })
-  const out = join(outDir, 'client-preview.html')
+  // ── 屏定义（**唯一一份**）────────────────────────────────────────────────
+  // --preview 与 scripts/make-readme-images.mjs 共用这一份：出图脚本只认 manifest 里的
+  // id，不按下标取图 —— 「插一屏导致 4 张静默换内容」那个坑就死在这一点上。
+  //   out     = 发布到仓库的路径（README / 市场用的那 7 张）；null = 只出现在开发预览里
+  //   caption = README 图下那一行说明
   const secs = []
-  let panelOnly = null
+  const S = (id, out, caption, title, body) => secs.push({ id, out: out || null, caption: caption || '', title, body })
 
   // ① 文件列表 · 常态（抽屉关着）：看头部带徽标够不够显眼 + 列表起点
   {
@@ -631,7 +701,7 @@ async function emitPreview() {
     mem.st.settings = LIMITS_FIXTURE
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
     const tree = await rt.settle(C, {})
-    secs.push(['① 文件列表 · 常态（工具抽屉关着，头部带常显「体检 4 个问题」）', serHtml(tree)])
+    S('files-list', 'docs/images/files-list.png', '文件列表 —— 头部带常显「体检 N 个问题」与「待重启生效」，不用点开就知道该不该处理；灰底条目是已归档，随时可以恢复。', '① 文件列表 · 常态（工具抽屉关着，头部带常显「体检 4 个问题」）', serHtml(tree))
   }
   // ② 文件列表 · 抽屉打开（三项各带状态）+ 体检面板（定高）
   {
@@ -642,7 +712,7 @@ async function emitPreview() {
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
     let tree = await rt.settle(C, {})
     tree = await openDrawer(rt, C, tree)
-    secs.push(['② 文件列表 · 工具抽屉打开（每项带状态；关着时零占位）', serHtml(tree)])
+    S('tools-drawer', 'docs/images/tools-drawer.png', '工具抽屉 —— 关着时只占一个按钮，展开后三项各带状态：体检 4 个问题 / 归档候选 2 条 / 保留名 3 个。', '② 文件列表 · 工具抽屉打开（每项带状态；关着时零占位）', serHtml(tree))
   }
   // ③ 文件列表 · 抽屉里开体检（面板定高 + 内部滚动，列表还在首屏）
   {
@@ -653,7 +723,22 @@ async function emitPreview() {
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
     let tree = await rt.settle(C, {})
     tree = await openTool(rt, C, tree, '体检')
-    secs.push(['③ 文件列表 · 体检面板（定高 320px、内部滚动；硬问题红、提示灰）', serHtml(tree)])
+    S('audit', 'docs/images/audit.png', '体检 —— 索引悬空、漏索引、断链这类硬问题按类报红；「指向已归档」只作提示、不计入问题，也不提供一键修补按钮（改哪条由你决定）。', '③ 文件列表 · 体检面板（定高 320px、内部滚动；硬问题红、提示灰）', serHtml(tree))
+  }
+  // ③b 文件列表 · 归档候选（勾一条 → 执行归档；每条带「为什么建议归档」）
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    mem.st.audit = AUDIT_WITH_PROBLEMS
+    mem.st.settings = LIMITS_FIXTURE
+    mem.st.cand = CANDIDATES
+    const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
+    let tree = await rt.settle(C, {})
+    tree = await openTool(rt, C, tree, '归档候选')
+    const boxes = all(tree, (n) => n.type === 'input' && n.props.type === 'checkbox')
+    if (boxes[0]) boxes[0].props.onChange()
+    tree = await rt.settle(C, {})
+    S('archive-candidates', 'docs/images/archive-candidates.png', '归档候选 —— 每条都写清「为什么建议归档」（闲置天数 vs 该类型阈值），逐条或全选后确认才动文件；归档是把文件移进 archive/，不删除。', '③b 文件列表 · 归档候选（每条写清为什么建议归档）', serHtml(tree))
   }
   // ④ 自动做梦 · 运行段
   {
@@ -665,7 +750,7 @@ async function emitPreview() {
     let tree = await rt.settle(C, {})
     click(btn(tree, '自动做梦')[0])
     tree = await rt.settle(C, {})
-    secs.push(['④ 自动做梦 · 运行（启用 / 触发 / 改动方式 / 输入源 / 模型 / 立即整理）', serHtml(all(tree, byClass('smem-autodream'))[0])])
+    S('ad-run', null, '', '④ 自动做梦 · 运行（启用 / 触发 / 改动方式 / 输入源 / 模型 / 立即整理）', serHtml(all(tree, byClass('smem-autodream'))[0]))
   }
   // ⑤ 自动做梦 · 设置段（自动归档 + 两列注入参数 + 保留名名单）
   {
@@ -679,7 +764,7 @@ async function emitPreview() {
     click(btn(tree, '自动做梦')[0])
     tree = await rt.settle(C, {})
     tree = await gotoSeg(rt, C, tree, '设置')
-    secs.push(['⑤ 自动做梦 · 设置（自动归档三档 + 两列参数「当前 → 重启后」+ 保留名名单）', serHtml(all(tree, byClass('smem-autodream'))[0])])
+    S('autodream-settings', 'docs/images/autodream-settings.png', '自动做梦 · 设置 —— 运行 / 设置 / 记录 二级分组；五个注入参数两列排开，并写清「当前生效」与「重启后」，不会让人误以为改完立刻生效。', '⑤ 自动做梦 · 设置（自动归档三档 + 两列参数「当前 → 重启后」+ 保留名名单）', serHtml(all(tree, byClass('smem-autodream'))[0]))
   }
   // ⑥ 自动做梦 · 记录段
   {
@@ -691,19 +776,34 @@ async function emitPreview() {
     click(btn(tree, '自动做梦')[0])
     tree = await rt.settle(C, {})
     tree = await gotoSeg(rt, C, tree, '记录')
-    secs.push(['⑥ 自动做梦 · 记录（回滚点 / 整理记录 / 历史报告）', serHtml(all(tree, byClass('smem-autodream'))[0])])
+    S('ad-records', null, '', '⑥ 自动做梦 · 记录（回滚点 / 整理记录 / 历史报告）', serHtml(all(tree, byClass('smem-autodream'))[0]))
   }
-  // ⑦ 记忆星图：卡片里那行重复标题已去掉，头部带接管「我在哪」
-  {
+  // ⑦ / ⑨ 记忆星图：星空版（docs/starmap.png）与「点中暗星看详情」版（README 展示图）。
+  //    画布不手挑坐标 —— 把**真渲染器**最后一帧画过的星核抓出来回放（见 starReplay）。
+  for (const [id, out, caption, clickDim] of [
+    ['starmap-sky', 'docs/starmap.png', '', false],
+    ['starmap-archive', 'docs/images/starmap-archive.png', '记忆星图 —— 暗星是已归档的记忆；点开看归档时间、理由与「恢复到活动记忆」。', true],
+  ]) {
     const rt = makeReact()
-    const mem = makeMemoryRemote([ACTIVE[0], ACTIVE[1]], [ARCHIVED[0]], RAW_ARCHIVED)
-    mem.st.settings = LIMITS_FIXTURE
-    const smap = makeStarmapRemote(mem, STAR_META)
+    const mem = makeMemoryRemote(STAR_DEMO.active, STAR_DEMO.archived)
+    const smap = makeStarmapRemote(mem, STAR_DEMO.meta)
     const { comp: C } = await loadClient(rt, { memory: mem, starmap: smap })
     let tree = await rt.settle(C, {})
     click(btn(tree, '记忆星图')[0])
     tree = await rt.settle(C, {})
-    secs.push(['⑦ 记忆星图（卡片里去掉了与头部带重复的标题，只留控件）', serHtml(tree)])
+    const replay = starReplay(rt)
+    if (clickDim) {
+      // 点圆心外 14px：走的是放大热区那条路径（暗星画出来只有 ~2px）
+      const dim = replay.find((a) => a.f[0] !== '#')
+      const cv = all(tree, byClass('smap-canvas'))[0]
+      if (!dim || !cv || typeof cv.props.onClick !== 'function') throw new Error('星图：取不到暗星或画布 onClick')
+      cv.props.onClick({
+        currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 940, height: 520 }) },
+        clientX: dim.x + 14, clientY: dim.y,
+      })
+      tree = await rt.settle(C, {})
+    }
+    S(id, out, caption, (id === 'starmap-sky' ? '⑦ 记忆星图（星空 + 显示档案馆开）' : '⑨ 记忆星图（点中暗星看详情）'), serHtml(tree) + replayTag(replay))
   }
   // ⑧ 保留名「将新建」（走抽屉的回归）
   {
@@ -715,7 +815,7 @@ async function emitPreview() {
     tree = await openTool(rt, C, tree, '保留名编辑')
     click(btn(tree, 'session-log.md')[0])
     tree = await rt.settle(C, {})
-    secs.push(['⑧ 保留名还不存在时：明确标注「保存会新建它」（原样编辑器不变）', serHtml(tree)])
+    S('raw-new', null, '', '⑧ 保留名还不存在时：明确标注「保存会新建它」（原样编辑器不变）', serHtml(tree))
   }
 
   const head = `<!doctype html>
@@ -729,13 +829,18 @@ h1{font-size:17px;margin:0 0 4px;}
 .note{font-size:12px;color:#6b7280;margin-bottom:10px;}
 h2{font-size:13.5px;margin:26px 0 8px;color:#374151;}
 .frame{border:1px solid #e3e6ec;border-radius:12px;background:#fff;padding:16px 18px;}
+/* README 展示图用：一句说明 + 「界面预览 · 演示数据」标注，随图一起被截进去。 */
+.caption{font-size:15px;font-weight:600;color:#1f2430;margin:0 0 4px;}
+.watermark{font-size:11.5px;color:#9aa3af;margin:0 0 10px;}
 </style>
 <style>${capturedCss.join('\n')}</style>
 </head><body>`
 
   const mock = `<script>
-// 星图 canvas 是 mock：按渲染器同一套数字画一遍（活星 = 辉光 + 核心 + 脉冲环；归档星 = 一个暗点，无辉光）
+// 星图 canvas：把**真渲染器**画过的星核原样回放（位置/半径/颜色都来自渲染器），
+// 底色与星尘只是近似 —— 这样静态稿上的星野就是产品算出来的那一张。
 function hx(h, a){ var n = parseInt(h.slice(1), 16); return 'rgba(' + ((n>>16)&255) + ',' + ((n>>8)&255) + ',' + (n&255) + ',' + a + ')'; }
+var REPLAY = (window.__SMAP_REPLAY__ || []);
 document.querySelectorAll('canvas.smap-canvas').forEach(function(cv){
   var c = cv.getContext('2d'); if (!c) return;
   var W = 940, H = 520; cv.width = W*2; cv.height = H*2; c.setTransform(2,0,0,2,0,0);
@@ -743,43 +848,48 @@ document.querySelectorAll('canvas.smap-canvas').forEach(function(cv){
   c.fillStyle = bg; c.fillRect(0,0,W,H);
   for (var i = 0; i < 150; i++){ c.globalAlpha = 0.08 + 0.22*((i*37 % 100)/100); c.fillStyle = '#9fb3dd'; c.fillRect((i*97)%W, (i*53)%H, 1, 1); }
   c.globalAlpha = 1;
-  function live(x,y,col,r){
-    c.strokeStyle = hx(col,0.4); c.lineWidth = 1; c.beginPath(); c.arc(x,y,r+5,0,6.283); c.stroke();
-    var g = c.createRadialGradient(x,y,0,x,y,r*4.2); g.addColorStop(0, hx(col,0.5)); g.addColorStop(1, hx(col,0));
-    c.fillStyle = g; c.beginPath(); c.arc(x,y,r*4.2,0,6.283); c.fill();
-    c.globalAlpha = 0.95; c.fillStyle = col; c.beginPath(); c.arc(x,y,r,0,6.283); c.fill(); c.globalAlpha = 1;
-  }
-  function dim(x,y,col,r){
-    var g = c.createRadialGradient(x,y,0,x,y,r*3.4); g.addColorStop(0,'rgba(142,154,166,0.26)'); g.addColorStop(1,'rgba(142,154,166,0)');
-    c.fillStyle = g; c.beginPath(); c.arc(x,y,r*3.4,0,6.283); c.fill();
-    c.globalAlpha = 0.52; c.fillStyle = col; c.beginPath(); c.arc(x,y,Math.max(1.2,r*0.7),0,6.283); c.fill(); c.globalAlpha = 1;
-  }
-  live(300,180,'#e0c07a',3.2); live(620,330,'#ac9edc',3.0);
-  dim(470,110,'#8e9aa6',2.1);
+  REPLAY.forEach(function(p){
+    var g = c.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*4.2);
+    g.addColorStop(0, hx(p.f, 0.45)); g.addColorStop(1, hx(p.f, 0));
+    c.fillStyle = g; c.beginPath(); c.arc(p.x,p.y,p.r*4.2,0,6.283); c.fill();
+    c.globalAlpha = p.a; c.fillStyle = p.f; c.beginPath(); c.arc(p.x,p.y,p.r,0,6.283); c.fill(); c.globalAlpha = 1;
+  });
 });
 </script>`
 
-  const html = head + `
-<h1>sage-mem 档案馆界面 · 静态预览</h1>
-<div class="note">假数据 · 只含本阶段新增的两块（文件列表的归档/恢复、星图的暗星）。看的是「按钮找不找得到、信息层级清不清楚」，不是最终视觉稿。</div>
-${secs.map(([t, h]) => '<h2>' + esc(t) + '</h2><div class="frame">' + h + '</div>').join('\n')}
-` + mock + `
-</body></html>`
-  writeFileSync(out, html, 'utf8')
-  console.log('preview written: ' + out)
-
-  // 一屏一个文件：长图里任何一屏都不许被裁掉（Lead 2026-10-08 的要求）
-  secs.forEach(([title, body], i) => {
-    const one = head + `
-<h1>${esc(title)}</h1>
+  // 一份屏定义 → 三种产物：开发预览（合并页 + 一屏一个文件）、README 图用 HTML、manifest。
+  const manifest = []
+  for (const s of secs) {
+    const devFile = join(outDir, 'client-preview-' + s.id + '.html')
+    writeFileSync(devFile, head + `
+<h1>${esc(s.title)}</h1>
 <div class="note">假数据 · 静态预览，只这一屏。</div>
-<div class="frame">${body}</div>
+<div class="frame">${s.body}</div>
 ` + mock + `
-</body></html>`
-    const p = join(outDir, 'client-preview-s' + (i + 1) + '.html')
-    writeFileSync(p, one, 'utf8')
-    console.log('preview written: ' + p)
-  })
+</body></html>`, 'utf8')
+    const rec = { id: s.id, title: s.title, caption: s.caption, out: s.out, file: devFile }
+    if (s.out) {
+      rec.readmeFile = join(outDir, 'client-readme-' + s.id + '.html')
+      writeFileSync(rec.readmeFile, head + `
+<div class="caption">${esc(README_HEADLINE[s.id] || '')}</div>
+<div class="watermark">界面预览 · 演示数据（假数据，非真实记忆目录）</div>
+<div class="frame">${s.body}</div>
+` + mock + `
+</body></html>`, 'utf8')
+    }
+    manifest.push(rec)
+  }
+  const allFile = join(outDir, 'client-preview.html')
+  writeFileSync(allFile, head + `
+<h1>sage-mem 界面 · 静态预览</h1>
+<div class="note">假数据。看的是「按钮找不找得到、信息层级清不清楚」。</div>
+${secs.map((s) => '<h2>' + esc(s.title) + '</h2><div class="frame">' + s.body + '</div>').join('\n')}
+` + mock + `
+</body></html>`, 'utf8')
+  const mf = join(outDir, 'client-preview-manifest.json')
+  writeFileSync(mf, JSON.stringify(manifest, null, 2) + '\n', 'utf8')
+  console.log('preview written: ' + allFile)
+  console.log('manifest written: ' + mf + '（' + manifest.length + ' 屏，其中发布 ' + manifest.filter((m) => m.out).length + ' 张）')
 }
 
 // ════════════════════════════════════════════════════════════════════════════

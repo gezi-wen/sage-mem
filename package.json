@@ -17,7 +17,8 @@
   ],
   "scripts": {
     "test": "node test/run.mjs",
-    "build:client": "node scripts/build-client.mjs"
+    "build:client": "node scripts/build-client.mjs",
+    "images": "node scripts/make-readme-images.mjs"
   },
   "license": "Apache-2.0",
   "engines": {
