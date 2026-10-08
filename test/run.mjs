@@ -26,6 +26,7 @@ const SUITES = [
   'archive-test.mjs',
   'access-test.mjs',
   'panel-api-test.mjs',
+  'build-fresh.mjs',
   'client-exec-test.mjs',
 ]
 

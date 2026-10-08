@@ -16,7 +16,8 @@
     "NOTICE"
   ],
   "scripts": {
-    "test": "node test/run.mjs"
+    "test": "node test/run.mjs",
+    "build:client": "node scripts/build-client.mjs"
   },
   "license": "Apache-2.0",
   "engines": {
