@@ -793,10 +793,17 @@ async function emitPreview() {
     tree = await rt.settle(C, {})
     const replay = starReplay(rt)
     if (clickDim) {
-      // 点圆心外 14px：走的是放大热区那条路径（暗星画出来只有 ~2px）
-      const dim = replay.find((a) => a.f[0] !== '#')
+      // 点**可视区里那颗归档暗星**：详情面板盖住画布右侧约 45%，点右边的只会被面板压住 ——
+      // 那样图里就只剩亮星，与「暗星是已归档的记忆」这句说明对不上。
+      // 可视区（图像 x 60–360 / y 230–800）换算到逻辑坐标 ≈ x<285 且 y∈(35,484)。
+      const dims = replay.filter((a) => a.f[0] !== '#')
+      const inView = dims.filter((a) => a.x < 285 && a.y > 35 && a.y < 484)
+      if (!inView.length) {
+        throw new Error('星图：可视区里没有归档暗星（图会与说明不符）—— 调 STAR_DEMO 或画布尺寸')
+      }
+      const dim = inView.slice().sort((a, b) => a.x - b.x)[0] // 取最左那颗，离面板最远
       const cv = all(tree, byClass('smap-canvas'))[0]
-      if (!dim || !cv || typeof cv.props.onClick !== 'function') throw new Error('星图：取不到暗星或画布 onClick')
+      if (!cv || typeof cv.props.onClick !== 'function') throw new Error('星图：画布没有 onClick')
       cv.props.onClick({
         currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 940, height: 520 }) },
         clientX: dim.x + 14, clientY: dim.y,
