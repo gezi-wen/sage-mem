@@ -266,8 +266,9 @@ async function runOnce(mode, { apply = true } = {}) {
   }
   const engine = new adMod.AutodreamEngine(ctx, { memoryDir: memDir, sessionsRoot: '' })
   await engine.load()
-  Object.assign(engine.state.config, { apply, autoArchive: mode, reason: 'access-test' })
-  await engine.persist()
+  // 走面板会走的同一条路：setConfig（白名单 + 落盘）。autoArchive 若不在白名单里被静默丢掉，
+  // 下面 auto/off 那几组的行为断言会直接红 —— 这条路径本身就是回归守卫。
+  await engine.setConfig({ apply, autoArchive: mode })
   const res = await engine.run({ force: true, reason: 'access-test' })
   return { engine, res }
 }
@@ -446,6 +447,57 @@ group('13. 回收的 ENOENT 分类：记忆根不存在时一个键都不许清'
   const after3 = await access.readAccessLedger()
   ok(r3.ok === true && !('still-gone.md' in after3), '对照组：正常目录下假键仍会被回收')
   ok(beforeKeys.every((k) => k in after3), '对照组：真实存在的键仍然留着', JSON.stringify(Object.keys(after3)))
+}
+
+// ── 14. autoArchive 进配置面（面板可读写、非法值拒、落盘、重读得到）──
+group('14. autoArchive 三档：白名单接受、非法值拒、落盘后重新加载读得到')
+{
+  const mkEngine = () => new adMod.AutodreamEngine(
+    { get: () => undefined, logger: { warn: () => {}, error: () => {} } },
+    { memoryDir: memDir, sessionsRoot: '' },
+  )
+  const engine = mkEngine()
+  await engine.load()
+  const cfgPath = engine.configPath
+  ok(DEFAULT_CONFIG.autoArchive === 'report', '默认值就是 report', String(DEFAULT_CONFIG.autoArchive))
+
+  // ① 合法值：读回 + 落盘
+  const c1 = await engine.setConfig({ autoArchive: 'auto' })
+  ok(c1.config.autoArchive === 'auto', 'setConfig(auto) 后 getConfig 读回 auto', String(c1.config.autoArchive))
+  ok(JSON.parse(readFileSync(cfgPath, 'utf8')).config.autoArchive === 'auto', '落盘到 .sage-mem/autodream.json')
+
+  // ② 「重进程」：换一个引擎实例走 load()（真实代码路径就是读这个文件）
+  const fresh = mkEngine()
+  await fresh.load()
+  ok(fresh.state.config.autoArchive === 'auto', '新实例 load() 后仍是 auto（重进程读得到）')
+  ok((await fresh.getConfig()).config.autoArchive === 'auto', '新实例 getConfig() 也回 auto')
+
+  // ③ 非法值：一律不写入（照抄现有 setConfig 处理非法枚举的方式：保留原值，不另立 {ok:false}）
+  const badValues = [['sometimes', '字符串乱填'], [123, '数字'], [{ mode: 'auto' }, '对象'], [null, 'null'], [true, '布尔']]
+  for (const [bad, label] of badValues) {
+    let threw = null
+    let got = null
+    try { got = await engine.setConfig({ autoArchive: bad }) } catch (e) { threw = e }
+    ok(threw === null && got?.config?.autoArchive === 'auto',
+      `非法值被拒（${label}）且原值保持 auto`, threw ? `抛了 ${threw.message}` : String(got?.config?.autoArchive))
+  }
+  ok(JSON.parse(readFileSync(cfgPath, 'utf8')).config.autoArchive === 'auto', '非法值那几轮没有改到配置文件')
+  for (const v of ['off', 'report', 'auto']) {
+    const c = await engine.setConfig({ autoArchive: v })
+    ok(c.config.autoArchive === v, `三个合法值都收（${v}）`, String(c.config.autoArchive))
+  }
+  ok((await engine.getConfig()).defaults.autoArchive === 'report', 'getConfig().defaults 里也能看到默认值')
+
+  // ④ off 档：什么都不做（连候选清单都不出）
+  writeMem('project_off_candidate.md', { updated: daysAgo(200) })
+  const { res } = await runOnce('off')
+  ok(res.ok === true, 'off 档的一趟运行成功')
+  ok(existsSync(join(memDir, 'project_off_candidate.md')), 'off 档：够龄的候选也留在根目录')
+  ok(!existsSync(join(memDir, 'archive', 'project_off_candidate.md')), 'off 档：archive/ 里没有它')
+  const md = readFileSync(join(memDir, 'autodream', res.report), 'utf8')
+  ok(!/自动归档候选/.test(md), 'off 档：报告里连候选清单都不出')
+  const m = manifestOf(res.runId).archive
+  ok(m.mode === 'off' && m.candidates.length === 0, 'off 档：manifest 记 mode=off、候选为空', JSON.stringify({ mode: m.mode, n: m.candidates.length }))
 }
 
 rmSync(sandbox, { recursive: true, force: true })
