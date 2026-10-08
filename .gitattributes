@@ -1,0 +1,14 @@
+# 行尾统一为 LF：索引与工作树都不做 CRLF 转换。
+#
+# 为什么要有这个文件：本仓库长期依赖宿主的 core.autocrlf=true —— 索引虽然一直是 LF，
+# 但工作树被检出成 CRLF，于是 pnpm pack 出来的包里 EOL 混杂，diff 也会出现「只差行尾」
+# 的幻影改动。这里的规则把两侧都钉死在 LF。
+#
+# ⚠️ pattern 与属性必须在**同一行**：写成两行会让规则静默失效（`git check-attr` 报
+# unspecified），而且不报任何错。
+* text=auto eol=lf
+
+# 二进制资源不参与文本处理。
+*.png binary
+*.jpg binary
+*.ico binary
