@@ -162,6 +162,11 @@ if (clientInv) {
   const clientAuto = clientInv.filter((i) => (i.service || i.namespace) === 'autodream')
   ok(clientAuto.length === 11, `客户端声明了 11 条 autodream 描述符（实际 ${clientAuto.length}）`)
 
+  // 契约总数：memory 7（原 4 + archive / restore / listArchived）+ starmap 2 + autodream 11 = 20。
+  // v0.9.0 之前是 17 —— 变的只是这个数字，下面每一条比对仍然是逐条严格比对。
+  ok(clientInv.length === 20, `客户端声明了 20 条描述符（实际 ${clientInv.length}）`)
+  ok(hostInv.length === 20, `宿主 manifest 也是 20 条 invocation（实际 ${hostInv.length}）`)
+
   const missing = [...hostMap.keys()].filter((k) => !clientMap.has(k))
   const extra = [...clientMap.keys()].filter((k) => !hostMap.has(k))
   ok(missing.length === 0, '宿主有的方法客户端都声明了', `缺：${missing.join(', ')}`)
@@ -191,6 +196,20 @@ if (clientInv) {
     if (JSON.stringify(hp) !== JSON.stringify(cp)) typeMismatch.push(`${k} 入参 typeSymbol：宿主 ${hp} vs 客户端 ${cp}`)
   }
   ok(typeMismatch.length === 0, 'result/parameter 的 typeSymbol 逐条一致', typeMismatch.join('\n       '))
+
+  // mode 也必须逐条对齐：任何一侧悄悄把 strict 退化成宽松模式，都要在这里现形。
+  let modeMismatch = []
+  for (const [k, h] of hostMap) {
+    const c = clientMap.get(k)
+    if (!c) continue
+    const hm = h.result && h.result.mode
+    const cm = c.result && c.result.mode
+    if (hm !== 'strict' || cm !== 'strict') modeMismatch.push(`${k}：宿主 ${hm} vs 客户端 ${cm}`)
+    const hp = (h.parameters || []).map((p) => p.codec && p.codec.mode)
+    const cp = (c.parameters || []).map((p) => p.codec && p.codec.mode)
+    if (JSON.stringify(hp) !== JSON.stringify(cp)) modeMismatch.push(`${k} 入参 mode：宿主 ${hp} vs 客户端 ${cp}`)
+  }
+  ok(modeMismatch.length === 0, 'result/parameter 的 mode 逐条 strict 且两侧一致', modeMismatch.join('\n       '))
 }
 
 console.log(`\n结果：${pass} passed, ${fail} failed`)

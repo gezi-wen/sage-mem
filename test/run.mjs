@@ -23,6 +23,7 @@ const SUITES = [
   'retrieval-test.mjs',
   'typert-test.mjs',
   'inject-test.mjs',
+  'archive-test.mjs',
   'client-exec-test.mjs',
 ]
 
