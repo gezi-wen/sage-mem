@@ -24,6 +24,7 @@ const SUITES = [
   'typert-test.mjs',
   'inject-test.mjs',
   'archive-test.mjs',
+  'access-test.mjs',
   'client-exec-test.mjs',
 ]
 
