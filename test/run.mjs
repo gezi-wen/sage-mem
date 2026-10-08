@@ -28,6 +28,7 @@ const SUITES = [
   'panel-api-test.mjs',
   'build-fresh.mjs',
   'client-exec-test.mjs',
+  'client-render-test.mjs',
 ]
 
 /** 各脚本收尾那行：`结果：53 passed, 0 failed`。 */

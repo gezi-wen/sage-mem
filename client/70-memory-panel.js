@@ -147,6 +147,27 @@
 				loadSettings();
 			}, []);
 
+			/**
+			 * 抽屉「点外部 / Esc 关闭」。
+			 *
+			 * ⚠️ 监听**只在展开时挂**（依赖 [drawer]）：关着时一个 document 监听都没有 ——
+			 * 「点外部关闭」绝不能变成「点哪儿都没反应」。cleanup 里成对摘掉，不留悬挂监听。
+			 * 用 click 而不是 pointerdown：宿主的弹窗里 pointerdown 可能被别的控件的拖拽吃掉。
+			 * 点抽屉里的条目也一样会关（条目自己的 onClick 先把它设成 false，这里再设一次无害）。
+			 */
+			react.useEffect(function () {
+				if (!drawer) return undefined;
+				if (typeof document === "undefined" || !document.addEventListener) return undefined;
+				function onOutside() { setDrawer(false); }
+				function onKey(e) { if (e && (e.key === "Escape" || e.keyCode === 27)) setDrawer(false); }
+				document.addEventListener("click", onOutside);
+				document.addEventListener("keydown", onKey);
+				return function () {
+					document.removeEventListener("click", onOutside);
+					document.removeEventListener("keydown", onKey);
+				};
+			}, [drawer]);
+
 			function closeForm() {
 				setFormOpen(false); setEditingFile(null); setFormName(""); setFormDesc(""); setFormBody(""); setFormType("feedback");
 				setFormFm(null); setFormBaseType(""); setFormTags("");
