@@ -473,9 +473,9 @@
 			}
 
 			return h("div", { className: "smap-card" },
+				// 卡片里不再重复「记忆星图 / sage-mem memory」这一行 —— 标题已经在面板顶部
+				// 那条共用头部带里（「我在哪」），这里只留控件，少一行噪音。
 				h("div", { className: "smap-head" },
-					h("span", { className: "smap-title" }, "记忆星图"),
-					h("span", { className: "smap-sub" }, "sage-mem memory · 每颗星是一条记忆"),
 					h("span", { className: "smap-spacer" }),
 					h("span", { className: "smap-viewtoggle" },
 						h("button", { className: "smap-vt-btn" + (viewMode === "sky" ? " on" : ""), onClick: () => setViewMode("sky"), title: "空间视角：星座分布" }, "星空"),

@@ -75,8 +75,16 @@
 			const sArchSaving = react.useState(false);
 			const archSaving = sArchSaving[0], setArchSaving = sArchSaving[1];
 			// ── 工具面板（体检 / 归档候选 / 保留名原样编辑）──
-			// 一次只开一个：三个面板同时展开会把文件列表整个顶下去。数据按需拉，
-			// 打开时才打 remote（不给每一次渲染都加一次全目录扫描）。
+			// 三个入口收进「工具 ▾」抽屉：关着时零占位，点开才占版面。
+			// 面板一次只开一个（tool 状态），列表始终留在下面。
+			// ⚠️ 抽屉本身不负责「可发现」——那是头部带上常显徽标的活。所以 audit / settings
+			// 在面板挂载时就各拉一次（都只读）：体检有几个问题、有没有待重启项，不打开也看得见。
+			const sDrawer = react.useState(false);
+			const drawer = sDrawer[0], setDrawer = sDrawer[1];
+			// 自动做梦的二级分段状态放在这里（不放面板内部）：头部带的「待重启生效」徽标
+			// 点一下就切到自动做梦·设置那一段，需要跨组件指路。
+			const sAdSeg = react.useState("run");
+			const adSeg = sAdSeg[0], setAdSeg = sAdSeg[1];
 			const sTool = react.useState(null);
 			const tool = sTool[0], setTool = sTool[1];
 			const sAudit = react.useState(null);
@@ -132,7 +140,12 @@
 					.catch(function () { setArchiveItems([]); });
 			}
 
-			react.useEffect(function () { load(); }, []);
+			react.useEffect(function () {
+				load();
+				// 头部带的两个徽标要有数据才立得住：体检（只读扫描）与待重启项。
+				runAudit();
+				loadSettings();
+			}, []);
 
 			function closeForm() {
 				setFormOpen(false); setEditingFile(null); setFormName(""); setFormDesc(""); setFormBody(""); setFormType("feedback");
@@ -368,6 +381,15 @@
 				if (next === "raw" && !settings) loadSettings();
 			}
 
+			/** 打开某个工具（头部带的徽标点进来时用：不切换、直接开）。 */
+			function openTool(name) {
+				setTool(name);
+				setError(null);
+				if (name === "audit" && !audit) runAudit();
+				if (name === "candidates" && !cand) loadCandidates();
+				if (name === "raw" && !settings) loadSettings();
+			}
+
 			/**
 			 * 执行归档（逐条 / 批量都走这里）。reason 用候选算出来的那个
 			 * —— 归档留痕要写清「为什么」，不能把模型/界面的判断丢掉。
@@ -502,6 +524,13 @@
 			// 两个计数永远一起露脸：用户不必先筛状态才知道档案馆里有没有东西。
 			const headerCount = (hasFilter ? "筛出 " + String(filtered.length) + " / " + String(statusItems.length) + " · " : "") +
 				"活动中 " + String(items.length) + " · 已归档 " + String(archiveItems.length);
+			// 头部带的「待重启生效」徽标：有多少项要重启才生效，从 limits / pendingLimits 的差算出来
+			// （reserved 名单的变化 getSettings 只给 restartRequired 布尔值，数不出来就不写数）。
+			const LIMIT_KEYS = ["maxResults", "maxChars", "maxBaseline", "maxSessionBytes", "staleDays"];
+			const pendingDiff = (settings && settings.limits && settings.pendingLimits)
+				? LIMIT_KEYS.filter(function (k) { return settings.limits[k] !== settings.pendingLimits[k]; }).length
+				: 0;
+			const restartPending = !!(settings && settings.restartRequired);
 
 			// 「文件列表」这一屏：状态筛选决定看哪一批，灰色卡片与留痕块自带「退役」语义。
 			// banner 只在**专门看归档**时出现，切到全部时不重复说一遍。
@@ -577,45 +606,68 @@
 					h("button", { type: "button", className: "smem-tab" + (tab === "star" ? " smem-tab--on" : ""), key: "s", onClick: function () { setTab("star"); } }, "记忆星图"),
 					h("button", { type: "button", className: "smem-tab" + (tab === "autodream" ? " smem-tab--on" : ""), key: "d", onClick: function () { setTab("autodream"); } }, "自动做梦"),
 				]),
+				// 三个 tab 共用的一条头部带：我在哪 · 目录状态 · 活动/归档计数 · 体检徽标 · 待重启徽标 · 主操作。
+				// 层级形状固定：导航＝下划线（.smem-tabs）、筛选＝chip、动作＝按钮，三种不混用。
 				h("div", { className: "smem-head", key: "head" }, [
-					h("span", { className: "smem-title", key: "t" }, "记忆文件（sage-mem）"),
+					h("span", { className: "smem-title", key: "t" }, "记忆管理"),
+					h("span", { className: "smem-head-job", key: "job" }, TAB_LABEL[tab] || ""),
 					h("span", { className: "smem-dot" + (dirOk ? "" : " smem-dot--bad"), key: "dot", title: dirOk ? "memory 目录可读" : "memory 目录不可读" }),
 					h("span", { className: "smem-muted", key: "st" }, dirOk ? "目录可读" : "目录不可读"),
 					h("span", { className: "smem-badge", key: "cnt" }, headerCount),
+					// 体检徽标：**抽屉关着也一直看得见**。整个「工具收进抽屉」的方案就靠它成立 ——
+					// 没有这个徽标，三个能力就退回「藏起来」了（上一轮刚把它们做成用户自己的入口）。
+					h("button", {
+						type: "button", key: "aud",
+						className: "smem-tool-badge" + (audit && audit.problems ? " smem-tool-badge--bad" : ""),
+						title: audit ? (audit.problems ? "打开体检看是哪几条" : "体检没有发现问题") : "跑一次体检（只读）",
+						onClick: function () { openTool("audit"); },
+					}, audit ? (audit.problems ? ("体检 " + audit.problems + " 个问题") : "体检 通过") : "体检 · 未跑"),
+					restartPending
+						? h("button", {
+								type: "button", key: "rs", className: "smem-tool-badge smem-ad-badge--warn",
+								title: "有改动要重启 DSH 才生效",
+								onClick: function () { setTab("autodream"); setAdSeg("settings"); },
+							}, (pendingDiff ? (pendingDiff + " 项") : "") + "待重启生效")
+						: null,
+					// 主操作：只放当前 tab 的那一个（星图/自动做梦的主操作在各自面板里，不重复摆一份）。
+					h("span", { className: "smem-head-actions", key: "act" }, tab === "files" ? [
+						h("button", { type: "button", className: "smem-btn", key: "refresh", disabled: busy || loading, onClick: load }, "刷新"),
+						h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "add", onClick: openAdd }, "+ 添加记忆"),
+					] : null),
 				]),
-				// 搜索 / 刷新 / 添加 / 筛选都只属于「文件列表」这个视图。
-				// 放在 tab 分支外面，会让星图和自动做梦页也顶着一排用不上的控件
-				// （走查时发现：「+ 添加记忆」出现在星图页上）。
+				// 工具栏只剩「搜索 + 工具 ▾」：刷新与添加已经收进头部带的主操作位。
 				tab === "files" ? h("div", { className: "smem-toolbar", key: "bar" }, [
 					h("input", { className: "smem-search", key: "q", value: query, placeholder: "搜索文件名 / 描述 / 类型 / 标签…", onChange: function (e) { setQuery(e.target.value); } }),
-					h("button", { type: "button", className: "smem-btn", key: "refresh", disabled: busy || loading, onClick: load }, "刷新"),
-					h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "add", onClick: openAdd }, "+ 添加记忆"),
-				]) : null,
-				// 三个新入口：一行轻量文字按钮，不跟主工具栏抢重量级，也不各占一块版面。
-				// 面板一次只开一个（tool 状态），所以列表始终留在下面。
-				tab === "files" ? h("div", { className: "smem-tools", key: "tools" }, [
-					h("span", { className: "smem-filters-label", key: "l" }, "工具"),
-					h("button", {
-						type: "button", className: "smem-tool-btn", key: "audit",
-						"data-on": tool === "audit" ? "1" : "0",
-						title: "只读体检：索引、双链、frontmatter、行尾",
-						onClick: function () { toggleTool("audit"); },
-					}, tool === "audit" ? "收起体检" : "体检"),
-					h("button", {
-						type: "button", className: "smem-tool-btn", key: "cand",
-						"data-on": tool === "candidates" ? "1" : "0",
-						title: "按闲置天数列出可归档的候选，并逐个执行",
-						onClick: function () { toggleTool("candidates"); },
-					}, tool === "candidates" ? "收起归档候选" : "归档候选"),
-					h("button", {
-						type: "button", className: "smem-tool-btn", key: "raw",
-						"data-on": tool === "raw" ? "1" : "0",
-						title: "索引 / 流水这类保留名：原样文本编辑",
-						onClick: function () { toggleTool("raw"); },
-					}, tool === "raw" ? "收起保留名编辑" : "保留名编辑"),
+					// 工具抽屉：关着时这里只有一个按钮，零占位；面板一次只开一个。
+					h("span", { className: "smem-drawer", key: "drawer" }, [
+						h("button", {
+							type: "button", key: "btn",
+							className: "smem-btn" + (drawer ? " smem-btn-primary" : ""),
+							"aria-expanded": drawer ? "true" : "false",
+							title: "体检 / 归档候选 / 保留名编辑",
+							onClick: function () { setDrawer(!drawer); },
+						}, "工具 ▾"),
+						drawer ? h("div", { className: "smem-drawer-pop", key: "pop" }, [
+							h("button", {
+								type: "button", className: "smem-drawer-item", key: "a",
+								"data-on": tool === "audit" ? "1" : "0",
+								onClick: function () { toggleTool("audit"); setDrawer(false); },
+							}, ["体检", h("span", { className: "smem-status" + (audit && audit.problems ? " smem-status--bad" : ""), key: "s" }, audit ? (audit.problems ? (audit.problems + " 个问题") : "通过") : "未跑")]),
+							h("button", {
+								type: "button", className: "smem-drawer-item", key: "c",
+								"data-on": tool === "candidates" ? "1" : "0",
+								onClick: function () { toggleTool("candidates"); setDrawer(false); },
+							}, ["归档候选", h("span", { className: "smem-status", key: "s" }, cand ? (cand.count + " 条") : "未取")]),
+							h("button", {
+								type: "button", className: "smem-drawer-item", key: "r",
+								"data-on": tool === "raw" ? "1" : "0",
+								onClick: function () { toggleTool("raw"); setDrawer(false); },
+							}, ["保留名编辑", h("span", { className: "smem-status", key: "s" }, settings && settings.reserved ? (settings.reserved.length + " 个") : "")]),
+						]) : null,
+					]),
 				]) : null,
 				tab === "files" && tool === "audit"
-					? h(AuditPanel, { report: audit, busy: auditBusy, onRun: runAudit })
+					? h(AuditPanel, { report: audit, busy: auditBusy, onRun: runAudit, onClose: function () { setTool(null); } })
 					: null,
 				tab === "files" && tool === "candidates"
 					? h(CandidatePanel, {
@@ -624,6 +676,7 @@
 							picked: picked,
 							confirm: candConfirm,
 							onLoad: loadCandidates,
+							onClose: function () { setTool(null); },
 							onPick: function (file) {
 								const nx = Object.assign({}, picked);
 								if (nx[file]) delete nx[file]; else nx[file] = true;
@@ -741,7 +794,7 @@
 						])
 					: null,
 				tab === "autodream"
-					? h(AutodreamPanel, { key: "autodream", ctx: props.ctx })
+					? h(AutodreamPanel, { key: "autodream", ctx: props.ctx, seg: adSeg, onSeg: setAdSeg })
 					: tab === "star"
 					? h("div", { className: "smem-starmap", key: "starmap" },
 							h(StarmapRuntime.StarMap, { ctx: props.ctx }))

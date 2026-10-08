@@ -57,7 +57,23 @@
 			".smem-tool-btn{border:0;background:transparent;color:var(--dsw-alias-label-secondary);font-size:12px;font-family:inherit;cursor:pointer;padding:2px 8px;border-radius:6px;}",
 			".smem-tool-btn:hover{color:var(--dsw-alias-label-primary);}",
 			'.smem-tool-btn[data-on="1"]{color:var(--dsw-alias-brand-primary,#4d76e6);background:var(--dsw-alias-bg-layer-2);}',
+			// 工具抽屉：关着时**零占位**（工具栏里只有一个「工具 ▾」），点开才占版面。
+			// ⚠️ 可发现性不靠抽屉本身，靠头部带常显的「体检 N 个问题」徽标 —— 那是整个
+			// 抽屉方案能成立的前提（否则三个能力就退回「藏起来」了）。
+			".smem-drawer{position:relative;flex:none;}",
+			".smem-drawer-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:6;min-width:236px;background:var(--dsw-alias-bg-base);border:1px solid var(--dsw-alias-border-l2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.10);padding:6px;display:flex;flex-direction:column;gap:2px;}",
+			".smem-drawer-item{display:flex;align-items:center;gap:8px;border:0;background:transparent;font-family:inherit;font-size:12.5px;color:var(--dsw-alias-label-primary);text-align:left;padding:6px 8px;border-radius:8px;cursor:pointer;}",
+			".smem-drawer-item:hover{background:var(--dsw-alias-bg-layer-2);}",
+			'.smem-drawer-item[data-on="1"]{background:var(--dsw-alias-bg-layer-2);font-weight:600;}',
+			".smem-drawer-item .smem-status{margin-left:auto;}",
+			".smem-status--bad{color:var(--dsw-alias-state-error-primary,#dc2626);font-weight:600;}",
+			// 头部带：三个 tab 共用的一条「我在哪 + 现在什么状态 + 主操作」。
+			".smem-head-job{font-size:12.5px;font-weight:600;}",
+			".smem-head-actions{margin-left:auto;display:flex;align-items:center;gap:6px;}",
 			".smem-tool-panel{border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1);padding:10px 12px;display:flex;flex-direction:column;gap:8px;}",
+			// 体检 / 候选是「翻清单」的面板：定高 + 内部滚动，列表不被顶出首屏。
+			// 原样编辑器（.smem-ar-editor）不设上限 —— 那是专心改一份文件的界面，给它完整高度。
+			".smem-tool-panel--cap{max-height:320px;overflow-y:auto;}",
 			".smem-tool-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}",
 			".smem-tool-title{font-weight:600;font-size:13px;}",
 			".smem-tool-badge{display:inline-flex;align-items:center;font-size:11px;color:var(--dsw-alias-label-secondary);border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:0 6px;white-space:nowrap;}",
@@ -79,6 +95,16 @@
 			".smem-cand-act{display:flex;justify-content:flex-end;}",
 			".smem-cand-confirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;border-top:1px dashed var(--dsw-alias-border-l2);padding-top:6px;}",
 			".smem-raw-names{display:flex;gap:6px;flex-wrap:wrap;}",
+			// 自动做梦的二级分组：导航用**下划线**（跟筛选 chip、动作按钮区分开，三种层级三种形状）。
+			".smem-subtabs{display:flex;gap:16px;border-bottom:1px solid var(--dsw-alias-border-l2);margin:2px 0 8px;}",
+			".smem-subtab{background:none;border:0;padding:5px 1px 7px;font-size:12.5px;font-family:inherit;color:var(--dsw-alias-label-secondary);cursor:pointer;position:relative;}",
+			".smem-subtab--on{color:var(--dsw-alias-label-primary);font-weight:600;}",
+			'.smem-subtab--on:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:2px 2px 0 0;background:var(--dsw-alias-label-primary);}',
+			".smem-subtab-n{opacity:.6;margin-left:5px;font-variant-numeric:tabular-nums;}",
+			// 五个注入参数排两列：一行放两个，扫读反而更清楚（吸收方案 A 的做法）。
+			".smem-ad-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:4px 18px;}",
+			".smem-ad-field{display:flex;align-items:center;gap:8px;min-width:0;}",
+			".smem-ad-field .smem-autodream-key{min-width:96px;}",
 			".smem-actions{display:flex;gap:6px;}",
 			".smem-form{border:1px solid var(--dsw-alias-border-l2);border-radius:10px;padding:12px;background:var(--dsw-alias-bg-layer-2);display:flex;flex-direction:column;gap:8px;}",
 			".smem-form-title{font-weight:600;font-size:13px;}",

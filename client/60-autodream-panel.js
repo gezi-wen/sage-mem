@@ -323,7 +323,24 @@
 				return encodeRoute(r.provider, r.model) === modelValue;
 			});
 
+			// 二级分组：**运行 / 设置 / 记录**。
+			// 这三类东西原来混在一条滚动里（实测约 1760px）：跑一次要用的、要调的、回头看历史的
+			// 全叠在一起，找什么东西都得滚。分段之后每段都落在一屏内（标尺：可视高度约 1000px）。
+			// ⚠️ 分段状态放在 Section 里（props.seg），因为头部带的「待重启生效」徽标要能一步切到「设置」。
+			const segOf = (props.seg === "settings" || props.seg === "records") ? props.seg : "run";
+			const subtab = (name, label, note) => h("button", {
+				type: "button", key: name, className: "smem-subtab" + (segOf === name ? " smem-subtab--on" : ""),
+				"aria-current": segOf === name ? "true" : "false",
+				onClick: function () { if (props.onSeg) props.onSeg(name); },
+			}, [label, note ? h("span", { className: "smem-subtab-n", key: "n" }, note) : null]);
+
 			return h("div", { className: "smem-autodream" }, [
+				h("div", { className: "smem-subtabs", key: "segs" }, [
+					subtab("run", "运行"),
+					subtab("settings", "设置"),
+					subtab("records", "记录", String(snaps.length + runs.length + reports.length)),
+				]),
+				segOf === "run" ? h("div", { className: "smem-seg", key: "seg-run" }, [
 				h("div", { className: "smem-autodream-sec", key: "top" }, [
 					h("div", { className: "smem-autodream-row", key: "r" }, [
 						h("button", {
@@ -419,6 +436,35 @@
 						? h("div", { className: "smem-autodream-note", key: "mnote" }, String(models.note))
 						: null,
 				]),
+				h("div", { className: "smem-autodream-sec", key: "run" }, [
+					h("div", { className: "smem-autodream-row", key: "r" }, [
+						h("button", {
+							type: "button", className: "smem-btn smem-btn-primary", key: "go",
+							disabled: busy || running || !remote,
+							onClick: run,
+						}, running ? "正在整理…" : "立即整理"),
+						h("span", { className: "smem-status", key: "s" },
+							running
+								? ("已跑 " + ((st && st.steps && st.steps.length) || 0) + " 轮 · " + String((st && st.phase) || ""))
+								: (st && st.hoursSince != null ? ("距上次整理 " + st.hoursSince.toFixed(1) + " 小时") : "从未整理过")),
+					]),
+					running && st && st.steps && st.steps.length
+						? h("div", { className: "smem-autodream-note", key: "prog" }, st.steps.map(function (x) {
+								return "第 " + x.step + " 轮：" + (x.tools.length ? x.tools.join("、") : "结束");
+							}).join("　·　"))
+						: null,
+					last
+						? h("div", { className: "smem-status", key: "last" },
+								"上次 " + String(last.atHuman || "") + " · " + (last.ok
+									? ("成功" + (last.apply ? "，改写了 " + ((last.touched || []).length) + " 个文件" : "（只出报告）") +
+										" · 结构问题 " + last.problemsBefore + " → " + last.problemsAfter +
+										" · token " + last.tokensIn + " / " + last.tokensOut)
+									: ("失败：" + (last.error || "未知"))) +
+								(last.report ? " · 报告 " + last.report : ""))
+						: null,
+				]),
+				]) : null,
+				segOf === "settings" ? h("div", { className: "smem-seg", key: "seg-set" }, [
 				h("div", { className: "smem-autodream-sec", key: "autoarchive" }, [
 					h("div", { className: "smem-autodream-row", key: "r" }, [
 						h("span", { className: "smem-autodream-key", key: "k" }, "自动归档"),
@@ -453,15 +499,17 @@
 								"⚠ 这些值在 DSH 启动时就固化了 —— 要重启 DSH 才生效。下面每行都写清「当前 → 重启后」。")
 						: h("div", { className: "smem-autodream-note", key: "rn" },
 								"这些值在 DSH 启动时固化：保存后要重启 DSH 才生效 —— 所以每行都会标出「当前生效」与「重启后」。"),
-					LIMIT_FIELDS.map(function (f) {
+					// 五个参数排两列（一行两个）：同样的信息，行数少一半，扫读反而更清楚。
+					h("div", { className: "smem-ad-grid2", key: "grid" }, LIMIT_FIELDS.map(function (f) {
 						const cur = memSet && memSet.limits ? memSet.limits[f.key] : null;
 						const pend = memSet && memSet.pendingLimits ? memSet.pendingLimits[f.key] : null;
 						const diff = cur != null && pend != null && cur !== pend;
-						return h("div", { className: "smem-autodream-row", key: f.key }, [
-							h("span", { className: "smem-autodream-key", key: "k" }, f.label),
+						return h("div", { className: "smem-ad-field", key: f.key }, [
+							h("span", { className: "smem-autodream-key", key: "k", title: f.unit + " · 范围 " + f.lo + "–" + f.hi }, f.label),
 							h("input", {
 								className: "smem-num", key: "v", type: "number",
 								min: String(f.lo), max: String(f.hi),
+								title: "范围 " + f.lo + "–" + f.hi + " " + f.unit,
 								value: limitsDraft && limitsDraft[f.key] != null ? limitsDraft[f.key] : "",
 								onChange: function (e) {
 									const nx = Object.assign({}, limitsDraft);
@@ -469,12 +517,11 @@
 									setLimitsDraft(nx);
 								},
 							}),
-							h("span", { className: "smem-status", key: "r" }, f.unit + " · 范围 " + f.lo + "–" + f.hi),
 							diff
 								? h("span", { className: "smem-ad-badge smem-ad-badge--warn", key: "d" }, "当前 " + String(cur) + " → 重启后 " + String(pend))
-								: h("span", { className: "smem-status", key: "d" }, cur == null ? "" : ("当前生效 " + String(cur))),
+								: h("span", { className: "smem-status", key: "d" }, "范围 " + f.lo + "–" + f.hi + (cur == null ? "" : (" · 当前生效 " + String(cur)))),
 						]);
-					}),
+					})),
 					h("div", { className: "smem-autodream-row", key: "save" }, [
 						h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "s", disabled: saveBusy, onClick: saveLimits }, saveBusy ? "保存中…" : "保存注入参数"),
 						h("span", { className: "smem-status", key: "n" }, "保存后需重启 DSH 才生效"),
@@ -534,35 +581,10 @@
 						h("div", { className: "smem-status", key: "paths" }, "配置与状态：" + ((st && st.paths && st.paths.configPath) || "—")),
 					]),
 				]),
-				h("div", { className: "smem-autodream-sec", key: "run" }, [
-					h("div", { className: "smem-autodream-row", key: "r" }, [
-						h("button", {
-							type: "button", className: "smem-btn smem-btn-primary", key: "go",
-							disabled: busy || running || !remote,
-							onClick: run,
-						}, running ? "正在整理…" : "立即整理"),
-						h("span", { className: "smem-status", key: "s" },
-							running
-								? ("已跑 " + ((st && st.steps && st.steps.length) || 0) + " 轮 · " + String((st && st.phase) || ""))
-								: (st && st.hoursSince != null ? ("距上次整理 " + st.hoursSince.toFixed(1) + " 小时") : "从未整理过")),
-					]),
-					running && st && st.steps && st.steps.length
-						? h("div", { className: "smem-autodream-note", key: "prog" }, st.steps.map(function (x) {
-								return "第 " + x.step + " 轮：" + (x.tools.length ? x.tools.join("、") : "结束");
-							}).join("　·　"))
-						: null,
-					last
-						? h("div", { className: "smem-status", key: "last" },
-								"上次 " + String(last.atHuman || "") + " · " + (last.ok
-									? ("成功" + (last.apply ? "，改写了 " + ((last.touched || []).length) + " 个文件" : "（只出报告）") +
-										" · 结构问题 " + last.problemsBefore + " → " + last.problemsAfter +
-										" · token " + last.tokensIn + " / " + last.tokensOut)
-									: ("失败：" + (last.error || "未知"))) +
-								(last.report ? " · 报告 " + last.report : ""))
-						: null,
-				]),
+				]) : null,
 				// ── 回滚点（新）──────────────────────────────────────────────
 				// 只改这一个文件、只用既有 h() 写法；数据全走 remote.autodream。
+				segOf === "records" ? h("div", { className: "smem-seg", key: "seg-rec" }, [
 				h("div", { className: "smem-autodream-sec", key: "snap" }, [
 					h("div", { className: "smem-autodream-row", key: "h" }, [
 						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, "回滚点"),
@@ -673,6 +695,7 @@
 							})),
 					open && body ? h("pre", { className: "smem-report-pre", key: "body" }, body) : null,
 				]),
+				]) : null,
 				listErr && !err ? h("div", { className: "smem-err", key: "lerr" }, "⚠ " + listErr) : null,
 				err ? h("div", { className: "smem-err", key: "err" }, "⚠ " + err) : null,
 				notice && !err ? h("div", { className: "smem-ok", key: "ok" }, "✓ " + notice) : null,

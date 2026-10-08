@@ -415,6 +415,17 @@
 		};
 		const autoArchiveOf = (v) => (v === "off" || v === "auto" ? v : "report");
 
+		/** 头部带上的「我在哪」：三个 tab 的中文名（与 .smem-tabs 上的字面一致）。 */
+		const TAB_LABEL = { files: "文件列表", star: "记忆星图", autodream: "自动做梦" };
+
+		/**
+		 * 工具面板头部的「收起」按钮：抽屉里开的工具要能一键收回去 ——
+		 * 面板不收，列表就还在下面被顶着。
+		 */
+		const toolClose = (props) => (props.onClose
+			? h("button", { type: "button", className: "smem-btn", key: "close", onClick: props.onClose }, "收起")
+			: null);
+
 		/**
 		 * 「体检」结果面板。
 		 *
@@ -436,7 +447,7 @@
 					])
 				: null);
 			const hints = r.archivedLinks || [];
-			return h("div", { className: "smem-tool-panel", key: "audit" }, [
+			return h("div", { className: "smem-tool-panel smem-tool-panel--cap", key: "audit" }, [
 				h("div", { className: "smem-tool-head", key: "head" }, [
 					h("span", { className: "smem-tool-title", key: "t" }, "体检"),
 					h("span", { className: "smem-muted", key: "s" },
@@ -446,6 +457,7 @@
 					h("span", { className: "smem-tool-badge" + (r.problems ? " smem-tool-badge--bad" : ""), key: "p" },
 						r.problems ? ("问题 " + r.problems) : "没有问题"),
 					h("button", { type: "button", className: "smem-btn", key: "again", disabled: props.busy, onClick: props.onRun }, props.busy ? "体检中…" : "重新体检"),
+					toolClose(props),
 				]),
 				r.problems
 					? h("div", { className: "smem-audit-secs", key: "secs" }, [
@@ -485,7 +497,7 @@
 			const pickedN = cands.filter((x) => props.picked[x.file]).length;
 			const mode = autoArchiveOf(c.autoArchive);
 			const allPicked = cands.length > 0 && pickedN === cands.length;
-			return h("div", { className: "smem-tool-panel", key: "cand" }, [
+			return h("div", { className: "smem-tool-panel smem-tool-panel--cap", key: "cand" }, [
 				h("div", { className: "smem-tool-head", key: "head" }, [
 					h("span", { className: "smem-tool-title", key: "t" }, "归档候选"),
 					h("span", { className: "smem-muted", key: "s" },
@@ -494,6 +506,7 @@
 						String(th.user == null ? "?" : th.user) + " 天"),
 					h("span", { className: "smem-tool-badge", key: "n" }, "候选 " + cands.length),
 					h("button", { type: "button", className: "smem-btn", key: "again", disabled: props.busy, onClick: props.onLoad }, props.busy ? "刷新中…" : "刷新"),
+					toolClose(props),
 				]),
 				cands.length === 0
 					? h("div", { className: "smem-empty", key: "empty" },
