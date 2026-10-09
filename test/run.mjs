@@ -20,6 +20,7 @@ const SUITES = [
   'ad-smoke.mjs',
   'ad-fixes.mjs',
   'ad-matrix.mjs',
+  'rollback-guard-test.mjs',
   'retrieval-test.mjs',
   'typert-test.mjs',
   'inject-test.mjs',
