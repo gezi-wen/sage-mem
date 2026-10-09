@@ -398,6 +398,9 @@ group('11. 体检假阳性：非条目文件 / 代码里的双链 / 索引无 fr
   writeFileSync(join(memDir, 'reference_talker.md'), [
     '---', 'name: reference_talker', 'type: reference', 'description: 讲链接语法', '---', '',
     '行内代码里的不算链接：`[[双链]]`。', '',
+    // ⚠️ 双反引号那种写法（内容里还含反引号）—— 2026-10-09 在真实记忆库上漏过一次：
+    // 只认单反引号的剥法会把它漏掉，照样报假断链。这一行就是那次的回归守卫。
+    '双反引号包着的也不算：`` `[[multi_ghost]]` ``。', '',
     '```', '围栏代码块里的也不算：[[fenced_ghost]]', '```', '',
     '但正文里真不存在的目标仍要报：[[real_ghost]]。', '',
     '而指向非条目文件是真链接：[[session-log]] 与 [[MEMORY]]。', '',
@@ -415,6 +418,8 @@ group('11. 体检假阳性：非条目文件 / 代码里的双链 / 索引无 fr
     '行内代码 `[[双链]]` 不算断链（那是在讲链接语法）')
   ok(!r.brokenLinks.some((x) => x.target === 'fenced_ghost'),
     '围栏代码块里的 [[目标]] 也不算断链')
+  ok(!r.brokenLinks.some((x) => x.target === 'multi_ghost'),
+    '双反引号行内代码（`` `` `[[x]]` `` ``）里的也不算断链 —— 只认单反引号会漏掉这种')
   // ③ 索引没有 frontmatter 不是问题
   ok(!r.noFrontmatter.some((x) => x.file === 'MEMORY.md'),
     '索引 MEMORY.md 没有 frontmatter 不算问题（它是清单，不是一条记忆）')
