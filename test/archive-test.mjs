@@ -386,6 +386,52 @@ group('10. 归档文件的读 / 写：改正文但留痕不许丢')
   shape('writeArchived 失败分支符合 #ArchivedWriteResult', 'sage-mem#memory/writeArchived', await gw.writeArchived('nope.md', 'x'))
 }
 
+// ── 11. 体检的三种假阳性 ──────────────────────────────────────
+// 2026-10-09 在**真实记忆库**上实测到的：一个健康的库被报 3 条「问题」，三条全是假的
+// （[[session-log]] 指向真实存在的文件、`[[双链]]` 是行内代码、MEMORY.md 是索引不是条目）。
+// 这一组**正反两面都断言** —— 修假阳性最容易顺手把真问题一起遮掉，所以每条放行都配一条反面。
+group('11. 体检假阳性：非条目文件 / 代码里的双链 / 索引无 frontmatter')
+{
+  writeFileSync(join(memDir, 'MEMORY.md'), '# 记忆索引\n\n- [项目](project_beta.md)\n', 'utf8')
+  writeFileSync(join(memDir, 'session-log.md'),
+    '---\nname: session-log\ntype: reference\ndescription: 流水\n---\n\n流水正文\n', 'utf8')
+  writeFileSync(join(memDir, 'reference_talker.md'), [
+    '---', 'name: reference_talker', 'type: reference', 'description: 讲链接语法', '---', '',
+    '行内代码里的不算链接：`[[双链]]`。', '',
+    '```', '围栏代码块里的也不算：[[fenced_ghost]]', '```', '',
+    '但正文里真不存在的目标仍要报：[[real_ghost]]。', '',
+    '而指向非条目文件是真链接：[[session-log]] 与 [[MEMORY]]。', '',
+  ].join('\n'), 'utf8')
+
+  const r = await auditMemoryDir(memDir)
+
+  // ① 非条目文件（session-log.md / MEMORY.md）也在链接目标池里
+  ok(!r.brokenLinks.some((x) => x.target === 'session-log'),
+    '[[session-log]] 不算断链：文件真实存在，只是不参与检索')
+  ok(!r.brokenLinks.some((x) => x.target === 'MEMORY'),
+    '[[MEMORY]] 同理（索引文件也是真实存在的目标）')
+  // ② 代码里的双链不是链接
+  ok(!r.brokenLinks.some((x) => x.target === '双链'),
+    '行内代码 `[[双链]]` 不算断链（那是在讲链接语法）')
+  ok(!r.brokenLinks.some((x) => x.target === 'fenced_ghost'),
+    '围栏代码块里的 [[目标]] 也不算断链')
+  // ③ 索引没有 frontmatter 不是问题
+  ok(!r.noFrontmatter.some((x) => x.file === 'MEMORY.md'),
+    '索引 MEMORY.md 没有 frontmatter 不算问题（它是清单，不是一条记忆）')
+
+  // ── 反面：放行了这三类，别把真问题一起遮掉 ──
+  ok(r.brokenLinks.some((x) => x.target === 'real_ghost'),
+    '代码之外的**真**悬空目标仍然报断链（没被顺手放过）')
+  writeFileSync(join(memDir, 'reference_nofm.md'), '# 没有 frontmatter 的普通记忆\n\n正文\n', 'utf8')
+  const r2 = await auditMemoryDir(memDir)
+  ok(r2.noFrontmatter.some((x) => x.file === 'reference_nofm.md'),
+    '普通记忆缺 frontmatter 仍然报（只放行索引，没放行全体）')
+
+  for (const n of ['MEMORY.md', 'session-log.md', 'reference_talker.md', 'reference_nofm.md']) {
+    rmSync(join(memDir, n), { force: true })
+  }
+}
+
 rmSync(sandbox, { recursive: true, force: true })
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
