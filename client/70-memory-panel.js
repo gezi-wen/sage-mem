@@ -710,6 +710,10 @@
 							}, (pendingDiff ? (pendingDiff + " 项") : "") + "待重启生效")
 						: null,
 					// 主操作：只放当前 tab 的那一个（星图/自动做梦的主操作在各自面板里，不重复摆一份）。
+					// 弹簧：把主操作顶到右边。**换行时它留在上一行**，主操作于是落到下一行、
+					// 左顶格 —— 这正是用 `margin-left:auto` 做不到的（那会把换行后的主操作
+					// 也推到最右，看起来像"跑出格子了"）。
+					h("span", { className: "smem-head-spacer", key: "sp" }),
 					h("span", { className: "smem-head-actions", key: "act" }, tab === "files" ? [
 						h("button", { type: "button", className: "smem-btn", key: "refresh", disabled: busy || loading, onClick: load }, "刷新"),
 						h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "add", onClick: openAdd }, "+ 添加记忆"),

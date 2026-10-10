@@ -29,8 +29,13 @@ const ARGS = process.argv.slice(2)
 const has = (f) => ARGS.includes(f)
 const argOf = (f) => { const i = ARGS.indexOf(f); return i >= 0 ? ARGS[i + 1] : null }
 
-/** 图宽与可视高度：宽度固定 1120（README 里按容器缩放），高度给足再按内容裁掉底部空白。 */
-const WIDTH = 1120
+/**
+ * 图宽与可视高度：默认 1120（README 里按容器缩放），高度给足再按内容裁掉底部空白。
+ *
+ * `SAGE_MEM_IMG_WIDTH` 可以覆盖宽度 —— 用来检查**窄窗口下的换行行为**：
+ * 头部带那类 `flex-wrap` 容器在 1120 宽下永远排得开，溢出问题只有窗口窄了才露出来。
+ */
+const WIDTH = Number(process.env.SAGE_MEM_IMG_WIDTH) || 1120
 const WINDOW_HEIGHT = 1500
 /** 底部留白：与已提交的那批图保持一致。 */
 const BOTTOM_PAD = 26

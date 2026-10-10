@@ -1,6 +1,15 @@
 		const CSS = [
 			".smem-root{display:flex;flex-direction:column;gap:12px;font-size:13px;line-height:1.55;color:var(--dsw-alias-label-primary);max-width:760px;}",
 			".smem-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}",
+			/**
+			 * 头部带里的「弹簧」：吃掉本行的剩余空间，把后面的主操作顶到右边。
+			 *
+			 * 为什么不用 `margin-left:auto`：那个写法在**换行之后依然把它推到最右**，
+			 * 于是窗口一窄（或状态徽标一多）主操作就被挤到下一行的右端，看着像跑出了格子。
+			 * 弹簧换成 `flex:1 1 auto` 之后 —— 放得下时它撑开（主操作靠右），
+			 * 放不下时主操作换行、而弹簧留在上一行，**下一行就是左顶格**。
+			 */
+			".smem-head-spacer{flex:1 1 auto;min-width:0;}",
 			".smem-title{font-size:15px;font-weight:600;}",
 			".smem-dot{width:8px;height:8px;border-radius:50%;background:var(--dsw-alias-state-success-primary,#22c55e);flex:none;}",
 			".smem-dot--bad{background:var(--dsw-alias-state-error-primary,#ef4444);}",
@@ -69,7 +78,8 @@
 			".smem-status--bad{color:var(--dsw-alias-state-error-primary,#dc2626);font-weight:600;}",
 			// 头部带：三个 tab 共用的一条「我在哪 + 现在什么状态 + 主操作」。
 			".smem-head-job{font-size:12.5px;font-weight:600;}",
-			".smem-head-actions{margin-left:auto;display:flex;align-items:center;gap:6px;}",
+			// 头部带主操作：**不用 margin-left:auto**（见 .smem-head-spacer 的注释）
+			".smem-head-actions{display:flex;align-items:center;gap:6px;}",
 			".smem-tool-panel{border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1);padding:10px 12px;display:flex;flex-direction:column;gap:8px;}",
 			// 独立成屏的工具面板（现在的「体检」）：显式占满**可用宽度**。
 			// 整个面板的宽度上限在 `.smem-root`（760px）上，这里只要确保它在任何父容器里

@@ -16,6 +16,7 @@
  *                                                    # $SAGE_MEM_PREVIEW_DIR（默认系统临时目录）
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -1491,6 +1492,30 @@ async function main() {
     ok(settingsPane.indexOf('记忆注入参数') >= 0, '（前提）确实在自动做梦的设置页上')
     ok(settingsPane.indexOf('只出报告') < 0, '自动做梦的设置里不再有三档策略（已挪到「自动归档」页）')
   }
+  // ── 8f. 头部带：主操作换行后左顶格（v0.9.10）────────────────────────────
+  group('8f. 头部带：主操作换行后左顶格')
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const { comp: C } = await loadClient(rt, { memory: mem })
+    const tree = await rt.settle(C, {})
+    const head = all(tree, byClass('smem-head'))[0]
+    ok(!!head, '有头部带')
+
+    // 弹簧必须在主操作**之前**：它吃掉本行剩余空间，放不下时主操作换行、自己留在上一行
+    const ordered = all(head, (n) => n.props && (n.props.className === 'smem-head-spacer' ||
+      String(n.props.className || '').indexOf('smem-head-actions') >= 0))
+    ok(ordered.length === 2 && ordered[0].props.className === 'smem-head-spacer',
+      `弹簧元素在主操作之前（实际：${ordered.map((n) => n.props.className).join(' / ')}）`)
+
+    // CSS 层面：主操作组**不能**再用 margin-left:auto —— 它会把换行后的那一行也推到最右
+    const css = await readFile(new URL('../lib/client.js', import.meta.url), 'utf8')
+    const rule = (css.match(/\.smem-head-actions\{[^}]*\}/) || [''])[0]
+    ok(rule !== '' && rule.indexOf('margin-left:auto') < 0, `主操作组不再用 margin-left:auto（实际：${rule}）`)
+    ok(/\.smem-head-spacer\{[^}]*flex:1/.test(css), '弹簧是 flex:1（吃掉本行剩余空间）')
+    ok(/\.smem-head\{[^}]*flex-wrap:wrap/.test(css), '头部带允许换行（flex-wrap:wrap）')
+  }
+
   group('9. 归档候选：理由 + 逐条 / 批量执行')
   {
     // 9a 逐条
