@@ -1,0 +1,36 @@
+name: 测试
+
+# 为什么 CI 在这里不只是「形式」：
+# 开发机是 Windows（NTFS 默认**不区分大小写**），而 Linux 是区分大小写的 ——
+# 记忆目录的文件名归一、回滚时的同名判定、保留名保护都踩在这条差异上。
+# 在 ubuntu-latest 上跑同一批断言，是这套语义唯一能被真验证的地方。
+# 时区同理：runner 是 UTC，本地是 +08:00。
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['24.x']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      # 断言脚本只依赖 node: 内置模块（不引测试框架、不装依赖）—— 所以没有 install 这一步。
+      - name: 跑全部断言
+        run: npm test
+
+      # 同一批断言再来一遍，显式钉死 UTC：本地是 +08:00，时区敏感的写法会在这里露出来。
+      - name: 跑全部断言（TZ=UTC）
+        run: npm test
+        env:
+          TZ: UTC

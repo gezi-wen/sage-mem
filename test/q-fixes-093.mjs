@@ -18,6 +18,7 @@
 import { mkdtemp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { fsIsCaseInsensitive } from './_platform.mjs'
 
 const LIB = new URL('../lib/', import.meta.url)
 const { AutodreamEngine } = await import(new URL('autodream.js', LIB).href)
@@ -397,10 +398,26 @@ console.log('== Q06e：快照后只改了大小写的文件，整目录回滚不
     const rb = await engine.rollback({ snapshotId: snap.id, scope: 'all' })
     ok(rb.ok === true, '回滚成功', JSON.stringify(rb))
     const hits = (await readdir(memoryDir)).filter((n) => n.toLowerCase() === 'casey.md')
+    /**
+     * 期望几个文件，取决于**这个目录所在的文件系统**（运行时探测，别猜平台）：
+     *   - 不区分大小写（NTFS 默认）：`casey.md` 与 `Casey.md` 是同一个文件 → 恰好 1 个
+     *   - 区分大小写（ext4 等）：它们是两个文件。回滚会按快照名 `casey.md` 写回一份，
+     *     而运行期改出来的 `Casey.md` 因为快照里「有同名」（按大小写归一判定）不会被 park
+     *     —— 于是留下 2 个同内容文件。这是「不敏感归一」在那边**有意选择的代价**：
+     *     宁可多留一个可清理的副本，也不冒「把文件判成不存在而移走」的险。
+     */
+    const caseInsensitive = await fsIsCaseInsensitive(memoryDir)
     ok(
-      hits.length === 1,
-      '顶层仍然有这个文件（旧实现按大小写敏感的 Set 判定 → 先写回、再 park 进 archive/ → 静默消失）',
+      caseInsensitive ? hits.length === 1 : hits.length >= 1,
+      caseInsensitive
+        ? '顶层恰好一个（旧实现按大小写敏感的 Set 判定 → 先写回、再 park 进 archive/ → 静默消失）'
+        : '顶层至少一个（区分大小写的卷上多留一份副本是取舍，不是丢文件）',
       JSON.stringify(await readdir(memoryDir)),
+    )
+    ok(
+      hits.length > 0 && (await readFile(join(memoryDir, hits[0]), 'utf8')).includes('运行前'),
+      '留下的那份内容就是运行前那一版（不论留下几个，内容必须对）',
+      JSON.stringify(hits),
     )
     const arch = await readdir(join(memoryDir, 'archive')).catch(() => [])
     ok(

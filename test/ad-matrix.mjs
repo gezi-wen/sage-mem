@@ -6,6 +6,7 @@ import { mkdtemp, mkdir, writeFile, readFile, readdir, stat, utimes } from 'node
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createHash } from 'node:crypto'
+import { fsIsCaseInsensitive } from './_platform.mjs'
 
 const LIB = new URL('../lib/', import.meta.url)
 const { AutodreamEngine } = await import(new URL('autodream.js', LIB).href)
@@ -210,30 +211,40 @@ console.log('== MODEL-03 开工前的确定性失败不吃失败退避（preflig
   ok(st2.lastResult.changeCount === 0, '运行期故障没有遗留改动')
 }
 
-console.log('== RB-9 / D-2 回归：NTFS 大小写失配也能回滚 ==')
+console.log('== RB-9 / D-2 回归：文件系统不区分大小写时，大小写失配也能回滚 ==')
 {
   const { engine, memoryDir } = await world()
-  const runner = createToolRunner({ memoryDir, sessionsRoot: '', apply: true, withSessions: false })
-  const snap = await engine.snapshot('20261001-160000-cas1', 'run')
-  // 盘上是 a.md，模型给 A.md —— NTFS 下是同一个文件
-  await runner.run('write_memory', {
-    file: 'A.md',
-    content: '---\nname: a\ntype: project\n---\n\n改写后内容\n',
-    reason: '大小写失配',
-  })
-  const c = runner.changes()[0]
-  ok(c.file === 'a.md', `变更记录落到磁盘真实名字（实际 ${c.file}）`)
-  await engine.writeDeclaration({
-    runId: '20261001-160000-cas1', startedAt: Date.now() - 1000, endedAt: Date.now(),
-    reason: 'RB-9', apply: true, source: 'memory', provider: 'p', model: 'm', fromDefault: false,
-    hoursSince: 1, sessionCount: 1, tokensIn: 1, tokensOut: 1, snapshot: snap,
-    changes: runner.changes(), warnings: [], notes: [],
-    auditBefore: { problems: 0 }, auditAfter: { problems: 0 }, finalText: '',
-  })
-  ok((await readFile(join(memoryDir, 'a.md'), 'utf8')).includes('改写后内容'), '写入确实生效（命令与磁盘真实名字是同一个文件）')
-  const rb = await engine.rollback({ snapshotId: snap.id, scope: 'files' })
-  ok(rb.ok === true && rb.restored === 1, `文件级回滚把原版退回来（restored=${rb.restored}, skipped=${rb.skipped}）`, JSON.stringify(rb))
-  ok((await readFile(join(memoryDir, 'a.md'), 'utf8')).includes('原文'), '内容确实是原版')
+  /**
+   * 这条验的是 **NTFS 语义**：盘上是 `a.md`、调用方给 `A.md`，两者是同一个文件。
+   * 在区分大小写的文件系统上它们是两个不同文件，「变更记录落到磁盘真实名字」这句话
+   * 根本不成立 —— 整段跳过，但要把跳过原因打出来（静默跳过等于没测）。
+   */
+  const caseInsensitive = await fsIsCaseInsensitive(memoryDir)
+  if (!caseInsensitive) {
+    console.log('  SKIP 大小写失配回滚（本机文件系统区分大小写：A.md 与 a.md 是两个文件，NTFS 语义不适用）')
+  } else {
+    const runner = createToolRunner({ memoryDir, sessionsRoot: '', apply: true, withSessions: false })
+    const snap = await engine.snapshot('20261001-160000-cas1', 'run')
+    // 盘上是 a.md，模型给 A.md —— NTFS 下是同一个文件
+    await runner.run('write_memory', {
+      file: 'A.md',
+      content: '---\nname: a\ntype: project\n---\n\n改写后内容\n',
+      reason: '大小写失配',
+    })
+    const c = runner.changes()[0]
+    ok(c.file === 'a.md', `变更记录落到磁盘真实名字（实际 ${c.file}）`)
+    await engine.writeDeclaration({
+      runId: '20261001-160000-cas1', startedAt: Date.now() - 1000, endedAt: Date.now(),
+      reason: 'RB-9', apply: true, source: 'memory', provider: 'p', model: 'm', fromDefault: false,
+      hoursSince: 1, sessionCount: 1, tokensIn: 1, tokensOut: 1, snapshot: snap,
+      changes: runner.changes(), warnings: [], notes: [],
+      auditBefore: { problems: 0 }, auditAfter: { problems: 0 }, finalText: '',
+    })
+    ok((await readFile(join(memoryDir, 'a.md'), 'utf8')).includes('改写后内容'), '写入确实生效（命令与磁盘真实名字是同一个文件）')
+    const rb = await engine.rollback({ snapshotId: snap.id, scope: 'files' })
+    ok(rb.ok === true && rb.restored === 1, `文件级回滚把原版退回来（restored=${rb.restored}, skipped=${rb.skipped}）`, JSON.stringify(rb))
+    ok((await readFile(join(memoryDir, 'a.md'), 'utf8')).includes('原文'), '内容确实是原版')
+  }
 }
 
 console.log('== AUD-09 / D-1 回归：有一个文件读不动时，审计不裸抛、单列一类 ==')

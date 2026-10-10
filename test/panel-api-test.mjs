@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fsIsCaseInsensitive } from './_platform.mjs'
 
 const sandbox = join(tmpdir(), `sage-mem-panel-test-${process.pid}`)
 const memDir = join(sandbox, 'memory')
@@ -170,7 +171,17 @@ group('5. readRaw()：保留名原样读、普通记忆被拒')
   ok(bad.ok === false && /readFile|form/.test(String(bad.error)), '普通记忆 → {ok:false} 且文案指路', JSON.stringify(bad))
   let threw = null
   try { await gw.readRaw('memory.md') } catch (e) { threw = e }
-  ok(threw === null, '保留名用大小写变体也读得到（NTFS 不区分大小写）')
+  // ⚠️ 这一段是**文件系统语义**，不是代码语义：不区分大小写的卷上 `memory.md` 就是
+  // `MEMORY.md`（同一个文件），区分大小写的卷上它是另一个名字、读不到才对。
+  // 判据必须运行时探测，猜平台会在别人的机器上给出相反结论。
+  const caseInsensitive = await fsIsCaseInsensitive(memDir)
+  ok(
+    caseInsensitive ? threw === null : threw !== null,
+    caseInsensitive
+      ? '保留名用大小写变体也读得到（本机文件系统不区分大小写）'
+      : '大小写变体读不到（本机文件系统区分大小写：那是另一个文件名，读不到才对）',
+    String(threw?.message ?? '(没抛)'),
+  )
   // 读不到要抛（与 readFile 一致）
   rmSync(join(memDir, 'session-log.md'))
   let missingThrew = null
