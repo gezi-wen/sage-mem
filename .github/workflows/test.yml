@@ -6,8 +6,12 @@ name: 测试
 # 在 ubuntu-latest 上跑同一批断言，是这套语义唯一能被真验证的地方。
 # 时区同理：runner 是 UTC，本地是 +08:00。
 
+# 只挂在 main 上：每笔提交都会**同时推 `feat/autodream` 与 `main` 两个 ref**（内容一致），
+# 挂 `push` 全分支等于同一份代码跑两遍 —— 失败时还会发两条通知，白吵人。
+# 需要单跑别的分支时用 workflow_dispatch。
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 

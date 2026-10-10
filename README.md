@@ -49,13 +49,17 @@ sage-mem 换一条路：**每条记忆就是一个 Markdown 文件**。用编辑
 
 *文件列表 —— 头部带常显「体检 N 个问题」与「待重启生效」，不用点开就知道该不该处理；灰底条目是已归档，随时可以恢复。*
 
-![工具抽屉：体检 / 归档候选 / 保留名编辑，关着时零占位](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/tools-drawer.png)
+![工具抽屉：归档候选 / 保留名编辑，关着时零占位](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/tools-drawer.png)
 
-*工具抽屉 —— 关着时只占一个按钮，展开后三项各带状态：体检 4 个问题 / 归档候选 2 条 / 保留名 3 个。*
+*工具抽屉 —— 关着时只占一个按钮，展开后两项各带状态：归档候选 2 条 / 保留名 3 个。（体检不在这里：它自己有一页。）*
 
-![体检：硬问题按类报红分节，「指向已归档」只作提示](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/audit.png)
+![体检：独立一页，硬问题按类报红分节，「指向已归档」只作提示](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/audit.png)
 
-*体检 —— 索引悬空、漏索引、断链这类硬问题按类报红；「指向已归档」只作提示、不计入问题，也不提供一键修补按钮（改哪条由你决定）。*
+*体检（排在「自动做梦」之后的第 4 个页签）—— 索引悬空、漏索引、断链这类硬问题按类报红；「指向已归档」只作提示、不计入问题，也不提供一键修补按钮（改哪条由你决定）。*
+
+![更新提示：只在真有新版本时出现一条横幅](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/update-banner.png)
+
+*更新提示 —— 只在**真有新版本**时出现一条横幅，写明新版本与当前版本；「看更新内容」开新标签页，「×」只是这次不看。查不到 / 被限流 / 网络不通一律静默，不会因为查版本失败而冒红条。*
 
 ![归档候选：每条写清「为什么建议归档」，确认后才执行](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/archive-candidates.png)
 

@@ -71,6 +71,11 @@
 			".smem-head-job{font-size:12.5px;font-weight:600;}",
 			".smem-head-actions{margin-left:auto;display:flex;align-items:center;gap:6px;}",
 			".smem-tool-panel{border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1);padding:10px 12px;display:flex;flex-direction:column;gap:8px;}",
+			// 独立成屏的工具面板（现在的「体检」）：显式占满**可用宽度**。
+			// 整个面板的宽度上限在 `.smem-root`（760px）上，这里只要确保它在任何父容器里
+			// 都吃满那个上限 —— 抽屉里的小面板没有这个问题（它外面还套着一层），
+			// 而独立成屏后如果父容器不是 column flex，`align-items:stretch` 就不会发生。
+			".smem-tool-panel--full{width:100%;align-self:stretch;box-sizing:border-box;}",
 			// 体检 / 候选是「翻清单」的面板：定高 + 内部滚动，列表不被顶出首屏。
 			// 原样编辑器（.smem-ar-editor）不设上限 —— 那是专心改一份文件的界面，给它完整高度。
 			".smem-tool-panel--cap{max-height:320px;overflow-y:auto;}",
@@ -169,5 +174,12 @@
 			".smem-ad-warn{color:var(--dsw-alias-state-warning-primary,#d97706);}",
 			".smem-chip--fixed{opacity:.72;cursor:default;}",
 			".smem-chip-x{border:0;background:transparent;color:inherit;cursor:pointer;font-size:11px;font-family:inherit;padding:0 0 0 5px;}",
+			// ── 更新提示（有新版本才出现的一条窄横幅）──
+			".smem-update{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--dsw-alias-brand-primary,#4d76e6);border-radius:8px;padding:6px 10px;font-size:12px;background:var(--dsw-alias-bg-layer-1);}",
+			".smem-update-link{color:var(--dsw-alias-brand-primary,#4d76e6);text-decoration:underline;}",
+			".smem-update-x{margin-left:auto;border:0;background:transparent;color:inherit;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;}",
+			// ── 底部一行仓库链接（引流，不抢视线）──
+			".smem-star{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--dsw-alias-label-tertiary,#8b93a1);padding:2px 2px 0;}",
+			".smem-star-link{color:var(--dsw-alias-brand-primary,#4d76e6);text-decoration:underline;}",
 		].join("\n");
 

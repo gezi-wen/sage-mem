@@ -91,6 +91,9 @@
 			const audit = sAudit[0], setAudit = sAudit[1];
 			const sAuditBusy = react.useState(false);
 			const auditBusy = sAuditBusy[0], setAuditBusy = sAuditBusy[1];
+			// 更新提示：只在**确实有新版本**时才被赋值（查不到/限流/网络错都不赋值）
+			const sUpdate = react.useState(null);
+			const updateInfo = sUpdate[0], setUpdateInfo = sUpdate[1];
 			const sCand = react.useState(null);
 			const cand = sCand[0], setCand = sCand[1];
 			const sCandBusy = react.useState(false);
@@ -145,6 +148,19 @@
 				// 头部带的两个徽标要有数据才立得住：体检（只读扫描）与待重启项。
 				runAudit();
 				loadSettings();
+				/**
+				 * 更新检查：**静默**跑，失败一律不打扰 ——
+				 * 网络不通、被 GitHub 限流、仓库还没建 release，都不该在面板上冒一条红。
+				 * 只有 `updateAvailable` 为真才把结果放进 state，界面才有一条横幅。
+				 */
+				if (remote && typeof remote.checkUpdate === "function") {
+					remote.checkUpdate()
+						.then(function (r) {
+							const d = unwrap(r);
+							if (d && d.updateAvailable) setUpdateInfo(d);
+						})
+						.catch(function () { /* 查版本失败不是用户的事 */ });
+				}
 			}, []);
 
 			/**
@@ -397,16 +413,27 @@
 				const next = tool === name ? null : name;
 				setTool(next);
 				setError(null);
-				if (next === "audit" && !audit) runAudit();
 				if (next === "candidates" && !cand) loadCandidates();
 				if (next === "raw" && !settings) loadSettings();
 			}
 
-			/** 打开某个工具（头部带的徽标点进来时用：不切换、直接开）。 */
+			/**
+			 * 切到「体检」这一屏。
+			 *
+			 * 体检从工具抽屉里独立出来了（它本来就是「看」不是「做」），排在「自动做梦」之后。
+			 * 数据没拉过才拉：初始加载已经跑过一次体检（头部带那个徽标要有数据才立得住），
+			 * 切过来通常直接就看得见内容。
+			 */
+			function openAuditTab() {
+				setTab("audit");
+				setError(null);
+				if (!audit) runAudit();
+			}
+
+			/** 打开某个工具（抽屉里点进来时用）。 */
 			function openTool(name) {
 				setTool(name);
 				setError(null);
-				if (name === "audit" && !audit) runAudit();
 				if (name === "candidates" && !cand) loadCandidates();
 				if (name === "raw" && !settings) loadSettings();
 			}
@@ -626,8 +653,11 @@
 					h("button", { type: "button", className: "smem-tab" + (tab === "files" ? " smem-tab--on" : ""), key: "f", onClick: function () { setTab("files"); } }, "文件列表"),
 					h("button", { type: "button", className: "smem-tab" + (tab === "star" ? " smem-tab--on" : ""), key: "s", onClick: function () { setTab("star"); } }, "记忆星图"),
 					h("button", { type: "button", className: "smem-tab" + (tab === "autodream" ? " smem-tab--on" : ""), key: "d", onClick: function () { setTab("autodream"); } }, "自动做梦"),
+					// 体检排在「自动做梦」之后、独立成一屏：它只报告不修改，和「文件列表」里的
+					// 增删改是两件事，塞在工具抽屉里会让人以为它是个动作按钮。
+					h("button", { type: "button", className: "smem-tab" + (tab === "audit" ? " smem-tab--on" : ""), key: "a", onClick: openAuditTab }, "体检"),
 				]),
-				// 三个 tab 共用的一条头部带：我在哪 · 目录状态 · 活动/归档计数 · 体检徽标 · 待重启徽标 · 主操作。
+				// 四个 tab 共用的一条头部带：我在哪 · 目录状态 · 活动/归档计数 · 体检徽标 · 待重启徽标 · 主操作。
 				// 层级形状固定：导航＝下划线（.smem-tabs）、筛选＝chip、动作＝按钮，三种不混用。
 				h("div", { className: "smem-head", key: "head" }, [
 					h("span", { className: "smem-title", key: "t" }, "记忆管理"),
@@ -635,13 +665,12 @@
 					h("span", { className: "smem-dot" + (dirOk ? "" : " smem-dot--bad"), key: "dot", title: dirOk ? "memory 目录可读" : "memory 目录不可读" }),
 					h("span", { className: "smem-muted", key: "st" }, dirOk ? "目录可读" : "目录不可读"),
 					h("span", { className: "smem-badge", key: "cnt" }, headerCount),
-					// 体检徽标：**抽屉关着也一直看得见**。整个「工具收进抽屉」的方案就靠它成立 ——
-					// 没有这个徽标，三个能力就退回「藏起来」了（上一轮刚把它们做成用户自己的入口）。
+					// 体检徽标：**抽屉关着也一直看得见**，点它就切到「体检」那一屏。
 					h("button", {
 						type: "button", key: "aud",
 						className: "smem-tool-badge" + (audit && audit.problems ? " smem-tool-badge--bad" : ""),
-						title: audit ? (audit.problems ? "打开体检看是哪几条" : "体检没有发现问题") : "跑一次体检（只读）",
-						onClick: function () { openTool("audit"); },
+						title: audit ? (audit.problems ? "切到体检看是哪几条" : "体检没有发现问题") : "跑一次体检（只读）",
+						onClick: openAuditTab,
 					}, audit ? (audit.problems ? ("体检 " + audit.problems + " 个问题") : "体检 通过") : "体检 · 未跑"),
 					restartPending
 						? h("button", {
@@ -656,6 +685,22 @@
 						h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "add", onClick: openAdd }, "+ 添加记忆"),
 					] : null),
 				]),
+				// 更新提示：四个 tab 共用一条，只在真有新版时出现；「×」只是这次不看
+				updateInfo
+					? h("div", { className: "smem-update", key: "update" }, [
+							h("span", { key: "t" }, "发现新版本 v" + String(updateInfo.latest) + "（当前 v" + String(updateInfo.current) + "）"),
+							h("a", {
+								key: "l", className: "smem-update-link",
+								href: updateInfo.releasesUrl || "https://github.com/gezi-wen/sage-mem/releases",
+								target: "_blank", rel: "noreferrer",
+							}, "看更新内容"),
+							h("button", {
+								type: "button", key: "x", className: "smem-update-x",
+								title: "这次不看了（下次进面板还会提示）",
+								onClick: function () { setUpdateInfo(null); },
+							}, "×"),
+						])
+					: null,
 				// 工具栏只剩「搜索 + 工具 ▾」：刷新与添加已经收进头部带的主操作位。
 				tab === "files" ? h("div", { className: "smem-toolbar", key: "bar" }, [
 					h("input", { className: "smem-search", key: "q", value: query, placeholder: "搜索文件名 / 描述 / 类型 / 标签…", onChange: function (e) { setQuery(e.target.value); } }),
@@ -665,15 +710,11 @@
 							type: "button", key: "btn",
 							className: "smem-btn" + (drawer ? " smem-btn-primary" : ""),
 							"aria-expanded": drawer ? "true" : "false",
-							title: "体检 / 归档候选 / 保留名编辑",
+							title: "归档候选 / 保留名编辑",
 							onClick: function () { setDrawer(!drawer); },
 						}, "工具 ▾"),
 						drawer ? h("div", { className: "smem-drawer-pop", key: "pop" }, [
-							h("button", {
-								type: "button", className: "smem-drawer-item", key: "a",
-								"data-on": tool === "audit" ? "1" : "0",
-								onClick: function () { toggleTool("audit"); setDrawer(false); },
-							}, ["体检", h("span", { className: "smem-status" + (audit && audit.problems ? " smem-status--bad" : ""), key: "s" }, audit ? (audit.problems ? (audit.problems + " 个问题") : "通过") : "未跑")]),
+							// 体检独立成 tab 之后，抽屉里只剩这两件「要动手」的事。
 							h("button", {
 								type: "button", className: "smem-drawer-item", key: "c",
 								"data-on": tool === "candidates" ? "1" : "0",
@@ -687,8 +728,8 @@
 						]) : null,
 					]),
 				]) : null,
-				tab === "files" && tool === "audit"
-					? h(AuditPanel, { report: audit, busy: auditBusy, onRun: runAudit, onClose: function () { setTool(null); } })
+				tab === "audit"
+					? h(AuditPanel, { report: audit, busy: auditBusy, onRun: runAudit, standalone: true })
 					: null,
 				tab === "files" && tool === "candidates"
 					? h(CandidatePanel, {
@@ -819,7 +860,13 @@
 					: tab === "star"
 					? h("div", { className: "smem-starmap", key: "starmap" },
 							h(StarmapRuntime.StarMap, { ctx: props.ctx }))
+					: tab === "audit"
+					// 体检面板在上面已经渲染过了 —— 这里必须显式给 null，
+					// 否则会落进下面那个 `filesView` 兜底分支，变成「体检 + 一整套文件列表」同屏。
+					? null
 					: filesView,
+				// 底部一行仓库链接（四个 tab 都在，不抢视线）
+				h(StarLine, { key: "star-line" }),
 			]);
 		}
 

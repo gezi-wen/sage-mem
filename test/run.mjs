@@ -24,6 +24,7 @@ const SUITES = [
   'q-fixes-093.mjs',
   'q-fixes-094.mjs',
   'q-fixes-095.mjs',
+  'update-test.mjs',
   'retrieval-test.mjs',
   'typert-test.mjs',
   'inject-test.mjs',

@@ -364,15 +364,15 @@ group('10. 归档文件的读 / 写：改正文但留痕不许丢')
   ok(readInvalid !== null && /invalid file name/.test(readInvalid.message), 'readArchived 带路径成分 → 抛错', String(readInvalid?.message))
 
   // ④ 「归档 = 不删」：这两条 remote 之外不许有删除/出档的入口。
-  // D1 起 memory 面从 9 条长到 15 条（audit / archiveCandidates / getSettings / setSettings /
-  // readRaw / writeRaw），契约面由 client-exec 的 28 条对表守着；这里仍然逐名列全，
+  // D1 起 memory 面从 9 条长到 16 条（audit / archiveCandidates / checkUpdate / getSettings /
+  // setSettings / readRaw / writeRaw），契约面由 client-exec 的 29 条对表守着；这里仍然逐名列全，
   // 防的是「顺手加了个 deleteArchived」这种没人看出来的新入口。
   const methods = Object.getOwnPropertyNames(mod.MemoryGateway.prototype).filter((n) => n !== 'constructor' && !n.startsWith('@')).sort()
   ok(JSON.stringify(methods) === JSON.stringify([
-    'archive', 'archiveCandidates', 'audit', 'deleteFile', 'getSettings', 'listArchived', 'listFiles',
+    'archive', 'archiveCandidates', 'audit', 'checkUpdate', 'deleteFile', 'getSettings', 'listArchived', 'listFiles',
     'readArchived', 'readFile', 'readRaw', 'restore', 'setSettings', 'writeArchived', 'writeFile', 'writeRaw',
   ]),
-    'memory 面恰好 15 个方法，没有 deleteArchived 之类的新入口', methods.join(','))
+    'memory 面恰好 16 个方法，没有 deleteArchived 之类的新入口', methods.join(','))
 
   // ⑤ 真实输出过一遍 manifest schema
   const { TYPERT } = await import(new URL('typert.host.js', LIB).href)

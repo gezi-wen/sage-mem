@@ -122,6 +122,16 @@
 					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
 				},
 				{
+					id: "sage-mem#memory/checkUpdate",
+					service: "memory",
+					namespace: "memory",
+					method: "checkUpdate",
+					invocation: { kind: "direct" },
+					parameters: [],
+					result: { mode: "strict", typeSymbol: "sage-mem/types#UpdateCheck", schema: objCodec, create: () => objCodec },
+					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
+				},
+				{
 					id: "sage-mem#memory/archiveCandidates",
 					service: "memory",
 					namespace: "memory",

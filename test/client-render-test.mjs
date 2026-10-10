@@ -234,7 +234,7 @@ function makeMemoryRemote(active, archived, raw) {
   const st = {
     active: active.map((x) => ({ ...x })), archived: archived.map((x) => ({ ...x })),
     calls: [], raw: { ...(raw || {}) },
-    audit: null, cand: null, settings: null,
+    audit: null, cand: null, settings: null, update: null,
   }
   return {
     st,
@@ -258,6 +258,14 @@ function makeMemoryRemote(active, archived, raw) {
     getSettings() {
       st.calls.push(['getSettings'])
       return Promise.resolve(st.settings || { limits: {}, pendingLimits: {}, restartRequired: false, reserved: ['memory.md', 'session-log.md'], reservedExtra: [] })
+    },
+    // 更新检查：默认「没有新版」，所以不进面板也不会让任何既有断言多出一条横幅
+    checkUpdate() {
+      st.calls.push(['checkUpdate'])
+      return Promise.resolve(st.update || {
+        current: '0.0.0', latest: null, updateAvailable: false, rateLimited: false,
+        error: '', releasesUrl: 'https://github.com/gezi-wen/sage-mem/releases',
+      })
     },
     setSettings(patch) {
       st.calls.push(['setSettings', patch])
@@ -688,7 +696,7 @@ function replayTag(replay) {
  */
 const README_HEADLINE = {
   'files-list': '文件列表：每条记忆是一个 Markdown 文件；灰底的那几条是已归档',
-  'tools-drawer': '工具抽屉：体检 / 归档候选 / 保留名编辑 —— 关着时零占位，开了各带状态',
+  'tools-drawer': '工具抽屉：归档候选 / 保留名编辑 —— 关着时零占位，开了各带状态',
   audit: '体检：硬问题按类报红分节；「指向已归档」只作提示，不计入问题',
   'archive-candidates': '归档候选：每条都写清「为什么建议归档」，确认后才动文件',
   'starmap-archive': '记忆星图：暗星是已归档的记忆，点开看归档时间、理由与恢复入口',
@@ -719,7 +727,7 @@ async function emitPreview() {
     const tree = await rt.settle(C, {})
     S('files-list', 'docs/images/files-list.png', '文件列表 —— 头部带常显「体检 N 个问题」与「待重启生效」，不用点开就知道该不该处理；灰底条目是已归档，随时可以恢复。', '① 文件列表 · 常态（工具抽屉关着，头部带常显「体检 4 个问题」）', serHtml(tree))
   }
-  // ② 文件列表 · 抽屉打开（三项各带状态）+ 体检面板（定高）
+  // ② 文件列表 · 抽屉打开（两项各带状态）
   {
     const rt = makeReact()
     const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
@@ -728,9 +736,9 @@ async function emitPreview() {
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
     let tree = await rt.settle(C, {})
     tree = await openDrawer(rt, C, tree)
-    S('tools-drawer', 'docs/images/tools-drawer.png', '工具抽屉 —— 关着时只占一个按钮，展开后三项各带状态：体检 4 个问题 / 归档候选 2 条 / 保留名 3 个。', '② 文件列表 · 工具抽屉打开（每项带状态；关着时零占位）', serHtml(tree))
+    S('tools-drawer', 'docs/images/tools-drawer.png', '工具抽屉 —— 关着时只占一个按钮，展开后两项各带状态：归档候选 2 条 / 保留名 3 个。（体检不在这里：它自己有一屏。）', '② 文件列表 · 工具抽屉打开（每项带状态；关着时零占位）', serHtml(tree))
   }
-  // ③ 文件列表 · 抽屉里开体检（面板定高 + 内部滚动，列表还在首屏）
+  // ③ 体检 · 独立一屏（排在「自动做梦」之后的第 4 个页签）
   {
     const rt = makeReact()
     const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
@@ -738,8 +746,22 @@ async function emitPreview() {
     mem.st.settings = LIMITS_FIXTURE
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
     let tree = await rt.settle(C, {})
-    tree = await openTool(rt, C, tree, '体检')
-    S('audit', 'docs/images/audit.png', '体检 —— 索引悬空、漏索引、断链这类硬问题按类报红；「指向已归档」只作提示、不计入问题，也不提供一键修补按钮（改哪条由你决定）。', '③ 文件列表 · 体检面板（定高 320px、内部滚动；硬问题红、提示灰）', serHtml(tree))
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '体检')[0])
+    tree = await rt.settle(C, {})
+    S('audit', 'docs/images/audit.png', '体检 —— 索引悬空、漏索引、断链这类硬问题按类报红；「指向已归档」只作提示、不计入问题，也不提供一键修补按钮（改哪条由你决定）。', '③ 体检（独立页签，排在自动做梦之后；硬问题红、提示灰）', serHtml(tree))
+  }
+  // ③c 更新提示（有新版本时的一条横幅）
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    mem.st.audit = AUDIT_WITH_PROBLEMS
+    mem.st.update = {
+      current: '0.9.6', latest: '0.9.7', updateAvailable: true, rateLimited: false, error: '',
+      releasesUrl: 'https://github.com/gezi-wen/sage-mem/releases',
+    }
+    const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
+    const tree = await rt.settle(C, {})
+    S('update-banner', 'docs/images/update-banner.png', '更新提示 —— 只在**真有新版本**时出现一条横幅，写明新版本与当前版本；「看更新内容」开新标签页，「×」只是这次不看（下次进面板还会提示）。', '④ 文件列表 · 发现新版本', serHtml(tree))
   }
   // ③b 文件列表 · 归档候选（勾一条 → 执行归档；每条带「为什么建议归档」）
   {
@@ -1247,12 +1269,33 @@ async function main() {
     mem.st.audit = AUDIT_WITH_PROBLEMS
     const { comp: C } = await loadClient(rt, { memory: mem })
     let tree = await rt.settle(C, {})
-    // 头部带的体检徽标：抽屉关着也看得见（这是抽屉方案能成立的前提）
+    // 头部带的体检徽标：**每个 tab 下**都看得见（这是「体检自己有一屏」能成立的前提）
     const badge = all(tree, (n) => n.type === 'button' && byClass('smem-tool-badge')(n) && textOf(n).indexOf('体检') === 0)[0]
     ok(!!badge && textOf(badge).indexOf('4 个问题') >= 0,
-      `抽屉关着时头部就有「体检 4 个问题」徽标（实际：${badge ? textOf(badge) : '没有'}）`)
-    tree = await openTool(rt, C, tree, '体检')
-    ok(mem.st.calls.some((c) => c[0] === 'audit'), '点了就调 memory.audit()')
+      `任何 tab 下头部都有「体检 4 个问题」徽标（实际：${badge ? textOf(badge) : '没有'}）`)
+
+    // 页签顺序：体检独立成第 4 个，排在「自动做梦」**之后**
+    const tabLabels = all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n)).map(textOf)
+    ok(JSON.stringify(tabLabels) === JSON.stringify(['文件列表', '记忆星图', '自动做梦', '体检']),
+      `体检独立成第 4 个页签、排在自动做梦之后（实际：${tabLabels.join(' / ')}）`)
+
+    // 点徽标就能切过去（徽标是「一直看得见」的那条路）
+    click(badge)
+    tree = await rt.settle(C, {})
+    ok(mem.st.calls.some((c) => c[0] === 'audit'), '切到体检这一屏会拉一次 audit')
+
+    // 抽屉里不该再有体检：那边只剩两件「要动手」的事。
+    // ⚠️ 「工具 ▾」只在文件列表这一屏渲染，所以要先切回去再验。
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '文件列表')[0])
+    tree = await rt.settle(C, {})
+    const t2 = await openDrawer(rt, C, tree)
+    const drawerLabels = all(t2, (n) => n.type === 'button' && byClass('smem-drawer-item')(n)).map(textOf)
+    ok(!drawerLabels.some((x) => x.indexOf('体检') === 0), `抽屉里不再有「体检」（实际：${drawerLabels.join(' / ')}）`)
+    click(btnHas(t2, '工具')[0]) // 收起抽屉
+    tree = await rt.settle(C, {})
+    // 再切回体检那一屏看结果
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '体检')[0])
+    tree = await rt.settle(C, {})
 
     const panel = all(tree, byClass('smem-tool-panel'))[0]
     ok(!!panel, '体检结果区出现')
@@ -1271,8 +1314,53 @@ async function main() {
       '提示里列出条目并说明「不用改」')
 
     const panelBtns = all(panel, (n) => n.type === 'button').map(textOf)
-    ok(panelBtns.length === 2 && panelBtns[0] === '重新体检' && panelBtns[1] === '收起',
-      `只读：面板里只有「重新体检」与「收起」两个按钮、没有任何修补入口（实际：${panelBtns.join(' / ')}）`)
+    ok(panelBtns.length === 1 && panelBtns[0] === '重新体检',
+      `只读：面板里只有「重新体检」一个按钮（独立成屏后没有「收起」）、没有任何修补入口（实际：${panelBtns.join(' / ')}）`)
+    // ⚠️ 这条是**看图**才发现的：三元链最后是 `: filesView` 兜底，audit 曾经落进 else 分支 →
+    // 体检面板下面还跟着一整套文件卡片。DOM 断言当时只找「体检面板在不在」，没发现多了一屏。
+    ok(all(tree, byClass('smem-card')).length === 0,
+      `体检这一屏只有体检，不该再渲染文件列表卡片（实际 ${all(tree, byClass('smem-card')).length} 张）`)
+
+    // 底部一行仓库引流：不占一屏、语气轻、点开是新标签页
+    const star = all(tree, (n) => n.props && n.props.className === 'smem-star')[0]
+    ok(!!star, '面板底部有一行仓库引流')
+    const starLink = all(tree, (n) => n.type === 'a' && n.props && String(n.props.href || '').indexOf('github.com/gezi-wen/sage-mem') >= 0)[0]
+    ok(!!starLink, '引流链接指向仓库', starLink ? String(starLink.props.href) : '没有链接')
+    ok(!!starLink && starLink.props.target === '_blank' && String(starLink.props.rel).indexOf('noreferrer') >= 0,
+      '新标签页打开、带 noreferrer')
+  }
+
+  // ── 8b. 更新提示：只有真有新版才出现一条横幅 ─────────────────────────────
+  group('8b. 更新提示：有新版本才出现，且「×」只关这一次')
+  {
+    const mk = (update) => {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      mem.st.audit = AUDIT_WITH_PROBLEMS
+      mem.st.update = update
+      return loadClient(rt, { memory: mem }).then(({ comp: C }) => rt.settle(C, {}).then((tree) => ({ rt, C, tree, mem })))
+    }
+    const isBanner = (n) => n.props && n.props.className === 'smem-update'
+
+    const none = await mk({ current: '0.9.6', latest: '0.9.6', updateAvailable: false, rateLimited: false, error: '', releasesUrl: '' })
+    ok(!all(none.tree, isBanner)[0], '没有新版 → 一条横幅都不出现（查版本失败同理）')
+    ok(none.mem.st.calls.some((c) => c[0] === 'checkUpdate'), '进面板会静默查一次版本')
+
+    const some = await mk({
+      current: '0.9.6', latest: '9.9.9', updateAvailable: true, rateLimited: false, error: '',
+      releasesUrl: 'https://github.com/gezi-wen/sage-mem/releases',
+    })
+    const banner = all(some.tree, isBanner)[0]
+    ok(!!banner, '有新版本 → 出现一条横幅')
+    const bt = treeText(banner || {})
+    ok(bt.indexOf('9.9.9') >= 0 && bt.indexOf('0.9.6') >= 0, `横幅写明新版本与当前版本（${bt}）`)
+    const upLink = all(banner, (n) => n.type === 'a')[0]
+    ok(!!upLink && String(upLink.props.href).indexOf('releases') >= 0, '带「看更新内容」的链接（地址由宿主给）')
+
+    click(all(banner, (n) => n.type === 'button')[0])
+    const after = await some.rt.settle(some.C, {})
+    ok(!all(after, isBanner)[0], '点「×」→ 横幅消失（这次不看）')
+    ok(!!all(after, (n) => n.props && n.props.className === 'smem-star')[0], '底部的仓库引流不受影响')
   }
 
   // ── 9. 归档候选：每条都说清为什么 + 确认后执行 ───────────────────────────
@@ -1554,12 +1642,12 @@ async function main() {
     ok(!!rsBadge && rsBadge.props.className.indexOf('smem-ad-badge--warn') >= 0, `头部也常显「待重启生效」徽标（${rsBadge && textOf(rsBadge)}）`)
     ok(!!btnHas(tree, '工具')[0], '工具栏里只有一个「工具 ▾」按钮')
 
-    // 13c 点开抽屉：三项都在，且各自带状态
+    // 13c 点开抽屉：只剩两件「要动手」的事（体检已经独立成页签，不在这里）
     tree = await openDrawer(rt, C, tree)
     const items = all(tree, byClass('smem-drawer-item'))
-    ok(items.length === 3, `抽屉里有三项（${items.map(textOf).join(' / ')}）`)
+    ok(items.length === 2, `抽屉里有两项（${items.map(textOf).join(' / ')}）`)
     const itemText = items.map(textOf).join(' | ')
-    ok(itemText.indexOf('体检') >= 0 && itemText.indexOf('4 个问题') >= 0, '体检项带「4 个问题」')
+    ok(itemText.indexOf('体检') < 0, '体检不在抽屉里（它自己有一屏）')
     ok(itemText.indexOf('归档候选') >= 0, '归档候选项在（未取数时显示「未取」）')
     ok(itemText.indexOf('保留名编辑') >= 0 && itemText.indexOf('3 个') >= 0, '保留名编辑项带数量（memory.md / session-log.md / project_notes.md）')
     ok(drawerItem(tree, '归档候选') && textOf(drawerItem(tree, '归档候选')).indexOf('未取') >= 0,
@@ -1570,7 +1658,7 @@ async function main() {
     tree = await rt.settle(C, {})
     ok(all(tree, byClass('smem-tool-panel')).length === 1, '抽屉里选一项就开出对应面板')
     ok(all(tree, byClass('smem-tool-panel'))[0].props.className.indexOf('smem-tool-panel--cap') >= 0,
-      '体检 / 候选面板带定高（列表不被顶出首屏）')
+      '抽屉里的面板带定高（列表不被顶出首屏）；体检独立成屏后不再限高')
     tree = await openTool(rt, C, tree, '归档候选')
     ok(all(tree, byClass('smem-tool-panel')).length === 0, '再选一次同一个工具 → 面板收起')
 
@@ -1630,18 +1718,18 @@ async function main() {
     tree = await openDrawer(rt, C, tree)
     ok(fakeDoc.listenerCount('click') === 1 && fakeDoc.listenerCount('keydown') === 1,
       `展开后挂上一个 click + 一个 keydown 监听（click ${fakeDoc.listenerCount('click')} / keydown ${fakeDoc.listenerCount('keydown')}）`)
-    click(drawerItem(tree, '体检'))
+    click(drawerItem(tree, '归档候选'))
     tree = await rt.settle(C, {})
-    ok(drawerItem(tree, '体检') === undefined, '点条目 → 抽屉收起')
-    ok(all(tree, byClass('smem-tool-panel')).length === 1, '点条目同时把对应面板打开')
+    ok(drawerItem(tree, '归档候选') === undefined, '点条目 → 抽屉收起')
+    ok(all(tree, byClass('smem-tool-panel')).length >= 1, '点条目同时把对应面板打开')
     ok(fakeDoc.listenerCount('click') === 0 && fakeDoc.listenerCount('keydown') === 0, '点条目关掉后监听也摘掉')
 
     // 14c 点外部关闭
     tree = await openDrawer(rt, C, tree)
-    ok(!!drawerItem(tree, '体检'), '重新展开：条目在')
+    ok(!!drawerItem(tree, '归档候选'), '重新展开：条目在')
     fakeDoc.fire('click', {})
     tree = await rt.settle(C, {})
-    ok(drawerItem(tree, '体检') === undefined, '点外部 → 抽屉关闭')
+    ok(drawerItem(tree, '归档候选') === undefined, '点外部 → 抽屉关闭')
     ok(fakeDoc.listenerCount('click') === 0 && fakeDoc.listenerCount('keydown') === 0, '关闭后监听成对摘掉，不留悬挂')
     ok(all(tree, (n) => n.type === 'button' && byClass('smem-tool-badge')(n) && textOf(n).indexOf('体检 4 个问题') >= 0).length === 1,
       '点外部关掉后头部徽标照样在（可发现性不随抽屉丢）')
@@ -1649,20 +1737,25 @@ async function main() {
 
     // 14d Esc 关闭
     tree = await openDrawer(rt, C, tree)
-    ok(!!drawerItem(tree, '体检'), '再次展开：条目在')
+    ok(!!drawerItem(tree, '归档候选'), '再次展开：条目在')
     fakeDoc.fire('keydown', { key: 'Escape' })
     tree = await rt.settle(C, {})
-    ok(drawerItem(tree, '体检') === undefined, 'Esc → 抽屉关闭')
+    ok(drawerItem(tree, '归档候选') === undefined, 'Esc → 抽屉关闭')
     ok(fakeDoc.listenerCount('keydown') === 0, 'Esc 关闭后 keydown 监听也摘掉')
 
     // 14e 别的按键不该关；抽屉里换一个工具；面板里的「收起」能关面板
     tree = await openDrawer(rt, C, tree)
     fakeDoc.fire('keydown', { key: 'a' })
     tree = await rt.settle(C, {})
-    ok(!!drawerItem(tree, '体检'), '按别的键（a）不关抽屉')
+    ok(!!drawerItem(tree, '归档候选'), '按别的键（a）不关抽屉')
+    // ⚠️ 要**换**一个工具（候选面板这会儿正开着，再点它等于关掉）
+    click(drawerItem(tree, '保留名编辑'))
+    tree = await rt.settle(C, {})
+    ok(treeText(all(tree, byClass('smem-tool-panel'))[0] || {}).indexOf('保留名') >= 0, '抽屉里换成「保留名编辑」→ 面板跟着换')
+    // 切回候选面板来验「收起」（保留名编辑那屏没有这个按钮）
+    tree = await openDrawer(rt, C, tree)
     click(drawerItem(tree, '归档候选'))
     tree = await rt.settle(C, {})
-    ok(treeText(all(tree, byClass('smem-tool-panel'))[0] || {}).indexOf('归档候选') >= 0, '抽屉里换成「归档候选」→ 面板跟着换')
     click(btnHas(all(tree, byClass('smem-tool-panel'))[0], '收起')[0])
     tree = await rt.settle(C, {})
     ok(all(tree, byClass('smem-tool-panel')).length === 0, '面板里的「收起」把面板关掉')

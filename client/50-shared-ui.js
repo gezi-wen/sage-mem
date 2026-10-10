@@ -415,8 +415,8 @@
 		};
 		const autoArchiveOf = (v) => (v === "off" || v === "auto" ? v : "report");
 
-		/** 头部带上的「我在哪」：三个 tab 的中文名（与 .smem-tabs 上的字面一致）。 */
-		const TAB_LABEL = { files: "文件列表", star: "记忆星图", autodream: "自动做梦" };
+		/** 头部带上的「我在哪」：四个 tab 的中文名（与 .smem-tabs 上的字面一致）。 */
+		const TAB_LABEL = { files: "文件列表", star: "记忆星图", autodream: "自动做梦", audit: "体检" };
 
 		/**
 		 * 工具面板头部的「收起」按钮：抽屉里开的工具要能一键收回去 ——
@@ -435,8 +435,33 @@
 		 * 硬问题与提示**分开渲染**：`archivedLinks` 是提示（归档不是删除，目标还在档案馆里），
 		 * 跟问题一样染红会让人去「修」一条本来正确的链接 —— 那正是审计里那条分界线。
 		 */
+		/**
+		 * 面板底部的一行仓库链接。
+		 *
+		 * 参照手机访问插件那一行的做法：放在不抢视线的地方、语气轻、点开是新标签页。
+		 * 它**是引流不是功能** —— 所以不占一屏、不做成按钮、失败也没有任何副作用；
+		 * 四个 tab 下都在（谁也没必要为看它切页）。
+		 */
+		function StarLine() {
+			return h("div", { className: "smem-star" }, [
+				h("span", { key: "ask" }, "⭐ 顺手留颗 Star，作者能高兴一整天"),
+				h("a", {
+					key: "cta",
+					href: "https://github.com/gezi-wen/sage-mem",
+					target: "_blank",
+					rel: "noreferrer",
+					className: "smem-star-link",
+				}, "行，给你一颗 Star"),
+			]);
+		}
+
 		function AuditPanel(props) {
 			const r = props.report || {};
+			/**
+			 * 独立成 tab 时不套抽屉那层窄框（`--cap` 有 320px 限高）、也不给「收起」按钮 ——
+			 * 它不是「暂时摊开的一层」，它就是这一屏。
+			 */
+			const standalone = props.standalone === true;
 			const rows = (list, render) => (list || []).map(function (x, i) {
 				return h("div", { className: "smem-audit-row", key: String(x.file || "?") + "-" + i }, render(x));
 			});
@@ -447,7 +472,7 @@
 					])
 				: null);
 			const hints = r.archivedLinks || [];
-			return h("div", { className: "smem-tool-panel smem-tool-panel--cap", key: "audit" }, [
+			return h("div", { className: "smem-tool-panel" + (standalone ? " smem-tool-panel--full" : " smem-tool-panel--cap"), key: "audit" }, [
 				h("div", { className: "smem-tool-head", key: "head" }, [
 					h("span", { className: "smem-tool-title", key: "t" }, "体检"),
 					h("span", { className: "smem-muted", key: "s" },
@@ -457,7 +482,7 @@
 					h("span", { className: "smem-tool-badge" + (r.problems ? " smem-tool-badge--bad" : ""), key: "p" },
 						r.problems ? ("问题 " + r.problems) : "没有问题"),
 					h("button", { type: "button", className: "smem-btn", key: "again", disabled: props.busy, onClick: props.onRun }, props.busy ? "体检中…" : "重新体检"),
-					toolClose(props),
+					standalone ? null : toolClose(props),
 				]),
 				r.problems
 					? h("div", { className: "smem-audit-secs", key: "secs" }, [
