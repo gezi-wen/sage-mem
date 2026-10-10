@@ -83,7 +83,7 @@ console.log('== R-8：自动触发不能被自己的扫描节流挡死 ==')
   const g = await engine.gate()
   ok(g.ok === true, '门控本身通过（时间门 + 会话门）', JSON.stringify(g))
 
-  // 先证明「旧写法确实会死」——这是评审的推理，必须自己复现出来才算数
+  // 先证明「旧写法确实会死」—— 必须自己复现出来才算数，不能只凭推理
   const buggy = await engine.run({ reason: '自动（门控通过）' })
   ok(buggy.ok === false && String(buggy.error).includes('节流'), '旧写法（run 内再跑一次 gate）确实被节流挡回', JSON.stringify(buggy))
 

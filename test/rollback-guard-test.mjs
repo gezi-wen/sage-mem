@@ -9,7 +9,7 @@
  *
  * 说明两处测法：
  *   - G-1 的「枚举失败」用**真实** ENOTDIR（把记忆路径做成一个文件）验证；
- *     「保护快照残缺」在 `snapshot()` 边界做**故障注入**（评审的复现手法也是注入），
+ *     「保护快照残缺」在 `snapshot()` 边界做**故障注入**（故障注入是这类缺陷的常用复现手法），
  *     因为要让单个文件的读取真的失败得靠 icacls 拒权，那在 CI 里不稳定。
  *   - G-2 用**真实的** `archiveMemory()` 把文件移走（连 `archived_at` 留痕一起产生），
  *     再按运行记录的真实形状造 manifest —— 归档这一步不是模拟的。
@@ -77,7 +77,7 @@ console.log('== G-1b：保护快照残缺 → 回滚中止，记忆目录一个�
   const CURRENT = '---\nname: a\ntype: project\n---\n\n# A\n\n这是当前版本，绝不能被覆盖\n'
   await writeFile(join(memoryDir, 'a.md'), CURRENT, 'utf8')
 
-  // 故障注入：让「回滚前保护快照」缺一个文件（评审的复现同法）
+  // 故障注入：让「回滚前保护快照」缺一个文件（同一手法）
   const orig = engine.snapshot.bind(engine)
   engine.snapshot = async (id, kind) => {
     const r = await orig(id, kind)

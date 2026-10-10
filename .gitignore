@@ -1,3 +1,5 @@
 node_modules/
 *.bak-*
 pnpm-workspace.yaml
+# 打包产物：发布时由 pnpm pack 现生成，不该进仓库
+*.tgz
