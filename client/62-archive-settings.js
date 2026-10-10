@@ -19,7 +19,7 @@
 		 * 保存后**一定回读**（`setConfig` 对非法值是「忽略并保留原值」，只信返回值会骗人）。
 		 */
 		function ArchiveSettingsPanel(props) {
-			const remote = props.ctx && props.ctx.get ? props.ctx.get("remote.autodream") : null;
+			const remote = stableRemote(props.ctx, "remote.autodream");
 			const sCfg = react.useState(null); const cfg = sCfg[0], setCfg = sCfg[1];
 			const sDraft = react.useState(null); const draft = sDraft[0], setDraft = sDraft[1];
 			const sErr = react.useState(null); const err = sErr[0], setErr = sErr[1];

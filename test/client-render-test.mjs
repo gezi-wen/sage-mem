@@ -471,7 +471,18 @@ async function loadClient(rt, remotes) {
     },
     // 注册组件是 `(props) => react.createElement(Section, { ...props, ctx })`：
     // ctx 在 apply 时就闭包进去了，所以 remote 只能从这里给。
-    get: (name) => (remotes ? remotes[String(name).replace(/^remote\./, '')] : undefined),
+    get: (name) => {
+      const r = remotes ? remotes[String(name).replace(/^remote\./, '')] : undefined
+      /**
+       * `remotes.unstableRemoteRefs`：模拟**真实宿主**的行为 —— 每次 `ctx.get()` 都返回一个
+       * 新的包装对象（原型链上带着方法）。
+       *
+       * 默认返回同一个对象是**假的安全**：issue #3 那个「effect 依赖 remote → 无限 RPC 风暴」
+       * 就是这么被漏掉的（渲染期取一次 + 依赖它 → 每次渲染都重跑 effect）。
+       */
+      if (r && remotes && remotes.unstableRemoteRefs) return Object.create(r)
+      return r
+    },
   }
   await mod.apply(ctx)
   // 面板与星图的 CSS 都是模块里 injectCss / apply 注入的：这里顺手留一份给静态预览
@@ -1514,6 +1525,28 @@ async function main() {
     ok(rule !== '' && rule.indexOf('margin-left:auto') < 0, `主操作组不再用 margin-left:auto（实际：${rule}）`)
     ok(/\.smem-head-spacer\{[^}]*flex:1/.test(css), '弹簧是 flex:1（吃掉本行剩余空间）')
     ok(/\.smem-head\{[^}]*flex-wrap:wrap/.test(css), '头部带允许换行（flex-wrap:wrap）')
+  }
+
+  // ── 8g. remote 引用不稳定时不许滚成无限请求（issue #3）──────────────────
+  group('8g. remote 引用不稳定 → 不进入无限请求循环')
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const ad = makeAutodreamRemote()
+    // 真实宿主的 ctx.get 每次返回新对象：effect 若依赖裸 remote，这里就会滚成几百次
+    const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad, unstableRemoteRefs: true })
+    let tree = await rt.settle(C, {})
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '自动做梦')[0])
+    tree = await rt.settle(C, {})
+    // 再settle 几轮：稳定实现下不该产生新的拉取
+    for (let i = 0; i < 4; i++) tree = await rt.settle(C, {})
+
+    const pulls = () => ad.st.calls.filter((c) => ['status', 'listModels', 'getConfig', 'listReports', 'listSnapshots', 'listRuns'].indexOf(c[0]) >= 0).length
+    const first = pulls()
+    ok(first <= 12, `引用不稳定时也只拉一轮左右（实际 ${first} 次）`, JSON.stringify(ad.st.calls.slice(0, 14)))
+    for (let i = 0; i < 3; i++) tree = await rt.settle(C, {})
+    ok(pulls() === first, `后续渲染不再新增拉取（${first} → ${pulls()}）`)
+    ok(treeText(tree).indexOf('记忆注入参数') >= 0 || treeText(tree).indexOf('自动做梦') >= 0, '面板照常渲染（没被循环卡死）')
   }
 
   group('9. 归档候选：理由 + 逐条 / 批量执行')

@@ -9,9 +9,11 @@
 		 *      （比如「记忆 + 会话记录」会把私密对话送进模型），默认全是最保守的那一档。
 		 */
 		function AutodreamPanel(props) {
-			const remote = props.ctx && props.ctx.get ? props.ctx.get("remote.autodream") : null;
+			// ⚠️ 必须走 stableRemote：真实宿主里 `ctx.get()` 每次返回**新对象**，
+			// 而下面那个 effect 依赖 remote —— 直接用会让 effect 无限重跑（issue #3）。
+			const remote = stableRemote(props.ctx, "remote.autodream");
 			// 注入设置走 memory 那半边（autodream 只管整理那趟）
-			const memRemote = props.ctx && props.ctx.get ? props.ctx.get("remote.memory") : null;
+			const memRemote = stableRemote(props.ctx, "remote.memory");
 			const sCfg = react.useState(null); const cfg = sCfg[0], setCfg = sCfg[1];
 			const sSt = react.useState(null); const st = sSt[0], setSt = sSt[1];
 			const sErr = react.useState(null); const err = sErr[0], setErr = sErr[1];

@@ -1,5 +1,7 @@
 		function Section(props) {
-			const remote = props.ctx.get("remote.memory");
+			// 走 stableRemote：真实宿主里 `ctx.get()` 每次返回新对象（issue #3 的成因）。
+			// 这个面板的 effect 依赖是 `[]`、暂时不会爆，但引用稳定是**所有**面板的共同前提。
+			const remote = stableRemote(props.ctx, "remote.memory");
 			const sItems = react.useState([]);
 			const items = sItems[0], setItems = sItems[1];
 			const sLoading = react.useState(false);

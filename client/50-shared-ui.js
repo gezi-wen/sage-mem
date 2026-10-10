@@ -452,6 +452,30 @@
 			: null);
 
 		/**
+		 * 稳定的 remote 引用。
+		 *
+		 * 起因（issue #3，2026-10-10 外部报告）：面板在**渲染期**取 `ctx.get("remote.x")`，
+		 * 又把结果放进 `useEffect` 的依赖数组 —— 而真实宿主里 `ctx.get()` 每次返回一个
+		 * **新的包装对象**，于是
+		 *   渲染 → effect 重跑 → 6 个 RPC + setState → 再渲染 → …
+		 * 滚成无限请求风暴（报告者实测每秒上千次；本机观察到的形态是「组件一直在 setState」）。
+		 *
+		 * 为什么本机测试一直没抓到：mock 的 `ctx.get` 每次返回**同一个**对象 —— 假的安全。
+		 * 测试里现在有 `unstableRemoteRefs` 开关来复现真实行为。
+		 *
+		 * 同一个 ctx 永远拿到同一个 remote。用 WeakMap 而不是普通 Map：ctx 是长生命周期对象，
+		 * WeakMap 不会因为这张缓存把它拖住。
+		 */
+		const REMOTE_CACHE = new WeakMap();
+		function stableRemote(ctx, name) {
+			if (!ctx || typeof ctx.get !== "function") return null;
+			let byName = REMOTE_CACHE.get(ctx);
+			if (!byName) { byName = new Map(); REMOTE_CACHE.set(ctx, byName); }
+			if (!byName.has(name)) byName.set(name, ctx.get(name) || null);
+			return byName.get(name);
+		}
+
+		/**
 		 * 「体检」结果面板。
 		 *
 		 * 只读：这里**不提供任何「顺手修一下」的按钮** —— 修哪条、怎么修由用户决定，
