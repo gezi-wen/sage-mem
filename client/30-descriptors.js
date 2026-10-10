@@ -132,6 +132,20 @@
 					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
 				},
 				{
+					// 上锁 / 解锁一条记忆：锁上的记忆拒绝归档（自动与手动都不行）。
+					id: "sage-mem#memory/setLocked",
+					service: "memory",
+					namespace: "memory",
+					method: "setLocked",
+					invocation: { kind: "direct" },
+					parameters: [
+						{ name: "name", wire: "name", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#FileName", schema: strSchema, create: () => strSchema } },
+						{ name: "locked", wire: "locked", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#LockFlag", schema: boolSchema, create: () => boolSchema } },
+					],
+					result: { mode: "strict", typeSymbol: "sage-mem/types#LockResult", schema: objCodec, create: () => objCodec },
+					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
+				},
+				{
 					id: "sage-mem#memory/archiveCandidates",
 					service: "memory",
 					namespace: "memory",

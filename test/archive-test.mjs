@@ -97,8 +97,8 @@ group('1. 归档前：检索得到、listFiles 列得到')
   const listed = await gw.listFiles()
   ok(listed.some((f) => f.file === 'project_alpha.md'), '归档前 listFiles 列得到它')
   ok(
-    JSON.stringify(Object.keys(listed[0])) === JSON.stringify(['file', 'type', 'description', 'size', 'tags']),
-    'listFiles 的形状一个字都没变（键顺序也一致）',
+    JSON.stringify(Object.keys(listed[0])) === JSON.stringify(['file', 'type', 'description', 'size', 'tags', 'locked']),
+    'listFiles 的形状是「file/type/description/size/tags/locked」（v0.9.8 起多一个锁定状态，键顺序也一致）',
     JSON.stringify(Object.keys(listed[0])),
   )
   const archivedNow = await gw.listArchived()
@@ -370,9 +370,9 @@ group('10. 归档文件的读 / 写：改正文但留痕不许丢')
   const methods = Object.getOwnPropertyNames(mod.MemoryGateway.prototype).filter((n) => n !== 'constructor' && !n.startsWith('@')).sort()
   ok(JSON.stringify(methods) === JSON.stringify([
     'archive', 'archiveCandidates', 'audit', 'checkUpdate', 'deleteFile', 'getSettings', 'listArchived', 'listFiles',
-    'readArchived', 'readFile', 'readRaw', 'restore', 'setSettings', 'writeArchived', 'writeFile', 'writeRaw',
+    'readArchived', 'readFile', 'readRaw', 'restore', 'setLocked', 'setSettings', 'writeArchived', 'writeFile', 'writeRaw',
   ]),
-    'memory 面恰好 16 个方法，没有 deleteArchived 之类的新入口', methods.join(','))
+    'memory 面恰好 17 个方法，没有 deleteArchived 之类的新入口', methods.join(','))
 
   // ⑤ 真实输出过一遍 manifest schema
   const { TYPERT } = await import(new URL('typert.host.js', LIB).href)

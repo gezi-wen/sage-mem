@@ -330,8 +330,33 @@
 										]
 									: [
 											h("button", { type: "button", className: "smem-btn", key: "edit", onClick: function () { props.onEdit(item.file); } }, "编辑"),
-											// 归档排在「编辑」和「删除」之间：比编辑轻、比删除温和，且随时可逆。
-											h("button", { type: "button", className: "smem-btn", key: "arch", title: "收进档案馆：不再参与检索与星图，随时可以恢复", onClick: function () { props.onAskArchive(item.file); } }, "归档"),
+											/**
+											 * 锁定排在「编辑」与「归档」之间（文歌子 2026-10-11 指定）：
+											 * 它是「别归档这条」的开关，紧挨着归档才说得通。
+											 *
+											 * 锁上的记忆**自动与手动都不许归档** —— 候选计算会跳过它，
+											 * 手动点归档会被宿主拒绝。图标用 🔒 / 🔓 之外还留着文字，
+											 * 因为「锁」在这里是**拒绝归档**，不是「只读」。
+											 */
+											h("button", {
+												type: "button",
+												className: "smem-btn" + (item.locked ? " smem-btn-locked" : ""),
+												key: "lock",
+												title: item.locked
+													? "已锁定：自动归档不会选它，手动归档也会被拒绝。点一下解锁"
+													: "锁定这条记忆：自动与手动归档都不再动它（重要的人设 / 偏好建议锁上）",
+												disabled: props.busy,
+												onClick: function () { props.onToggleLock(item.file, !item.locked); },
+											}, item.locked ? "🔒 已锁定" : "🔓 锁定"),
+											// 归档排在「锁定」和「删除」之间：比编辑轻、比删除温和，且随时可逆。
+											h("button", {
+												type: "button", className: "smem-btn", key: "arch",
+												title: item.locked
+													? "这条已锁定，归档会被拒绝（先解锁）"
+													: "收进档案馆：不再参与检索与星图，随时可以恢复",
+												disabled: props.busy || item.locked === true,
+												onClick: function () { props.onAskArchive(item.file); },
+											}, "归档"),
 											h("button", { type: "button", className: "smem-btn smem-btn-danger-ghost", key: "del", onClick: function () { props.onAskDelete(item.file); } }, "删除"),
 										])),
 			]);

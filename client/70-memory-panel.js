@@ -302,9 +302,33 @@
 					.then(function () { setBusy(false); });
 			}
 
+			/**
+			 * 上锁 / 解锁一条记忆。
+			 *
+			 * 锁定 = **拒绝归档**（自动归档的候选里不出现、手动点归档也被宿主拒绝），
+			 * **不是「只读」** —— 文案必须按这个说，否则用户会以为锁上就不能编辑了。
+			 */
+			function toggleLock(file, locked) {
+				if (typeof remote.setLocked !== "function") {
+					setError("宿主侧还没有 setLocked 接口（插件版本较旧）");
+					return;
+				}
+				setBusy(true); setError(null); setNotice("");
+				remote.setLocked(file, locked)
+					.then(function (r) {
+						const d = unwrap(r);
+						if (d && d.ok === false) { setError(d.error || "锁定操作被拒绝"); return; }
+						setNotice(locked
+							? ("已锁定 " + file + " —— 自动归档不会再选它，手动归档也会被拒绝")
+							: ("已解锁 " + file));
+						load();
+					})
+					.catch(function (e) { setError(String((e && e.message) || e)); })
+					.then(function () { setBusy(false); });
+			}
+
 			/** 从档案馆捞回来：文件移回记忆目录，归档留痕被抹掉。 */
-			function restoreFile(file) {
-				if (typeof remote.restore !== "function") {
+			function restoreFile(file) {				if (typeof remote.restore !== "function") {
 					setError("宿主侧还没有 restore 接口（插件版本较旧）");
 					return;
 				}
@@ -313,7 +337,8 @@
 				remote.restore(file)
 					.then(function (r) {
 						if (r && r.ok === false) { setError(r.error || "恢复被拒绝"); return; }
-						setNotice("已恢复 " + file + " —— 它回到了活动记忆里");
+						// 恢复会顺带把这条补进索引：说清楚，否则用户不知道「漏索引」是怎么好的
+						setNotice("已恢复 " + file + " —— 它回到了活动记忆里" + (r && r.indexed ? "，并补进了索引" : ""));
 						load();
 					})
 					.catch(function (e) { setError(String((e && e.message) || e)); })
@@ -627,6 +652,7 @@
 						onAskArchive: function (file) { setArchiving(file); setArchiveReason(""); setDeleting(null); },
 						onCancelArchive: function () { setArchiving(null); setArchiveReason(""); },
 						onConfirmArchive: confirmArchive,
+						onToggleLock: toggleLock,
 						onToggle: function (file) {
 							const nx = {};
 							nx[file] = !expanded[file];

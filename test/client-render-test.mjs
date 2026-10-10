@@ -267,6 +267,13 @@ function makeMemoryRemote(active, archived, raw) {
         error: '', releasesUrl: 'https://github.com/gezi-wen/sage-mem/releases',
       })
     },
+    // 上锁 / 解锁：改的是 fixture 里的 locked，所以面板重取列表后状态保持得住
+    setLocked(name, locked) {
+      st.calls.push(['setLocked', name, locked])
+      const hit = st.active.find((x) => x.file === name)
+      if (hit) hit.locked = !!locked
+      return Promise.resolve({ ok: true, file: name, locked: !!locked })
+    },
     setSettings(patch) {
       st.calls.push(['setSettings', patch])
       const cur = st.settings || { limits: {}, pendingLimits: {}, restartRequired: false, reserved: ['memory.md', 'session-log.md'], reservedExtra: [] }
@@ -1361,6 +1368,35 @@ async function main() {
     const after = await some.rt.settle(some.C, {})
     ok(!all(after, isBanner)[0], '点「×」→ 横幅消失（这次不看）')
     ok(!!all(after, (n) => n.props && n.props.className === 'smem-star')[0], '底部的仓库引流不受影响')
+  }
+
+  // ── 8c. 锁定：按钮排在「编辑」与「归档」之间，锁上就拒绝归档 ──────────────
+  group('8c. 锁定：按钮位置 + 归档被拒')
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const { comp: C } = await loadClient(rt, { memory: mem })
+    let tree = await rt.settle(C, {})
+
+    const cardBtns = (t) => all(all(t, byClass('smem-card'))[0], (n) => n.type === 'button')
+    let labels = cardBtns(tree).map(textOf)
+    ok(labels[0] === '编辑' && String(labels[1]).indexOf('锁定') >= 0 && labels[2] === '归档',
+      `卡片按钮顺序是「编辑 / 锁定 / 归档 / 删除」（实际：${labels.join(' | ')}）`)
+
+    click(cardBtns(tree)[1]) // 点「锁定」
+    tree = await rt.settle(C, {})
+    ok(mem.st.calls.some((c) => c[0] === 'setLocked' && c[2] === true), '点了会调 memory.setLocked(file, true)')
+
+    labels = cardBtns(tree).map(textOf)
+    ok(String(labels[1]).indexOf('已锁定') >= 0, `锁定后按钮变成「已锁定」（实际：${labels.join(' | ')}）`)
+    const archBtn = all(all(tree, byClass('smem-card'))[0], (n) => n.type === 'button' && textOf(n) === '归档')[0]
+    ok(!!archBtn && archBtn.props.disabled === true, '锁定的卡片上「归档」被禁用（点不动，不是点了才失败）')
+
+    click(cardBtns(tree)[1]) // 再点一次 → 解锁
+    tree = await rt.settle(C, {})
+    ok(mem.st.calls.some((c) => c[0] === 'setLocked' && c[2] === false), '再点一次是解锁（setLocked(file, false)）')
+    labels = cardBtns(tree).map(textOf)
+    ok(String(labels[1]).indexOf('已锁定') < 0, '解锁后按钮回到「锁定」')
   }
 
   // ── 9. 归档候选：每条都说清为什么 + 确认后执行 ───────────────────────────
