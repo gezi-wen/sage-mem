@@ -25,6 +25,8 @@ const SUITES = [
   'q-fixes-094.mjs',
   'q-fixes-095.mjs',
   'q-fixes-098.mjs',
+  'archive-index-test.mjs',
+  'autodream-config-test.mjs',
   'update-test.mjs',
   'retrieval-test.mjs',
   'typert-test.mjs',
