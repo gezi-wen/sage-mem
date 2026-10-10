@@ -343,6 +343,8 @@ function makeAutodreamRemote() {
     config: {
       enabled: true, trigger: 'manual', apply: false, source: 'memory',
       autoArchive: 'report', provider: '', model: '',
+      // 自动归档的三个阈值（天）—— v0.9.9 起在「自动归档」页签里可改
+      archiveAfterDaysProject: 90, archiveAfterDaysReference: 180, archiveAfterDaysUser: 365,
     },
   }
   return {
@@ -756,6 +758,26 @@ async function emitPreview() {
     click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '体检')[0])
     tree = await rt.settle(C, {})
     S('audit', 'docs/images/audit.png', '体检 —— 索引悬空、漏索引、断链这类硬问题按类报红；「指向已归档」只作提示、不计入问题，也不提供一键修补按钮（改哪条由你决定）。', '③ 体检（独立页签，排在自动做梦之后；硬问题红、提示灰）', serHtml(tree))
+  }
+  // ③e 自动归档：用处说明 + 三档 + 三个阈值
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
+    let tree = await rt.settle(C, {})
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '自动归档')[0])
+    tree = await rt.settle(C, {})
+    S('archive-settings', 'docs/images/archive-settings.png', '自动归档 —— 独立一页：先说清它做什么（移进 archive/、不删除、随时能恢复），三档策略与三个闲置阈值都在这儿；阈值保存即生效，不用重启。', '⑥ 自动归档（排在自动做梦与体检之间）', serHtml(tree))
+  }
+  // ③d 锁定：卡片按钮排在「编辑」与「归档」之间
+  {
+    const rt = makeReact()
+    // 第一条锁上，第二条不锁 —— 一张图里同时看到两种状态
+    const active = ACTIVE.map((x, i) => (i === 0 ? Object.assign({}, x, { locked: true }) : x))
+    const mem = makeMemoryRemote(active, ARCHIVED, RAW_ARCHIVED)
+    const { comp: C } = await loadClient(rt, { memory: mem })
+    const tree = await rt.settle(C, {})
+    S('lock-card', 'docs/images/lock-card.png', '锁定 —— 按钮排在「编辑」与「归档」之间；锁上的那条显示「已锁定」且「归档」被禁用，自动归档的候选也不再选它。', '⑤ 文件列表 · 锁定一条记忆（拒绝归档）', serHtml(tree))
   }
   // ③c 更新提示（有新版本时的一条横幅）
   {
@@ -1283,8 +1305,8 @@ async function main() {
 
     // 页签顺序：体检独立成第 4 个，排在「自动做梦」**之后**
     const tabLabels = all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n)).map(textOf)
-    ok(JSON.stringify(tabLabels) === JSON.stringify(['文件列表', '记忆星图', '自动做梦', '体检']),
-      `体检独立成第 4 个页签、排在自动做梦之后（实际：${tabLabels.join(' / ')}）`)
+    ok(JSON.stringify(tabLabels) === JSON.stringify(['文件列表', '记忆星图', '自动做梦', '自动归档', '体检']),
+      `体检独立成页签、排在自动做梦与自动归档之后（实际：${tabLabels.join(' / ')}）`)
 
     // 点徽标就能切过去（徽标是「一直看得见」的那条路）
     click(badge)
@@ -1399,7 +1421,76 @@ async function main() {
     ok(String(labels[1]).indexOf('已锁定') < 0, '解锁后按钮回到「锁定」')
   }
 
-  // ── 9. 归档候选：每条都说清为什么 + 确认后执行 ───────────────────────────
+  // ── 8d. 「自动归档」独立成页签：写明用处 + 三档策略 + 阈值可改 ──────────────
+  group('8d. 自动归档页签：用处 + 三档策略 + 阈值可改')
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const ad = makeAutodreamRemote()
+    const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad })
+    let tree = await rt.settle(C, {})
+
+    const tabBtns = (t) => all(t, (n) => n.type === 'button' && byClass('smem-tab')(n))
+    const tabs = tabBtns(tree).map(textOf)
+    ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '记忆星图', '自动做梦', '自动归档', '体检']),
+      `五个页签、自动归档排在自动做梦与体检之间（实际：${tabs.join(' / ')}）`)
+
+    click(tabBtns(tree).find((b) => textOf(b) === '自动归档'))
+    tree = await rt.settle(C, {})
+    const pane = treeText(tree)
+
+    // ① 写明用处（他点名要求的那条）
+    ok(/archive\//.test(pane), '写清归档去哪：移进 archive/')
+    ok(/不删|不是删除/.test(pane), '写清「归档不是删除」')
+    ok(/恢复/.test(pane), '写清「随时可以恢复」')
+    ok(pane.indexOf('锁定') >= 0, '写明锁定的记忆不会被选中')
+
+    // ② 三档策略搬到这里（一处设定，不再在自动做梦的设置里）
+    const segLabels = all(tree, (n) => n.type === 'button').map(textOf)
+    ok(segLabels.indexOf('关闭') >= 0 && segLabels.indexOf('只出报告') >= 0 && segLabels.indexOf('满足条件自动跑') >= 0,
+      `三档策略都在这一页（${segLabels.filter((x) => /关闭|只出报告|自动跑/.test(x)).join(' / ')}）`)
+    // 代价说明跟着档位走（原来在自动做梦那页，随三档一起挪过来）
+    ok(pane.indexOf('只出报告：候选写进整理报告，一个文件都不动') >= 0, '当前档的代价说明就在开关下面')
+    click(all(tree, (n) => n.type === 'button' && textOf(n) === '满足条件自动跑')[0])
+    tree = await rt.settle(C, {})
+    ok(treeText(tree).indexOf('会真的把候选移进 archive/（只移不删，随时可恢复）') >= 0,
+      'auto 档说清「真的移动文件、只移不删」')
+    ok(treeText(tree).indexOf('这一档会自动降级成只出报告') >= 0, 'auto 档说清只读模式下的降级')
+    ok(treeText(tree).indexOf('自动归档已设为「满足条件自动跑」') >= 0, '保存成功有明确反馈')
+
+    // ③ 三个阈值输入框，显示当前生效值
+    const nums = all(tree, (n) => n.type === 'input' && String((n.props || {}).className || '').indexOf('smem-num') >= 0)
+    ok(nums.length === 3, `三个阈值输入框（实际 ${nums.length}）`)
+    const vals = nums.map((n) => String(n.props.value))
+    ok(vals.join(',') === '90,180,365', `输入框显示当前阈值（实际 ${vals.join(',')}）`)
+
+    // ④ 改一个 → 保存 → 调 setConfig（带 archiveAfterDays*）
+    typeInto(nums[0], '30')
+    tree = await rt.settle(C, {})
+    const saveBtn = all(tree, (n) => n.type === 'button' && /保存/.test(textOf(n)))[0]
+    ok(!!saveBtn, '有保存按钮')
+    click(saveBtn)
+    tree = await rt.settle(C, {})
+    ok(ad.st.calls.some((c) => c[0] === 'setConfig' && c[1] && c[1].archiveAfterDaysProject === 30),
+      '改阈值会调 setConfig({ archiveAfterDaysProject: 30 })', JSON.stringify(ad.st.calls.filter((c) => c[0] === 'setConfig')))
+  }
+
+  // ── 8e. 自动做梦的设置里不再重复放「自动归档」三档（一处设定） ──────────────
+  group('8e. 自动归档三档只在一处（不重复摆放）')
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
+    let tree = await rt.settle(C, {})
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '自动做梦')[0])
+    tree = await rt.settle(C, {})
+    const segBtn = all(tree, (n) => n.type === 'button' && byClass('smem-subtab')(n) && textOf(n) === '设置')[0]
+    click(segBtn)
+    tree = await rt.settle(C, {})
+    const settingsPane = treeText(tree)
+    ok(settingsPane.indexOf('记忆注入参数') >= 0, '（前提）确实在自动做梦的设置页上')
+    ok(settingsPane.indexOf('只出报告') < 0, '自动做梦的设置里不再有三档策略（已挪到「自动归档」页）')
+  }
   group('9. 归档候选：理由 + 逐条 / 批量执行')
   {
     // 9a 逐条
@@ -1541,28 +1632,24 @@ async function main() {
     ok(segTab(tree, '设置').props.className.indexOf('smem-subtab--on') >= 0, '点「设置」就切过去')
     ok(!!cardByKey(tree, 'limits') && !!cardByKey(tree, 'reserved'), '「设置」段里有注入参数与保留名名单')
 
-    // 11a 三档 + 代价说明（注意：「满足条件自动跑」这个词在「触发」那一行也有，
-    //      所以必须限定在 autoarchive 这张卡里找）
-    ok(!!chipIn(tree, 'autoarchive', '关闭') && !!chipIn(tree, 'autoarchive', '只出报告') && !!chipIn(tree, 'autoarchive', '满足条件自动跑'),
-      '三档开关都在（关闭 / 只出报告 / 满足条件自动跑）')
-    ok(chipIn(tree, 'autoarchive', '只出报告') && chipIn(tree, 'autoarchive', '只出报告').props['data-on'] === '1', '默认档是「只出报告」（data-on）')
-    ok(treeText(tree).indexOf('只出报告：候选写进整理报告，一个文件都不动') >= 0, '当前档的代价说明就在开关下面')
-    click(chipIn(tree, 'autoarchive', '满足条件自动跑'))
-    tree = await rt.settle(C, {})
-    ok(treeText(tree).indexOf('会真的把候选移进 archive/（只移不删，随时可恢复）') >= 0,
-      'auto 档说清了「真的移动文件、只移不删」')
-    ok(treeText(tree).indexOf('这一档会自动降级成只出报告') >= 0, 'auto 档说清了只读模式下的降级')
-    ok(ad.st.config.autoArchive === 'auto', 'setConfig 真的把值改成了 auto')
-    ok(treeText(tree).indexOf('自动归档已设为「满足条件自动跑」') >= 0, '保存成功有明确反馈')
+    // 11a 三档策略 + 三个阈值**已挪到「自动归档」页签**（v0.9.9）——
+    //      那页的断言在 8d/8e；这里不再重复。
 
-    // 11b 回读校验：模拟「setConfig 静默忽略」，界面必须报错而不是说已保存
+    // 11b 回读校验：模拟「setConfig 静默忽略」，界面必须报错而不是说已保存。
+    //      这一步改在新页签上做（三档现在住那儿）。
     ad.st.ignoreAutoArchive = true
-    click(chipIn(tree, 'autoarchive', '关闭'))
+    // 先让它处于 auto：这样下面「没生效时仍显示真实值」才有区分度（否则和默认档撞不出差别）
+    ad.st.config.autoArchive = 'auto'
+    click(btn(tree, '自动归档')[0])
+    tree = await rt.settle(C, {})
+    const archiveSeg = (t, label) => all(t, (n) => n.type === 'button' && String((n.props || {}).className || '').indexOf('smem-chip') >= 0 && textOf(n) === label)[0]
+    ok(!!archiveSeg(tree, '关闭'), '（前提）「自动归档」页签上能找到三档开关')
+    click(archiveSeg(tree, '关闭'))
     tree = await rt.settle(C, {})
     ok(ad.st.calls.some((c) => c[0] === 'getConfig'), '保存后会再 getConfig() 回读一次')
     ok(treeText(tree).indexOf('保存没生效') >= 0, '回读发现值没变 → 界面报错')
     ok(treeText(tree).indexOf('自动归档已设为「关闭」') < 0, '值没变时绝不谎报「已保存」')
-    ok(chipIn(tree, 'autoarchive', '满足条件自动跑') && chipIn(tree, 'autoarchive', '满足条件自动跑').props['data-on'] === '1',
+    ok(archiveSeg(tree, '满足条件自动跑') && archiveSeg(tree, '满足条件自动跑').props['data-on'] === '1',
       '没生效时界面仍显示真实值（auto）')
 
     // 11c 文件列表的候选区用同一套词（候选区的 autoArchive 来自 archiveCandidates，

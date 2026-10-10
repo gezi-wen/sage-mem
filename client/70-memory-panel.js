@@ -679,7 +679,11 @@
 					h("button", { type: "button", className: "smem-tab" + (tab === "files" ? " smem-tab--on" : ""), key: "f", onClick: function () { setTab("files"); } }, "文件列表"),
 					h("button", { type: "button", className: "smem-tab" + (tab === "star" ? " smem-tab--on" : ""), key: "s", onClick: function () { setTab("star"); } }, "记忆星图"),
 					h("button", { type: "button", className: "smem-tab" + (tab === "autodream" ? " smem-tab--on" : ""), key: "d", onClick: function () { setTab("autodream"); } }, "自动做梦"),
-					// 体检排在「自动做梦」之后、独立成一屏：它只报告不修改，和「文件列表」里的
+					// 「自动归档」排在自动做梦之后：归档是**确定性规则**（按闲置天数算，不调模型），
+					// 和「让模型整理记忆」是两件事。塞在自动做梦的设置里用户找不到
+					// （2026-10-11 用户原话：「扔这里连我都找不到」）。
+					h("button", { type: "button", className: "smem-tab" + (tab === "archive" ? " smem-tab--on" : ""), key: "ar", onClick: function () { setTab("archive"); } }, "自动归档"),
+					// 体检再排在「自动归档」之后、独立成一屏：它只报告不修改，和「文件列表」里的
 					// 增删改是两件事，塞在工具抽屉里会让人以为它是个动作按钮。
 					h("button", { type: "button", className: "smem-tab" + (tab === "audit" ? " smem-tab--on" : ""), key: "a", onClick: openAuditTab }, "体检"),
 				]),
@@ -886,6 +890,8 @@
 					: tab === "star"
 					? h("div", { className: "smem-starmap", key: "starmap" },
 							h(StarmapRuntime.StarMap, { ctx: props.ctx }))
+					: tab === "archive"
+					? h(ArchiveSettingsPanel, { key: "archive", ctx: props.ctx })
 					: tab === "audit"
 					// 体检面板在上面已经渲染过了 —— 这里必须显式给 null，
 					// 否则会落进下面那个 `filesView` 兜底分支，变成「体检 + 一整套文件列表」同屏。

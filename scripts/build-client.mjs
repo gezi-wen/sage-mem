@@ -35,6 +35,7 @@ export const CLIENT_PARTS = [
   'client/40-styles.js', // 主模块那份 CSS（同名第二份，工厂作用域内）
   'client/50-shared-ui.js', // TYPE_META / frontmatter 纯逻辑 / Chip・Card・ArchivedCard / 体检・候选・原样编辑面板
   'client/60-autodream-panel.js', // 「自动做梦」面板
+  'client/62-archive-settings.js', // 「自动归档」面板（三档策略 + 三个阈值；v0.9.9 独立成页）
   'client/70-memory-panel.js', // 记忆管理 Section：文件列表 / 筛选 / 归档 / 工具面板 / tab
   'client/80-apply.js', // inject + apply(ctx) + 收尾
 ]

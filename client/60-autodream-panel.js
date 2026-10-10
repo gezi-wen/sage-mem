@@ -39,7 +39,6 @@
 			const sMemSet = react.useState(null); const memSet = sMemSet[0], setMemSet = sMemSet[1];
 			const sLimitsDraft = react.useState(null); const limitsDraft = sLimitsDraft[0], setLimitsDraft = sLimitsDraft[1];
 			const sSaveBusy = react.useState(false); const saveBusy = sSaveBusy[0], setSaveBusy = sSaveBusy[1];
-			const sAutoSaving = react.useState(false); const autoSaving = sAutoSaving[0], setAutoSaving = sAutoSaving[1];
 			const sReservedNew = react.useState(""); const reservedNew = sReservedNew[0], setReservedNew = sReservedNew[1];
 
 			// 派生量放在 effect 之前：下面几个 effect 的依赖数组要在渲染期就能取到值。
@@ -137,35 +136,6 @@
 					setLimitsDraft(limitsDraftOf(d.pendingLimits || d.limits || {}));
 					if (onOk) onOk(d);
 				}, function (e) { setErr(detail(e)); });
-			}
-
-			/**
-			 * 自动归档三档：保存后**回读校验**。
-			 *
-			 * `setConfig` 对非法值沿用的是「忽略、保留原值」的语义（没有 `{ok:false}` 通道），
-			 * 所以不能只看它返回的 config —— 必须再 `getConfig()` 一次，确认那个值真的落在
-			 * 配置里。没变就报错：**不能让用户点了保存以为成了、实际什么都没发生**。
-			 */
-			function saveAutoArchive(v) {
-				setErr(null); setNotice(""); setAutoSaving(true);
-				callRemote("setConfig", [{ autoArchive: v }], function (d) {
-					if (d && d.config && d.config.autoArchive === v) {
-						setCfg(d.config);
-						setAutoSaving(false);
-						setNotice("自动归档已设为「" + AUTO_ARCHIVE_LABEL[v] + "」");
-						return;
-					}
-					// 返回的 config 里没看到新值 → 回读一次再定论
-					callRemote("getConfig", [], function (d2) {
-						const next = d2 && d2.config ? d2.config : null;
-						setAutoSaving(false);
-						if (next) setCfg(next);
-						const got = next ? autoArchiveOf(next.autoArchive) : null;
-						if (got === v) { setNotice("自动归档已设为「" + AUTO_ARCHIVE_LABEL[v] + "」"); return; }
-						setErr("保存没生效：配置里仍是「" + (got ? AUTO_ARCHIVE_LABEL[got] : "读不出来") +
-							"」。setConfig 对非法值会忽略并保留原值 —— 请重试，或看 DSH 启动日志。");
-					}, function (m) { setAutoSaving(false); setErr("保存后回读失败：" + m); });
-				}, function (m) { setAutoSaving(false); setErr(m); });
 			}
 
 			/** 保存 5 项上限。越界/非整数**本地先拦**（host 也是直接拒绝），别让它白跑一趟。 */
@@ -465,28 +435,9 @@
 				]),
 				]) : null,
 				segOf === "settings" ? h("div", { className: "smem-seg", key: "seg-set" }, [
-				h("div", { className: "smem-autodream-sec", key: "autoarchive" }, [
-					h("div", { className: "smem-autodream-row", key: "r" }, [
-						h("span", { className: "smem-autodream-key", key: "k" }, "自动归档"),
-						h(Seg, {
-							key: "v", value: autoArchiveOf(c.autoArchive),
-							options: [
-								{ value: "off", label: AUTO_ARCHIVE_LABEL.off },
-								{ value: "report", label: AUTO_ARCHIVE_LABEL.report },
-								{ value: "auto", label: AUTO_ARCHIVE_LABEL.auto },
-							],
-							// 点一档就存一档，但**存完要回读**：setConfig 对非法值是静默忽略，
-							// 只信返回值不够（见 saveAutoArchive 的注释）。
-							onChange: function (v) { if (v !== autoArchiveOf(c.autoArchive)) saveAutoArchive(v); },
-						}),
-						autoSaving ? h("span", { className: "smem-status", key: "s" }, "保存中…") : null,
-					]),
-					h("div", { className: "smem-autodream-note", key: "cost" }, AUTO_ARCHIVE_COST[autoArchiveOf(c.autoArchive)]),
-					autoArchiveOf(c.autoArchive) === "auto" && !c.apply
-						? h("div", { className: "smem-autodream-note smem-ad-warn", key: "deg" },
-								"注意：现在「改动方式」是只出报告 —— 这一档会自动降级成只出报告，不会动文件。")
-						: null,
-				]),
+				// 自动归档那一段（三档策略 + 三个阈值）**已挪到「自动归档」页签**（v0.9.9）：
+				// 归档是确定性规则、不调模型，和这一页的「让模型整理」不是一件事；
+				// 同一件事只在一处设定，这里不再重复摆一份。
 				h("div", { className: "smem-autodream-sec", key: "limits" }, [
 					h("div", { className: "smem-autodream-row", key: "h" }, [
 						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, "记忆注入参数"),

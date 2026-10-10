@@ -78,6 +78,8 @@
 			".smem-tool-panel--full{width:100%;align-self:stretch;box-sizing:border-box;}",
 			// 已锁定的记忆：卡片上那个按钮要一眼看出「这条现在拒绝归档」，用警示色
 			".smem-btn-locked{border-color:var(--dsw-alias-state-warning-primary,#d97706);color:var(--dsw-alias-state-warning-primary,#d97706);}",
+			// 「自动归档」页签里的天数输入框：窄一点，别让三个数字各占一整行
+			".smem-num{width:88px;}",
 			// 体检 / 候选是「翻清单」的面板：定高 + 内部滚动，列表不被顶出首屏。
 			// 原样编辑器（.smem-ar-editor）不设上限 —— 那是专心改一份文件的界面，给它完整高度。
 			".smem-tool-panel--cap{max-height:320px;overflow-y:auto;}",

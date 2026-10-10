@@ -53,9 +53,13 @@ sage-mem 换一条路：**每条记忆就是一个 Markdown 文件**。用编辑
 
 *工具抽屉 —— 关着时只占一个按钮，展开后两项各带状态：归档候选 2 条 / 保留名 3 个。（体检不在这里：它自己有一页。）*
 
+![锁定：按钮在「编辑」与「归档」之间，锁上后归档被禁用](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/lock-card.png)
+
+*锁定 —— 重要记忆（人设、偏好这类）点一下就锁上：**自动归档的候选里不再出现它，手动点归档也会被宿主拒绝**。锁存在状态目录里，不写进记忆自己的 frontmatter —— 那会被自动整理重写掉，锁一丢它又会回到候选里。*
+
 ![体检：独立一页，硬问题按类报红分节，「指向已归档」只作提示](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/audit.png)
 
-*体检（排在「自动做梦」之后的第 4 个页签）—— 索引悬空、漏索引、断链这类硬问题按类报红；「指向已归档」只作提示、不计入问题，也不提供一键修补按钮（改哪条由你决定）。*
+*体检（独立成一个页签）—— 索引悬空、漏索引、断链这类硬问题按类报红；「指向已归档」只作提示、不计入问题，也不提供一键修补按钮（改哪条由你决定）。从档案馆恢复一条记忆时，插件会顺手把它补回索引 —— 以前只搬文件、不补条目，于是顶层有文件、`MEMORY.md` 里没有，体检一直报「漏索引」。*
 
 ![更新提示：只在真有新版本时出现一条横幅](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/update-banner.png)
 
@@ -72,6 +76,10 @@ sage-mem 换一条路：**每条记忆就是一个 Markdown 文件**。用编辑
 ![自动做梦 · 设置：运行 / 设置 / 记录 二级分组，参数两列并写清「当前 → 重启后」](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/autodream-settings.png)
 
 *自动做梦 · 设置 —— 运行 / 设置 / 记录 二级分组；五个注入参数两列排开，并写清「当前生效」与「重启后」，不会让人误以为改完立刻生效。*
+
+![自动归档：独立一页，先说清它做什么，三档策略与三个闲置阈值都在这儿](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/archive-settings.png)
+
+*自动归档（独立成一个页签，排在「自动做梦」与「体检」之间）—— 它和自动做梦不是一件事：归档是**确定性规则**（按访问台账的闲置天数算，不调模型），混在模型那套设置里既难找、也容易让人以为归档会花钱。这一页决定「多久算闲置」，以及要不要真的动手；阈值**保存即生效**，不用重启。*
 
 ## 快速开始
 

@@ -440,8 +440,8 @@
 		};
 		const autoArchiveOf = (v) => (v === "off" || v === "auto" ? v : "report");
 
-		/** 头部带上的「我在哪」：四个 tab 的中文名（与 .smem-tabs 上的字面一致）。 */
-		const TAB_LABEL = { files: "文件列表", star: "记忆星图", autodream: "自动做梦", audit: "体检" };
+		/** 头部带上的「我在哪」：五个 tab 的中文名（与 .smem-tabs 上的字面一致）。 */
+		const TAB_LABEL = { files: "文件列表", star: "记忆星图", autodream: "自动做梦", archive: "自动归档", audit: "体检" };
 
 		/**
 		 * 工具面板头部的「收起」按钮：抽屉里开的工具要能一键收回去 ——
