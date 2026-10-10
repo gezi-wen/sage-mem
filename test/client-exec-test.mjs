@@ -1,5 +1,5 @@
 /**
- * 客户端 half 的「真执行」验证（主殿自用）。
+ * 客户端侧的「真执行」验证。
  *
  * 为什么必须做：client.js 是手写的 ModuleLoader bundle（非 ESM），`node --check` 只能证明
  * 它语法合法，证明不了「apply 跑得起来」和「它挂上去的 remote 描述符与宿主 manifest 对得上」。

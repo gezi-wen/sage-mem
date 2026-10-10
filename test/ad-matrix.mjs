@@ -1,6 +1,6 @@
 /**
- * 把 ZCode 外包的《测试用例矩阵》变成可执行断言（主殿自用）。
- * 只挑我原有 5 个套件**没覆盖**的用例；每条注释里保留她给的用例号，便于对账。
+ * 把一批故障注入用例变成可执行断言。
+ * 只挑既有套件**没覆盖**的用例；每条注释保留用例号，便于对照。
  */
 import { mkdtemp, mkdir, writeFile, readFile, readdir, stat, utimes } from 'node:fs/promises'
 import { join } from 'node:path'

@@ -21,6 +21,7 @@ const SUITES = [
   'ad-fixes.mjs',
   'ad-matrix.mjs',
   'rollback-guard-test.mjs',
+  'q-fixes-093.mjs',
   'retrieval-test.mjs',
   'typert-test.mjs',
   'inject-test.mjs',

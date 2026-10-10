@@ -135,7 +135,9 @@ ok(rd.manifest.changes[0].reasonSource === 'auto' && rd.manifest.changes[1].reas
 console.log('== 6. 回滚（files）==')
 const rb = await engine.rollback({ snapshotId: '20261001-120000-abcd', scope: 'files' })
 ok(rb.ok === true, `回滚成功（${rb.error ?? ''}）`)
-ok(rb.restored === 3, `写回 3 个（a.md 两次改写退回 + b.md 从 archive 移回，实际 ${rb.restored}）`)
+// v0.9.3 起 restored 按**文件**记账：a.md 这趟被改写两次，但在文件级回滚里只写回一次
+// （内容取自运行前快照，重复执行没有意义；面板文案一直是「恢复 N 个文件」）。
+ok(rb.restored === 2, `写回 2 个（a.md 不论改写几次只算一次 + b.md 从 archive 移回，实际 ${rb.restored}）`)
 ok(rb.parked === 1, `移走 1 个（c.md，实际 ${rb.parked}）`)
 ok((await readFile(F('a.md'), 'utf8')).includes('旧内容'), 'a.md 内容已退回')
 ok(await stat(F('c.md')).then(() => false, () => true), 'c.md 已不在顶层')
