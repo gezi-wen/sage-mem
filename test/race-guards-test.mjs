@@ -736,6 +736,87 @@ if (WORKER) {
     await rm(w2.memoryDir, { recursive: true, force: true }).catch(() => {})
   }
 
+  console.log('== 归档残留必须被体检报出来（它可能装着用户唯一一份内容）==')
+  {
+    const { memoryDir } = await world()
+    await writeFile(join(memoryDir, 'a.md'), body('A'), 'utf8')
+    // 伪造一份「归档中途崩了」的残留：私有名文件，可能装着唯一一份内容。
+    await writeFile(join(memoryDir, 'a.md.archiving-deadbeef1234'), body('LOST CONTENT'), 'utf8')
+    const { auditMemoryDir, formatAudit } = await import(new URL('autodream-audit.js', LIB).href)
+    const rep = await auditMemoryDir(memoryDir)
+    ok(
+      Array.isArray(rep.strays) && rep.strays.some((s) => String(s.file).includes('.archiving-')),
+      '体检把残留报出来了（旧版完全隐形）',
+      JSON.stringify(rep.strays),
+    )
+    ok(rep.problems >= 1, '残留计入 problems（面板上才亮得起来）', String(rep.problems))
+    ok(formatAudit(rep).includes('.archiving-'), '给模型看的文本里也点名了它')
+    // 面板拿到的必须与 host 一致：strict codec 不声明 strays 就等于界面永远看不见。
+    const auditInv = invOf('sage-mem#memory/audit')
+    const wired = auditInv.result.schema.parse(rep)
+    ok(Array.isArray(wired.strays) && wired.strays.length >= 1, 'strays 过了 wire codec（没被 strict 剥掉）', JSON.stringify(wired.strays))
+    await rm(memoryDir, { recursive: true, force: true }).catch(() => {})
+  }
+
+  console.log('== 访问台账并发 flush 不许丢时间戳（丢了会让归档阈值算错）==')
+  {
+    const root = await mkdtemp(join(tmpdir(), 'smem-access-'))
+    const memoryDir = join(root, 'memory')
+    await mkdir(memoryDir, { recursive: true })
+    for (const n of ['a.md', 'b.md']) await writeFile(join(memoryDir, n), body(n), 'utf8')
+    const acc = await import(new URL('memory/access.js', LIB).href)
+    acc.__resetAccessPendingForTest()
+
+    // 记录台账文件的读 / 写次序。判据用**机制**（第二次读必须排在第一次写之后），
+    // 不赌时序 —— 只断言「最后两条都在」的话，调度一变旧实现也能蒙对。
+    const events = []
+    const realReadFile = fsPromises.readFile
+    const realWriteFile = fsPromises.writeFile
+    fsPromises.readFile = async (p, ...a) => {
+      if (String(p).includes('access.json')) events.push('read')
+      return realReadFile(p, ...a)
+    }
+    fsPromises.writeFile = async (p, ...a) => {
+      if (String(p).includes('access.json')) events.push('write')
+      return realWriteFile(p, ...a)
+    }
+    syncBuiltinESMExports()
+    let results
+    try {
+      acc.recordAccess(['a.md'], 1_700_000_000_000)
+      const p1 = acc.flushAccess(memoryDir)
+      acc.recordAccess(['b.md'], 1_700_000_000_001)
+      const p2 = acc.flushAccess(memoryDir)
+      results = await Promise.all([p1, p2])
+    } finally {
+      fsPromises.readFile = realReadFile
+      fsPromises.writeFile = realWriteFile
+      syncBuiltinESMExports()
+    }
+
+    const firstRead = events.indexOf('read')
+    const firstWrite = events.indexOf('write')
+    const secondRead = events.indexOf('read', firstRead + 1)
+    /**
+     * 串行的判据：**不允许出现「两次读都排在第一次写之前」**。
+     * 新实现还会把排队期间新攒下的那批**合并**进前一个任务（于是只有一次读），
+     * 这也合规 —— 所以「没有第二次读」同样算通过。
+     */
+    ok(
+      firstWrite !== -1 && (secondRead === -1 || secondRead > firstWrite),
+      '两次 flush 真的串起来了（不存在「先读两遍旧盘、再各写一遍」的交错）',
+      JSON.stringify(events),
+    )
+
+    const ledger = await acc.readAccessLedger()
+    ok(
+      Number.isFinite(ledger['a.md']) && Number.isFinite(ledger['b.md']),
+      '两批时间戳都在台账里（旧写法被后写的整体覆盖冲掉一条）',
+      JSON.stringify({ ledger, results }),
+    )
+    await rm(root, { recursive: true, force: true }).catch(() => {})
+  }
+
   console.log(`\n结果：${pass} passed, ${fail} failed`)
   process.exit(fail ? 1 : 0)
 }

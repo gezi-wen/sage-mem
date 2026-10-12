@@ -543,6 +543,9 @@
 							section("未加引号的「空格+#」", r.hashHazards, (x) => x.file + " · " + x.line),
 							section("没有 frontmatter", r.noFrontmatter, (x) => x.file),
 							section("读不出来", r.unreadable, (x) => x.file),
+							// 归档中途崩溃留下的私有名残留：它不是一条记忆（扫描/注入都不认），
+							// 但里面可能是用户唯一一份内容 —— 所以要在体检里露头，而不是隐形。
+							section("归档残留（内容可能还在，请确认后改回 .md 或删除）", r.strays, (x) => x.file),
 						])
 					: h("div", { className: "smem-empty smem-empty--ok", key: "ok" },
 							"没有发现问题 —— 索引、双链、frontmatter 与行尾都对得上。"),
