@@ -410,6 +410,15 @@ function makeStarmapRemote(mem, meta) {
 const fakeDoc = {
   hidden: false,
   _created: [],
+  // 星图按 body 上的 data-ds-dark-theme 判主题（与宿主的挂钩一致），所以假 document
+  // 也得有 body —— 否则主题 effect 会第一句就短路，两档色板永远测不到。
+  // 默认不挂属性 = 浅色档；用例里手动 setAttribute 模拟宿主切主题。
+  body: {
+    _attrs: {},
+    hasAttribute(k) { return Object.prototype.hasOwnProperty.call(this._attrs, String(k)) },
+    setAttribute(k) { this._attrs[String(k)] = '' },
+    removeAttribute(k) { delete this._attrs[String(k)] },
+  },
   // 文档级监听按类型记账：抽屉的「点外部 / Esc 关闭」只有真的挂上监听才可能被断言到，
   // 也才能断言「关着时一个监听都不挂」（否则点外部关闭就会变成点哪儿都没反应）。
   _listeners: {},
@@ -436,6 +445,14 @@ const fakeDoc = {
 }
 const capturedCss = []
 
+/** 假 MutationObserver：只记回调与断连，用例里手动触发一次模拟「宿主切主题」。 */
+const fakeObservers = []
+class FakeMutationObserver {
+  constructor(cb) { this.cb = cb; fakeObservers.push(this) }
+  observe() {}
+  disconnect() { const i = fakeObservers.indexOf(this); if (i >= 0) fakeObservers.splice(i, 1) }
+}
+
 async function loadClient(rt, remotes) {
   const code = readFileSync(CLIENT, 'utf8')
   let loaded = null
@@ -451,6 +468,7 @@ async function loadClient(rt, remotes) {
       cancelAnimationFrame: rt.cancelAnimationFrame,
     },
     document: fakeDoc,
+    MutationObserver: FakeMutationObserver,
     console: { log() {}, warn() {}, error() {} },
     setTimeout, clearTimeout, setInterval, clearInterval,
     Symbol, Object, Array, JSON, Math, Date: FrozenDate, Map, Set, Promise, Error,
@@ -1300,6 +1318,46 @@ async function main() {
     ok(pr != null && ar != null && pr > ar, `底盘比核心铺得开（${pr} > ${ar}）`)
     ok(pad.length && Math.abs(pad[0].a - 0.26) < 0.001 && archCore.length && archCore[0].a === 1,
       '底盘用 0.26 的淡 alpha、核心用满 alpha 走普通分支（hover 才点亮得起来）')
+  }
+
+  // ── 7b. 主题两档：宿主切主题 → 画布重建并换一整份色板 ────────────────────
+  group('7b. 星图主题两档：切宿主主题换画布色板（浅色=暖纸，深色=夜空）')
+  {
+    const rt = makeReact(makeGlNode)
+    const mem = makeMemoryRemote([ACTIVE[0], ACTIVE[1]], [ARCHIVED[0]])
+    const smap = makeStarmapRemote(mem, STAR_META)
+    fakeDoc.body.removeAttribute('data-ds-dark-theme') // 从浅色档开始
+    fakeObservers.length = 0
+    const { comp: C } = await loadClient(rt, { memory: mem, starmap: smap })
+    let tree = await rt.settle(C, {})
+    click(btn(tree, '记忆星图')[0])
+    tree = await rt.settle(C, {})
+    await new Promise((r) => setTimeout(r, 60))
+    rt.flushRaf()
+
+    // 渲染器会把每次编译的 shader 记在 gl._shaders 上（group 7 已经在用），
+    // 所以「用哪一档色板」可以直接从编进去的底色常量读出来。
+    const glNow = () => { const nd = [...rt.nodeCache.values()].find((x) => x.gl); return nd && nd.gl }
+    const shaderSrc = () => { const g = glNow(); return g && g._shaders ? g._shaders.map((s) => s.src).join('\n') : '' }
+    const dotBg = (t) => {
+      const d = all(t, byClass('smap-dot'))[0]
+      return d && d.props && d.props.style ? d.props.style.background : undefined
+    }
+
+    ok(!/0\.105, 0\.117, 0\.145/.test(shaderSrc()), '浅色档：画布底不是夜空那块深灰')
+    ok(/0\.980, 0\.965, 0\.929/.test(shaderSrc()),
+      '浅色档：画布底编进了暖纸 #faf6ed（0.980,0.965,0.929）')
+    ok(dotBg(tree) === '#a4652c', `浅色档：图例点用纸本设色（实际 ${dotBg(tree)}）`)
+
+    // 宿主切深色 —— 真实链路就是 body 的这个属性变化，observer 负责把它变成重绘
+    fakeDoc.body.setAttribute('data-ds-dark-theme', '')
+    ok(fakeObservers.length >= 1, '星图挂了 body 属性监听（不是每次 render 现读属性）')
+    fakeObservers.forEach((mo) => mo.cb())
+    tree = await rt.settle(C, {})
+    await new Promise((r) => setTimeout(r, 60))
+    rt.flushRaf()
+    ok(/0\.105, 0\.117, 0\.145/.test(shaderSrc()), '深色档：切主题后重新编了夜空底（渲染器真被重建）')
+    ok(dotBg(tree) === '#e0c07a', `深色档：图例点回到夜空色板（实际 ${dotBg(tree)}）`)
   }
 
   // ── 8. 体检：只读、硬问题与提示分开 ──────────────────────────────────────

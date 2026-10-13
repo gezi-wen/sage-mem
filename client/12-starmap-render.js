@@ -5,14 +5,15 @@
 		}
 
 		// 归档星（暗星）的用色：把类型色往石板灰上压 —— 它得「还在图上、一眼数得出来」，
-		// 又要一眼看出不是活记忆。亮度靠 shader 那一档（0.52），这里负责色相：冷、灰、不饱和。
-		const ARCHIVE_GREY = [0.46, 0.50, 0.58];
+		// 又要一眼看出不是活记忆。亮度靠 shader 那一档（0.52），这里负责色相：
+		// 深色档是冷石板灰；浅色档换成暖灰，否则灰点落在纸上看不见。
 		function dimRgb(hex) {
 			const c = hexToRgb(hex);
+			const g = starmapPalette().archive;
 			return [
-				c[0] * 0.26 + ARCHIVE_GREY[0] * 0.74,
-				c[1] * 0.26 + ARCHIVE_GREY[1] * 0.74,
-				c[2] * 0.26 + ARCHIVE_GREY[2] * 0.74,
+				c[0] * 0.26 + g[0] * 0.74,
+				c[1] * 0.26 + g[1] * 0.74,
+				c[2] * 0.26 + g[2] * 0.74,
 			];
 		}
 		function dimCss(hex) {
@@ -25,17 +26,21 @@
 		// 「会呼吸的彩色底」正是廉价感的一大来源，而且每帧都要重算噪声。
 		// 现在只剩一条静态径向渐变：中心略亮的中性深灰，边缘更暗。uTime 保留声明
 		// 只为让 uniform 列表不变（用不到时 getUniformLocation 返回 null，调用是安全空操作）。
-		const SMAP_BG_FS = [
-			"precision highp float;",
-			"uniform vec2 uRes;",
-			"uniform float uTime;",
-			"void main(){",
-			"  vec2 suv = gl_FragCoord.xy / uRes;",
-			"  float r = length((suv - vec2(0.5, 0.44)) * vec2(1.0, 1.28));",
-			"  vec3 col = mix(vec3(0.105, 0.117, 0.145), vec3(0.043, 0.050, 0.065), clamp(r * 1.30, 0.0, 1.0));",
-			"  gl_FragColor = vec4(col, 1.0);",
-			"}",
-		].join("\n");
+		// 底色由调色板给（深色档=夜空深灰，浅色档=暖纸），所以是函数不是常量。
+		function smapBgFs(inner, outer) {
+			const v = (c) => c.map((x) => x.toFixed(3)).join(", ");
+			return [
+				"precision highp float;",
+				"uniform vec2 uRes;",
+				"uniform float uTime;",
+				"void main(){",
+				"  vec2 suv = gl_FragCoord.xy / uRes;",
+				"  float r = length((suv - vec2(0.5, 0.44)) * vec2(1.0, 1.28));",
+				"  vec3 col = mix(vec3(" + v(inner) + "), vec3(" + v(outer) + "), clamp(r * 1.30, 0.0, 1.0));",
+				"  gl_FragColor = vec4(col, 1.0);",
+				"}",
+			].join("\n");
+		}
 
 		const SMAP_STAR_VS = [
 			"attribute vec2 aCorner;",
@@ -184,7 +189,8 @@
 				canvasEl.width = W * 2;
 				canvasEl.height = H * 2;
 				gl.viewport(0, 0, canvasEl.width, canvasEl.height);
-				const progBg = glProgram(gl, SMAP_BG_VS, SMAP_BG_FS, ["aPos"], ["uRes", "uTime"]);
+				const pal = starmapPalette();
+				const progBg = glProgram(gl, SMAP_BG_VS, smapBgFs(pal.bgGl[0], pal.bgGl[1]), ["aPos"], ["uRes", "uTime"]);
 				const progStar = glProgram(gl, SMAP_STAR_VS, SMAP_STAR_FS, ["aCorner", "aMeta0", "aColor", "aMeta1", "aBirth"], ["uRes", "uTime", "uHoverIdx", "uRevealT"]);
 				const progLine = glProgram(gl, SMAP_LINE_VS, SMAP_LINE_FS, ["aPos", "aColor", "aBirth"], ["uRes", "uRevealT"]);
 
@@ -202,7 +208,7 @@
 						const x = rand01(i * 97 + 13) * W;
 						const y = rand01(i * 31 + 7) * H;
 						const r = 2.4 + rand01(i * 17 + 5) * 2.0;
-						pushStarQuad(arr, x, y, r, [0.62, 0.70, 0.87], 0.10 + 0.30 * rand01(i * 7 + 3), rand01(i * 11 + 29), 0, -1, -1);
+						pushStarQuad(arr, x, y, r, hexToRgb(pal.dust), 0.10 + 0.30 * rand01(i * 7 + 3), rand01(i * 11 + 29), 0, -1, -1);
 					}
 					gl.bindBuffer(gl.ARRAY_BUFFER, dustBuf);
 					gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), gl.STATIC_DRAW);
@@ -233,10 +239,10 @@
 							//      负责「深空底上一眼数得出来」——只画一个小点是数不出来的；
 							//   ② 一颗小核心（走普通分支，fresh 传 -1 = 归档档 0.52），负责
 							//      「看得出是颗星」，并且 hover 时整颗点亮 + 出环。
-							pushStarQuad(arr, p.x, p.y, p.r * 6.0, dimRgb(meta.color), 0.26, p.tw, 0, -1, birth);
-							pushStarQuad(arr, p.x, p.y, p.r * 4.4, dimRgb(meta.color), 1, p.tw, -1, i, birth);
+							pushStarQuad(arr, p.x, p.y, p.r * 6.0, dimRgb(kindColor(meta)), 0.26, p.tw, 0, -1, birth);
+							pushStarQuad(arr, p.x, p.y, p.r * 4.4, dimRgb(kindColor(meta)), 1, p.tw, -1, i, birth);
 						} else {
-							pushStarQuad(arr, p.x, p.y, p.r * 5.4, hexToRgb(meta.color), 1, p.tw, fresh, i, birth);
+							pushStarQuad(arr, p.x, p.y, p.r * 5.4, hexToRgb(kindColor(meta)), 1, p.tw, fresh, i, birth);
 						}
 					}
 					gl.bindBuffer(gl.ARRAY_BUFFER, starBuf);
@@ -251,7 +257,7 @@
 						const ln = visBox.lines[li];
 						const a = layout.pts[ln[0]];
 						const b = layout.pts[ln[1]];
-						const c = hexToRgb((KIND_META[ln[2]] || KIND_META.special).color);
+						const c = hexToRgb(kindColor(KIND_META[ln[2]] || KIND_META.special));
 						const hot = hoverLineIdx >= 0 && (ln[0] === hoverLineIdx || ln[1] === hoverLineIdx);
 						const mul = hot ? 1 : 0.72;
 						const al = hot ? 0.6 : 0.22;
@@ -343,16 +349,25 @@
 				const c2d = canvasEl.getContext("2d");
 				if (!c2d) return;
 				c2d.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+				const pal = starmapPalette();
 				const bg = c2d.createLinearGradient(0, 0, 0, H);
-				bg.addColorStop(0, "#0b1026");
-				bg.addColorStop(1, "#101731");
+				bg.addColorStop(0, pal.bg2d[0]);
+				bg.addColorStop(1, pal.bg2d[1]);
 				c2d.fillStyle = bg;
 				c2d.fillRect(0, 0, W, H);
+				// 晕染：中心透、边缘略深（浅色档才要，深色档的夜空渐变已经够了）
+				if (pal.vignette) {
+					const vg = c2d.createRadialGradient(W * 0.5, H * 0.46, 0, W * 0.5, H * 0.46, Math.max(W, H) * 0.72);
+					vg.addColorStop(0, hexA(pal.vignette.color, 0));
+					vg.addColorStop(1, hexA(pal.vignette.color, pal.vignette.a));
+					c2d.fillStyle = vg;
+					c2d.fillRect(0, 0, W, H);
+				}
 				for (let i = 0; i < 150; i++) {
 					const x = rand01(i * 97 + 13) * W;
 					const y = rand01(i * 31 + 7) * H;
 					c2d.globalAlpha = 0.08 + 0.22 * rand01(i * 7 + 3);
-					c2d.fillStyle = "#9fb3dd";
+					c2d.fillStyle = pal.dust;
 					c2d.fillRect(x, y, 1, 1);
 				}
 				c2d.globalAlpha = 1;
@@ -369,7 +384,7 @@
 						lrv = lt * lt * (3 - 2 * lt);
 						if (lrv <= 0) continue;
 					}
-					c2d.strokeStyle = hexA(meta.color, (hot ? 0.6 : 0.22) * lrv);
+					c2d.strokeStyle = hexA(kindColor(meta), (hot ? 0.6 : 0.22) * lrv);
 					c2d.lineWidth = 1;
 					c2d.beginPath();
 					c2d.moveTo(a.x, a.y);
@@ -391,7 +406,7 @@
 						// 暗星（canvas2d 兜底路径）：与 webgl 同一档 —— 核心小而暗、外面一圈很淡的冷辉光。
 						// 有辉光才「数得出来」；hover 时整颗点亮 + 描边环，这是它能被发现的关键。
 						const hot = hoverBox.idx === i;
-						const dc = dimRgb(meta.color);
+						const dc = dimRgb(kindColor(meta));
 						const rgba = (a) => "rgba(" + Math.round(dc[0] * 255) + "," + Math.round(dc[1] * 255) + "," + Math.round(dc[2] * 255) + "," + a.toFixed(3) + ")";
 						const haloR = p.r * 3.4;
 						const hg = c2d.createRadialGradient(p.x, p.y, 0, p.x, p.y, haloR);
@@ -402,13 +417,13 @@
 						c2d.arc(p.x, p.y, haloR, 0, Math.PI * 2);
 						c2d.fill();
 						c2d.globalAlpha = (hot ? 0.95 : 0.52) * rv;
-						c2d.fillStyle = dimCss(meta.color);
+						c2d.fillStyle = dimCss(kindColor(meta));
 						c2d.beginPath();
 						c2d.arc(p.x, p.y, Math.max(1.2, p.r * 0.7), 0, Math.PI * 2);
 						c2d.fill();
 						c2d.globalAlpha = 1;
 						if (hot) {
-							c2d.strokeStyle = dimCss(meta.color);
+							c2d.strokeStyle = dimCss(kindColor(meta));
 							c2d.lineWidth = 1;
 							c2d.beginPath();
 							c2d.arc(p.x, p.y, p.r + 5, 0, Math.PI * 2);
@@ -418,7 +433,7 @@
 					}
 					if (p.star.mtimeMs > 0 && nowMs - p.star.mtimeMs < FRESH_MS) {
 						const pr = p.r + 5 + 3 * (0.5 + 0.5 * Math.sin(phase * 1.4 + p.tw * 6.28));
-						c2d.strokeStyle = hexA(meta.color, 0.4 * rv);
+						c2d.strokeStyle = hexA(kindColor(meta), 0.4 * rv);
 						c2d.lineWidth = 1;
 						c2d.beginPath();
 						c2d.arc(p.x, p.y, pr, 0, Math.PI * 2);
@@ -426,20 +441,20 @@
 					}
 					const glowR = p.r * 4.2;
 					const g = c2d.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR);
-					g.addColorStop(0, hexA(meta.color, 0.5 * tw * rv));
-					g.addColorStop(1, hexA(meta.color, 0));
+					g.addColorStop(0, hexA(kindColor(meta), 0.5 * tw * rv));
+					g.addColorStop(1, hexA(kindColor(meta), 0));
 					c2d.fillStyle = g;
 					c2d.beginPath();
 					c2d.arc(p.x, p.y, glowR, 0, Math.PI * 2);
 					c2d.fill();
 					c2d.globalAlpha = (0.62 + 0.38 * tw) * rv;
-					c2d.fillStyle = meta.color;
+					c2d.fillStyle = kindColor(meta);
 					c2d.beginPath();
 					c2d.arc(p.x, p.y, p.r, 0, Math.PI * 2);
 					c2d.fill();
 					c2d.globalAlpha = 1;
 					if (hoverBox.idx === i) {
-						c2d.strokeStyle = hexA(meta.color, 0.9 * rv);
+						c2d.strokeStyle = hexA(kindColor(meta), 0.9 * rv);
 						c2d.lineWidth = 1;
 						c2d.beginPath();
 						c2d.arc(p.x, p.y, p.r + 5, 0, Math.PI * 2);

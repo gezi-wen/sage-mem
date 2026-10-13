@@ -55,6 +55,20 @@
 			const drawBox = react.useRef({ renderer: null, t0: 0, markDirty: null }).current;
 			const replayBox = react.useRef({ raf: 0, active: false }).current;
 
+			// 宿主主题：切主题要把画布重建一遍（底色/星点色都变了），所以它是个 state，
+			// 并进渲染 effect 的依赖。挂 observer 而不是每次 render 读属性 —— 属性变了要主动重画。
+			const themeKeyS = react.useState(isDarkTheme() ? "dark" : "light");
+			const themeKey = themeKeyS[0];
+			const setThemeKey = themeKeyS[1];
+			react.useEffect(() => {
+				if (typeof document === "undefined" || !document.body) return undefined;
+				const sync = () => setThemeKey(isDarkTheme() ? "dark" : "light");
+				sync();
+				const mo = new MutationObserver(sync);
+				mo.observe(document.body, { attributes: true, attributeFilter: ["data-ds-dark-theme"] });
+				return () => mo.disconnect();
+			}, []);
+
 			// Esc 分层：详情面板开着时先关面板（capture 阶段拦截），再按才落到 overlay 关星空。
 			react.useEffect(() => {
 				if (!selected) return undefined;
@@ -154,7 +168,7 @@
 					window.cancelAnimationFrame(replayBox.raf);
 					if (renderer.destroy) renderer.destroy();
 				};
-			}, [data, layout, canvasEl]);
+			}, [data, layout, canvasEl, themeKey]);
 
 			react.useEffect(() => {
 				if (!data || !layout || !kindsOn) return;
@@ -362,7 +376,7 @@
 						onClick: () => toggleKind(k),
 						title: "点击显示/隐藏这一类",
 					},
-					h("span", { className: "smap-dot", style: { background: KIND_META[k].color } }),
+					h("span", { className: "smap-dot", style: { background: kindColor(KIND_META[k]) } }),
 					KIND_META[k].label + " " + n));
 				}
 				let totalBytes = 0;
@@ -404,7 +418,7 @@
 							h("span", { className: "smap-panel-title" }, selected.star.title),
 							h("button", { className: "smap-btn", onClick: () => setSelected(null), title: "关闭" }, "×")),
 						h("div", { key: "meta", className: "smap-panel-meta" },
-							h("span", { className: "smap-meta-dot", style: { background: meta.color } }),
+							h("span", { className: "smap-meta-dot", style: { background: kindColor(meta) } }),
 							meta.label + " · " + selected.star.file + " · " + fmtBytes(selected.star.bytes) +
 							// 归档星的 mtime 是「当年写下」的时间，跟「什么时候收起来的」不是一回事 ——
 							// 这里只留「已归档」，具体时间在下面的归档块里给。
@@ -447,7 +461,7 @@
 										onClick: () => openStar(s),
 										title: s.archived === true ? "归档案：点开看归档信息并恢复" : "展开全文",
 									},
-									h("span", { className: "smap-meta-dot", style: { background: s.archived === true ? dimCss((KIND_META[s.kind] || KIND_META.special).color) : (KIND_META[s.kind] || KIND_META.special).color, flex: "none", alignSelf: "center" } }),
+									h("span", { className: "smap-meta-dot", style: { background: s.archived === true ? dimCss(kindColor(KIND_META[s.kind] || KIND_META.special)) : kindColor(KIND_META[s.kind] || KIND_META.special), flex: "none", alignSelf: "center" } }),
 									s.archived === true ? h("span", { className: "smap-ar-badge" }, "已归档") : null,
 									h("span", { className: "smap-tl-date", title: s.mtimeMs ? fmtDate(s.mtimeMs) : "" }, s.mtimeMs ? fmtRel(s.mtimeMs) : "—"),
 									h("span", { className: "smap-tl-title" }, s.title),

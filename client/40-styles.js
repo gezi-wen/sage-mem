@@ -87,7 +87,7 @@
 			// 而独立成屏后如果父容器不是 column flex，`align-items:stretch` 就不会发生。
 			".smem-tool-panel--full{width:100%;align-self:stretch;box-sizing:border-box;}",
 			// 已锁定的记忆：卡片上那个按钮要一眼看出「这条现在拒绝归档」，用警示色
-			".smem-btn-locked{border-color:var(--dsw-alias-state-warning-primary,#d97706);color:var(--dsw-alias-state-warning-primary,#d97706);}",
+			".smem-btn-locked{border-color:var(--dsw-alias-state-warn-primary,#d97706);color:var(--dsw-alias-state-warn-primary,#d97706);}",
 			// 「自动归档」页签里的天数输入框：窄一点，别让三个数字各占一整行
 			".smem-num{width:88px;}",
 			// 体检 / 候选是「翻清单」的面板：定高 + 内部滚动，列表不被顶出首屏。
@@ -176,7 +176,7 @@
 			".smem-ad-main{flex:1;min-width:140px;overflow-wrap:anywhere;}",
 			".smem-ad-sub{color:var(--dsw-alias-label-secondary);font-size:11.5px;overflow-wrap:anywhere;}",
 			".smem-ad-badge{display:inline-flex;align-items:center;font-size:11px;color:var(--dsw-alias-label-secondary);border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:0 5px;white-space:nowrap;}",
-			".smem-ad-badge--warn{color:var(--dsw-alias-state-warning-primary,#d97706);border-color:var(--dsw-alias-state-warning-primary,#d97706);}",
+			".smem-ad-badge--warn{color:var(--dsw-alias-state-warn-primary,#d97706);border-color:var(--dsw-alias-state-warn-primary,#d97706);}",
 			".smem-ad-badge--legacy{opacity:.78;}",
 			".smem-ad-confirm{border:1px solid var(--dsw-alias-state-error-primary,#ef4444);border-radius:8px;padding:7px 9px;font-size:12px;line-height:1.55;display:flex;flex-direction:column;gap:6px;overflow-wrap:anywhere;}",
 			".smem-ad-rb{font-size:12px;line-height:1.5;overflow-wrap:anywhere;}",
@@ -185,7 +185,7 @@
 			'.smem-ad-run[data-on="1"]{border-color:var(--dsw-alias-brand-primary,#4d76e6);}',
 			".smem-ad-md{max-height:360px;overflow:auto;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:10px 12px;background:var(--dsw-alias-bg-layer-2);font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.6;}",
 			// ── 注入参数 / 保留名名单（自动做梦 tab）──
-			".smem-ad-warn{color:var(--dsw-alias-state-warning-primary,#d97706);}",
+			".smem-ad-warn{color:var(--dsw-alias-state-warn-primary,#d97706);}",
 			".smem-chip--fixed{opacity:.72;cursor:default;}",
 			".smem-chip-x{border:0;background:transparent;color:inherit;cursor:pointer;font-size:11px;font-family:inherit;padding:0 0 0 5px;}",
 			// ── 更新提示（有新版本才出现的一条窄横幅）──

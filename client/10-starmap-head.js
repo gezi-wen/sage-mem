@@ -88,13 +88,55 @@ const StarmapRuntime = (function (require, _react) {
 		// 配色：五个色若取高饱和高亮度（#ffd27d / #6fe3ff / #b18cff / #7dffb0），
 		// 配上星芒与脉冲环，整体读起来像贴纸。现在统一降饱和、压亮度 ——
 		// 深空画布上够辨认，又不抢眼。
+		//
+		// 两档取值：`color` = 深色档（夜空画布），`light` = 浅色档（纸本设色）。
+		// 浅色档不用「深色档降亮度」那种做法 —— 高饱和冷色压在暖纸上会发脏；
+		// 换成明度接近的矿物颜料色（赭石/石青/紫墨/石绿/墨），色相错开才分得清类型。
 		const KIND_META = {
-			user: { label: "用户", color: "#e0c07a" },
-			feedback: { label: "反馈", color: "#7ec8da" },
-			project: { label: "项目", color: "#ac9edc" },
-			reference: { label: "参考", color: "#92ceaa" },
-			special: { label: "特殊", color: "#bcc3d0" },
+			user: { label: "用户", color: "#e0c07a", light: "#a4652c" },
+			feedback: { label: "反馈", color: "#7ec8da", light: "#3a6f8f" },
+			project: { label: "项目", color: "#ac9edc", light: "#6a5b8f" },
+			reference: { label: "参考", color: "#92ceaa", light: "#4a7c63" },
+			special: { label: "特殊", color: "#bcc3d0", light: "#5b5750" },
 		};
+		/**
+		 * 宿主主题挂钩 —— 与 ui-theme 同一处：body[data-ds-dark-theme] 存在即深色档。
+		 */
+		function isDarkTheme() {
+			return typeof document !== "undefined" && !!document.body
+				&& document.body.hasAttribute("data-ds-dark-theme");
+		}
+
+		/** 类型色按当前主题取（meta.color / meta.light）。 */
+		function kindColor(meta) {
+			const m = meta || KIND_META.special;
+			return (isDarkTheme() ? m.color : m.light) || m.color;
+		}
+
+		/**
+		 * 画布调色板：深色档 = 夜空，浅色档 = 暖纸 + 晕染。
+		 * 两套渲染器（WebGL / canvas2d）都从这里取色，别各写一份。
+		 * bgGl 是 WebGL shader 用的 0-1 分量（与 bg2d 是同一色，写法不同而已）。
+		 */
+		function starmapPalette() {
+			if (isDarkTheme()) {
+				return {
+					bg2d: ["#0b1026", "#101731"],
+					bgGl: [[0.105, 0.117, 0.145], [0.043, 0.050, 0.065]],
+					dust: "#9fb3dd",
+					archive: [0.46, 0.50, 0.58],
+					vignette: null,
+				};
+			}
+			return {
+				bg2d: ["#faf6ed", "#e9e0cd"],
+				bgGl: [[0.980, 0.965, 0.929], [0.914, 0.878, 0.804]],
+				dust: "#c9bfa6",
+				archive: [0.62, 0.60, 0.55],
+				vignette: { color: "#7a6a48", a: 0.10 },
+			};
+		}
+
 		const KIND_ORDER = ["user", "feedback", "project", "reference", "special"];
 		const FRESH_MS = 7 * 86400000;
 
