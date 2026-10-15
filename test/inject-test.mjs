@@ -253,6 +253,47 @@ group('6. baseline 的预算优先权')
   ok(!!text && !text.includes('### big-2.md'), '预算不够时先挤掉的是检索结果，不是 baseline')
 }
 
+// ═══ 6b. 注入的是「命中段落」，不是文件开头 ═══
+group('6b. 命中段落替换文件开头')
+{
+  resetDir()
+  // 摘要（description）与问句毫无词面重合，答案只在正文中段 ——
+  // 这正是旧版（只比摘要 + 永远端文件开头 1500 字）必然漏掉的那类。
+  const BODY = [
+    '# 上线流程',
+    '',
+    '这一节讲的是发布前的检查清单，包含打标签、跑 CI、通知值班同学三件事。',
+    '',
+    '## 历史故障',
+    '',
+    // 这一段必须**自己够长**（> CHUNK_MIN_CHARS=60），否则会被当成「短段」并进上一段，
+    // 整份文件就只剩一个段落 —— 那样「命中段落替换文件开头」这条断言根本无从区分。
+    '去年压测时连接池等待时间设成了 30 秒，导致大量请求排队超时；最后的处置是把等待时间调到 5 秒，并在网关侧加了重试上限。',
+  ].join('\n')
+  mem('deploy.md', { desc: '上线流程与回滚预案', body: BODY })
+  const { handler } = newGateway()
+
+  const text = await step(handler, 's-chunk', '去年压测连接池超时最后是怎么处置的')
+  ok(!!text && /### deploy\.md:\d+-\d+/.test(text), '摘要没命中时由正文兜底，且带行号', String(text && text.slice(0, 160)))
+  ok(!!text && text.includes('连接池等待时间'), '注入的是命中那一段')
+  ok(!!text && !text.includes('# 上线流程'), '不再无条件端文件开头')
+  ok(!!text && text.includes('上线流程与回滚预案'), '段落前补了该记忆的 description，补回上下文')
+}
+
+// ═══ 6c. baseline 不吃段落替换 ═══
+group('6c. baseline 仍注入开头')
+{
+  resetDir()
+  // baseline 的语义是「每场会话都该完整在场」。若它被问句命中就换成单个段落，
+  // 等于把「完整在场」偷偷降级成「命中在场」—— 那正是 baseline 要防的事。
+  mem('base-hit.md', { baseline: true, body: '第一段在这里。\n\n## 后段\nsagebound 的内容在后段。' })
+  const { handler } = newGateway()
+
+  const text = await step(handler, 's-base-hit', 'sagebound')
+  ok(!!text && text.includes('### base-hit.md'), 'baseline 被命中时照样进文本')
+  ok(!!text && !/### base-hit\.md:\d/.test(text), 'baseline 不被替换成单个段落（仍注入开头）', String(text && text.slice(0, 160)))
+}
+
 // ═══ 7. 全被挡掉 → 一条都不注 ═══
 group('7. 预算挡掉全部条目')
 {

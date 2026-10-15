@@ -1,0 +1,5923 @@
+{
+  "tool": "sage-mem eval-retrieval",
+  "generatedAt": "2026-10-15T10:43:18.310Z",
+  "mode": "all",
+  "limit": 5,
+  "perFile": 2,
+  "corpus": {
+    "dir": "E:\\DSH-plugins\\sage-mem\\test\\eval\\corpus",
+    "files": 30,
+    "hash": "637913e49b54"
+  },
+  "questions": {
+    "path": "E:\\DSH-plugins\\sage-mem\\test\\eval\\questions.jsonl",
+    "count": 79,
+    "hash": "72c65df645a3"
+  },
+  "audit": {
+    "missingNeeded": [],
+    "badSpans": [],
+    "missingBlacklist": [],
+    "missingWhitelist": [],
+    "whitelistMissingNeeded": [],
+    "blacklistChecks": 229,
+    "safeChecks": 180,
+    "unsafeSamples": [
+      "a01 × reference_birdwatching-log.md ← 别是",
+      "a02 × reference_stargazing-nights.md ← 先查",
+      "a03 × reference_sourdough-starter.md ← 器的",
+      "a08 × reference_sourdough-starter.md ← 时间",
+      "a08 × reference_birdwatching-log.md ← 时间",
+      "a15 × project_orchard-noise-log.md ← 一次",
+      "a15 × project_harbor-noise-notes.md ← 一次",
+      "a15 × project_lumen-noise-dump.md ← 一次"
+    ]
+  },
+  "metrics": {
+    "raw": {
+      "questions": 79,
+      "neededQuestions": 69,
+      "anyHit": 58,
+      "allHit": 56,
+      "neededItems": 81,
+      "foundItems": 65,
+      "spanItems": 47,
+      "spanStrict": 29,
+      "spanOverlap": 29,
+      "mrrSum": 51.083333333333336,
+      "retrieveErrors": 0,
+      "zeroHitQuestions": 9,
+      "dupQuestions": 0,
+      "dupExtra": 0,
+      "dupExtraBytes": 0,
+      "blacklistQuestions": 71,
+      "blacklistChecks": 229,
+      "blacklistViolationQuestions": 10,
+      "blacklistViolations": 14,
+      "blacklistSafeChecks": 180,
+      "blacklistSafeQuestions": 68,
+      "blacklistSafeViolationQuestions": 2,
+      "blacklistUnsafeViolations": 11,
+      "whitelistQuestions": 4,
+      "whitelistViolationQuestions": 4,
+      "whitelistViolations": 5,
+      "unresolvedQuestions": 10,
+      "overInjectQuestions": 1,
+      "incompleteCoverageQuestions": 0,
+      "skippedFiles": 0,
+      "candidatesSum": 342,
+      "latencies": [
+        10.497900000000001,
+        1.240399999999994,
+        1.308800000000005,
+        0.836199999999991,
+        0.7241999999999962,
+        1.0087000000000046,
+        0.8903000000000105,
+        1.0426999999999964,
+        1.2079999999999984,
+        1.2183999999999884,
+        0.8061999999999898,
+        0.8984999999999985,
+        0.7809999999999917,
+        0.8789000000000016,
+        0.7913000000000068,
+        0.8730000000000047,
+        0.8269000000000091,
+        0.9038000000000039,
+        0.8526999999999987,
+        1.257099999999994,
+        0.6606000000000023,
+        0.6906000000000034,
+        0.6265000000000072,
+        0.517799999999994,
+        0.6094000000000079,
+        0.5326000000000022,
+        0.7272999999999996,
+        0.658600000000007,
+        0.5865000000000009,
+        0.6248999999999967,
+        1.0516999999999967,
+        0.6377999999999986,
+        0.6602999999999923,
+        0.5681000000000012,
+        0.6808999999999941,
+        0.5683999999999969,
+        0.5908000000000015,
+        0.5938000000000017,
+        0.8982999999999919,
+        0.5628999999999991,
+        0.6259000000000015,
+        0.6766000000000076,
+        1.1003999999999934,
+        0.6743000000000023,
+        0.5688999999999993,
+        0.834699999999998,
+        0.8410999999999973,
+        0.953400000000002,
+        0.8485999999999905,
+        0.5716000000000037,
+        0.8263999999999925,
+        1.3386999999999887,
+        0.8108000000000004,
+        0.8743999999999943,
+        0.7865999999999929,
+        0.6769000000000034,
+        0.9047999999999945,
+        0.816599999999994,
+        0.7710000000000008,
+        0.6291999999999973,
+        1.0885000000000105,
+        0.5427999999999997,
+        0.24629999999999086,
+        0.45060000000000855,
+        0.46479999999999677,
+        0.4405999999999892,
+        0.17659999999997922,
+        0.503799999999984,
+        0.5149999999999864,
+        0.5646999999999878,
+        0.5690999999999917,
+        0.7676999999999907,
+        0.6740999999999815,
+        0.7451999999999828,
+        0.7838000000000136,
+        1.0646000000000129,
+        0.7489999999999952,
+        0.6864999999999952,
+        0.7066000000000088
+      ]
+    },
+    "rates": {
+      "recallAny": 0.8405797101449275,
+      "recallAll": 0.8115942028985508,
+      "itemRecall": 0.8024691358024691,
+      "spanStrictRate": 0.6170212765957447,
+      "spanOverlapRate": 0.6170212765957447,
+      "mrr": 0.7403381642512078,
+      "falseInjectRate": 0.14084507042253522,
+      "falseInjectSafeRate": 0.029411764705882353,
+      "whitelistViolationRate": 1,
+      "dupQuestionRate": 0,
+      "overInjectRate": 0.1,
+      "errorRate": 0,
+      "incompleteRate": 0,
+      "candidatesAvg": 4.329113924050633,
+      "latencyP50": 0.7451999999999828,
+      "latencyP95": 1.257099999999994
+    }
+  },
+  "groups": {
+    "摘要题（shouldReturn=summary）": {
+      "raw": {
+        "questions": 32,
+        "neededQuestions": 22,
+        "anyHit": 22,
+        "allHit": 20,
+        "neededItems": 34,
+        "foundItems": 29,
+        "spanItems": 0,
+        "spanStrict": 0,
+        "spanOverlap": 0,
+        "mrrSum": 21.333333333333332,
+        "retrieveErrors": 0,
+        "zeroHitQuestions": 9,
+        "dupQuestions": 0,
+        "dupExtra": 0,
+        "dupExtraBytes": 0,
+        "blacklistQuestions": 32,
+        "blacklistChecks": 112,
+        "blacklistViolationQuestions": 5,
+        "blacklistViolations": 8,
+        "blacklistSafeChecks": 85,
+        "blacklistSafeQuestions": 30,
+        "blacklistSafeViolationQuestions": 0,
+        "blacklistUnsafeViolations": 8,
+        "whitelistQuestions": 0,
+        "whitelistViolationQuestions": 0,
+        "whitelistViolations": 0,
+        "unresolvedQuestions": 10,
+        "overInjectQuestions": 1,
+        "incompleteCoverageQuestions": 0,
+        "skippedFiles": 0,
+        "candidatesSum": 122,
+        "latencies": [
+          10.497900000000001,
+          1.240399999999994,
+          1.308800000000005,
+          0.836199999999991,
+          0.7241999999999962,
+          1.0087000000000046,
+          0.8903000000000105,
+          1.0426999999999964,
+          1.2079999999999984,
+          1.2183999999999884,
+          0.8061999999999898,
+          0.8984999999999985,
+          0.7809999999999917,
+          0.8789000000000016,
+          0.7913000000000068,
+          0.8730000000000047,
+          0.8269000000000091,
+          0.9038000000000039,
+          0.5427999999999997,
+          0.24629999999999086,
+          0.45060000000000855,
+          0.46479999999999677,
+          0.4405999999999892,
+          0.17659999999997922,
+          0.503799999999984,
+          0.5149999999999864,
+          0.5646999999999878,
+          0.5690999999999917,
+          0.7676999999999907,
+          0.6740999999999815,
+          0.7451999999999828,
+          0.7838000000000136
+        ]
+      },
+      "rates": {
+        "recallAny": 1,
+        "recallAll": 0.9090909090909091,
+        "itemRecall": 0.8529411764705882,
+        "spanStrictRate": 0,
+        "spanOverlapRate": 0,
+        "mrr": 0.9696969696969696,
+        "falseInjectRate": 0.15625,
+        "falseInjectSafeRate": 0,
+        "whitelistViolationRate": 0,
+        "dupQuestionRate": 0,
+        "overInjectRate": 0.1,
+        "errorRate": 0,
+        "incompleteRate": 0,
+        "candidatesAvg": 3.8125,
+        "latencyP50": 0.7838000000000136,
+        "latencyP95": 1.308800000000005
+      }
+    },
+    "正文题（shouldReturn=body）": {
+      "raw": {
+        "questions": 47,
+        "neededQuestions": 47,
+        "anyHit": 36,
+        "allHit": 36,
+        "neededItems": 47,
+        "foundItems": 36,
+        "spanItems": 47,
+        "spanStrict": 29,
+        "spanOverlap": 29,
+        "mrrSum": 29.75,
+        "retrieveErrors": 0,
+        "zeroHitQuestions": 0,
+        "dupQuestions": 0,
+        "dupExtra": 0,
+        "dupExtraBytes": 0,
+        "blacklistQuestions": 39,
+        "blacklistChecks": 117,
+        "blacklistViolationQuestions": 5,
+        "blacklistViolations": 6,
+        "blacklistSafeChecks": 95,
+        "blacklistSafeQuestions": 38,
+        "blacklistSafeViolationQuestions": 2,
+        "blacklistUnsafeViolations": 3,
+        "whitelistQuestions": 4,
+        "whitelistViolationQuestions": 4,
+        "whitelistViolations": 5,
+        "unresolvedQuestions": 0,
+        "overInjectQuestions": 0,
+        "incompleteCoverageQuestions": 0,
+        "skippedFiles": 0,
+        "candidatesSum": 220,
+        "latencies": [
+          0.8526999999999987,
+          1.257099999999994,
+          0.6606000000000023,
+          0.6906000000000034,
+          0.6265000000000072,
+          0.517799999999994,
+          0.6094000000000079,
+          0.5326000000000022,
+          0.7272999999999996,
+          0.658600000000007,
+          0.5865000000000009,
+          0.6248999999999967,
+          1.0516999999999967,
+          0.6377999999999986,
+          0.6602999999999923,
+          0.5681000000000012,
+          0.6808999999999941,
+          0.5683999999999969,
+          0.5908000000000015,
+          0.5938000000000017,
+          0.8982999999999919,
+          0.5628999999999991,
+          0.6259000000000015,
+          0.6766000000000076,
+          1.1003999999999934,
+          0.6743000000000023,
+          0.5688999999999993,
+          0.834699999999998,
+          0.8410999999999973,
+          0.953400000000002,
+          0.8485999999999905,
+          0.5716000000000037,
+          0.8263999999999925,
+          1.3386999999999887,
+          0.8108000000000004,
+          0.8743999999999943,
+          0.7865999999999929,
+          0.6769000000000034,
+          0.9047999999999945,
+          0.816599999999994,
+          0.7710000000000008,
+          0.6291999999999973,
+          1.0885000000000105,
+          1.0646000000000129,
+          0.7489999999999952,
+          0.6864999999999952,
+          0.7066000000000088
+        ]
+      },
+      "rates": {
+        "recallAny": 0.7659574468085106,
+        "recallAll": 0.7659574468085106,
+        "itemRecall": 0.7659574468085106,
+        "spanStrictRate": 0.6170212765957447,
+        "spanOverlapRate": 0.6170212765957447,
+        "mrr": 0.6329787234042553,
+        "falseInjectRate": 0.1282051282051282,
+        "falseInjectSafeRate": 0.05263157894736842,
+        "whitelistViolationRate": 1,
+        "dupQuestionRate": 0,
+        "overInjectRate": 0,
+        "errorRate": 0,
+        "incompleteRate": 0,
+        "candidatesAvg": 4.680851063829787,
+        "latencyP50": 0.6864999999999952,
+        "latencyP95": 1.1003999999999934
+      }
+    },
+    "已知词法边界 [lexfail]": {
+      "raw": {
+        "questions": 4,
+        "neededQuestions": 4,
+        "anyHit": 0,
+        "allHit": 0,
+        "neededItems": 4,
+        "foundItems": 0,
+        "spanItems": 4,
+        "spanStrict": 0,
+        "spanOverlap": 0,
+        "mrrSum": 0,
+        "retrieveErrors": 0,
+        "zeroHitQuestions": 0,
+        "dupQuestions": 0,
+        "dupExtra": 0,
+        "dupExtraBytes": 0,
+        "blacklistQuestions": 0,
+        "blacklistChecks": 0,
+        "blacklistViolationQuestions": 0,
+        "blacklistViolations": 0,
+        "blacklistSafeChecks": 0,
+        "blacklistSafeQuestions": 0,
+        "blacklistSafeViolationQuestions": 0,
+        "blacklistUnsafeViolations": 0,
+        "whitelistQuestions": 0,
+        "whitelistViolationQuestions": 0,
+        "whitelistViolations": 0,
+        "unresolvedQuestions": 0,
+        "overInjectQuestions": 0,
+        "incompleteCoverageQuestions": 0,
+        "skippedFiles": 0,
+        "candidatesSum": 6,
+        "latencies": [
+          0.6766000000000076,
+          1.1003999999999934,
+          0.6743000000000023,
+          0.5688999999999993
+        ]
+      },
+      "rates": {
+        "recallAny": 0,
+        "recallAll": 0,
+        "itemRecall": 0,
+        "spanStrictRate": 0,
+        "spanOverlapRate": 0,
+        "mrr": 0,
+        "falseInjectRate": 0,
+        "falseInjectSafeRate": 0,
+        "whitelistViolationRate": 0,
+        "dupQuestionRate": 0,
+        "overInjectRate": 0,
+        "errorRate": 0,
+        "incompleteRate": 0,
+        "candidatesAvg": 1.5,
+        "latencyP50": 0.6743000000000023,
+        "latencyP95": 1.1003999999999934
+      }
+    },
+    "无答案题（unresolved 且不该注入）": {
+      "raw": {
+        "questions": 10,
+        "neededQuestions": 0,
+        "anyHit": 0,
+        "allHit": 0,
+        "neededItems": 0,
+        "foundItems": 0,
+        "spanItems": 0,
+        "spanStrict": 0,
+        "spanOverlap": 0,
+        "mrrSum": 0,
+        "retrieveErrors": 0,
+        "zeroHitQuestions": 9,
+        "dupQuestions": 0,
+        "dupExtra": 0,
+        "dupExtraBytes": 0,
+        "blacklistQuestions": 10,
+        "blacklistChecks": 43,
+        "blacklistViolationQuestions": 0,
+        "blacklistViolations": 0,
+        "blacklistSafeChecks": 38,
+        "blacklistSafeQuestions": 10,
+        "blacklistSafeViolationQuestions": 0,
+        "blacklistUnsafeViolations": 0,
+        "whitelistQuestions": 0,
+        "whitelistViolationQuestions": 0,
+        "whitelistViolations": 0,
+        "unresolvedQuestions": 10,
+        "overInjectQuestions": 1,
+        "incompleteCoverageQuestions": 0,
+        "skippedFiles": 0,
+        "candidatesSum": 1,
+        "latencies": [
+          0.5427999999999997,
+          0.24629999999999086,
+          0.45060000000000855,
+          0.46479999999999677,
+          0.4405999999999892,
+          0.17659999999997922,
+          0.503799999999984,
+          0.5149999999999864,
+          0.5646999999999878,
+          0.5690999999999917
+        ]
+      },
+      "rates": {
+        "recallAny": 0,
+        "recallAll": 0,
+        "itemRecall": 0,
+        "spanStrictRate": 0,
+        "spanOverlapRate": 0,
+        "mrr": 0,
+        "falseInjectRate": 0,
+        "falseInjectSafeRate": 0,
+        "whitelistViolationRate": 0,
+        "dupQuestionRate": 0,
+        "overInjectRate": 0.1,
+        "errorRate": 0,
+        "incompleteRate": 0,
+        "candidatesAvg": 0.1,
+        "latencyP50": 0.46479999999999677,
+        "latencyP95": 0.5690999999999917
+      }
+    }
+  },
+  "reference": {
+    "mode": "summary",
+    "raw": {
+      "questions": 79,
+      "neededQuestions": 69,
+      "anyHit": 35,
+      "allHit": 33,
+      "neededItems": 81,
+      "foundItems": 42,
+      "spanItems": 47,
+      "spanStrict": 0,
+      "spanOverlap": 0,
+      "mrrSum": 30.28333333333333,
+      "retrieveErrors": 0,
+      "zeroHitQuestions": 10,
+      "dupQuestions": 0,
+      "dupExtra": 0,
+      "dupExtraBytes": 0,
+      "blacklistQuestions": 71,
+      "blacklistChecks": 229,
+      "blacklistViolationQuestions": 9,
+      "blacklistViolations": 14,
+      "blacklistSafeChecks": 180,
+      "blacklistSafeQuestions": 68,
+      "blacklistSafeViolationQuestions": 2,
+      "blacklistUnsafeViolations": 11,
+      "whitelistQuestions": 4,
+      "whitelistViolationQuestions": 4,
+      "whitelistViolations": 5,
+      "unresolvedQuestions": 10,
+      "overInjectQuestions": 0,
+      "incompleteCoverageQuestions": 0,
+      "skippedFiles": 0,
+      "candidatesSum": 296,
+      "latencies": [
+        0.5389000000000124,
+        0.4692000000000007,
+        0.5189000000000021,
+        0.38820000000001187,
+        0.36990000000000123,
+        0.42549999999999955,
+        0.39229999999997744,
+        0.8231999999999857,
+        0.46999999999999886,
+        0.41509999999999536,
+        0.462600000000009,
+        0.5250000000000057,
+        0.4368999999999801,
+        0.41499999999999204,
+        0.38280000000000314,
+        0.45400000000000773,
+        0.3468000000000018,
+        0.3976000000000113,
+        0.4222000000000037,
+        0.36019999999999186,
+        0.518100000000004,
+        0.7561999999999784,
+        0.3760000000000048,
+        0.32159999999998945,
+        0.36410000000000764,
+        0.3143000000000029,
+        0.4128999999999792,
+        0.3623999999999796,
+        0.36299999999999955,
+        0.31110000000001037,
+        0.35829999999998563,
+        0.34360000000000923,
+        0.3710999999999842,
+        0.4163999999999817,
+        0.3960999999999899,
+        0.3242999999999938,
+        0.33629999999999427,
+        0.33670000000000755,
+        0.7268000000000256,
+        0.44540000000000646,
+        0.3532000000000153,
+        0.32450000000000045,
+        0.30930000000000746,
+        0.33440000000001646,
+        0.31520000000000437,
+        0.5281999999999982,
+        0.5343000000000018,
+        0.5430999999999813,
+        0.5227999999999895,
+        0.35070000000001755,
+        0.5503999999999962,
+        0.7956000000000074,
+        0.7098000000000013,
+        0.5392999999999972,
+        0.5653999999999826,
+        0.41800000000000637,
+        0.7855000000000132,
+        0.5962999999999852,
+        0.54849999999999,
+        0.4257000000000062,
+        0.6131999999999778,
+        0.5115999999999872,
+        0.14760000000001128,
+        0.35300000000000864,
+        0.3470999999999833,
+        0.9394000000000062,
+        0.2810000000000059,
+        0.7630999999999801,
+        0.6105000000000018,
+        0.5774999999999864,
+        0.601300000000009,
+        0.7438999999999965,
+        0.5331999999999937,
+        0.540600000000012,
+        0.5793000000000177,
+        0.4690000000000225,
+        0.4830000000000041,
+        0.4836999999999989,
+        0.44259999999999877
+      ]
+    },
+    "rates": {
+      "recallAny": 0.5072463768115942,
+      "recallAll": 0.4782608695652174,
+      "itemRecall": 0.5185185185185185,
+      "spanStrictRate": 0,
+      "spanOverlapRate": 0,
+      "mrr": 0.4388888888888889,
+      "falseInjectRate": 0.1267605633802817,
+      "falseInjectSafeRate": 0.029411764705882353,
+      "whitelistViolationRate": 1,
+      "dupQuestionRate": 0,
+      "overInjectRate": 0,
+      "errorRate": 0,
+      "incompleteRate": 0,
+      "candidatesAvg": 3.7468354430379747,
+      "latencyP50": 0.4368999999999801,
+      "latencyP95": 0.7855000000000132
+    }
+  },
+  "detail": [
+    {
+      "id": "a01",
+      "query": "灯笼的发布检查清单里四个锚点分别是什么",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中：query 与 description 词面高度重合",
+      "hits": [
+        {
+          "file": "project_lantern-release.md",
+          "lines": [
+            11,
+            13
+          ],
+          "score": 43.1625,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "feedback_review-checklist.md",
+          "lines": null,
+          "score": 0.1111,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_harbor-metrics.md",
+          "lines": null,
+          "score": 0.0556,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_quarry-migration.md",
+          "lines": null,
+          "score": 0.0556,
+          "matchedBy": [
+            "description"
+          ]
+        },
+        {
+          "file": "reference_lumen-theme-tokens.md",
+          "lines": null,
+          "score": 0.0556,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_lantern-release.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            13
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 10.4979,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 27,
+        "candidates": 5
+      }
+    },
+    {
+      "id": "a02",
+      "query": "果园构建超时应该先查哪两处",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中",
+      "hits": [
+        {
+          "file": "project_orchard-timeout.md",
+          "lines": [
+            11,
+            13
+          ],
+          "score": 28.4853,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_orchard-cache.md",
+          "lines": null,
+          "score": 0.25,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_orchard-noise-log.md",
+          "lines": null,
+          "score": 0.25,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_orchard-ci.md",
+          "lines": null,
+          "score": 0.0833,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_orchard-flags.md",
+          "lines": null,
+          "score": 0.0833,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_orchard-timeout.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            13
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 1.2404,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 22,
+        "candidates": 5
+      }
+    },
+    {
+      "id": "a03",
+      "query": "港口调度器的配置文件在哪，字段都有什么",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中",
+      "hits": [
+        {
+          "file": "reference_harbor-config.md",
+          "lines": [
+            11,
+            13
+          ],
+          "score": 32.4579,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_harbor-noise-notes.md",
+          "lines": [
+            17,
+            19
+          ],
+          "score": 13.5319,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_harbor-backpressure.md",
+          "lines": null,
+          "score": 0.4118,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_harbor-metrics.md",
+          "lines": null,
+          "score": 0.2941,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_sagemem-frontmatter.md",
+          "lines": null,
+          "score": 0.1176,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_harbor-config.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            13
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 1.3088,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 46,
+        "candidates": 7
+      }
+    },
+    {
+      "id": "a04",
+      "query": "我在写作输出上有什么偏好",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中(baseline 条目)",
+      "hits": [
+        {
+          "file": "user_preferences-writing.md",
+          "lines": null,
+          "score": 0.2727,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "user_preferences-writing.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.8362,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 19,
+        "candidates": 1
+      }
+    },
+    {
+      "id": "a05",
+      "query": "部署冻结期有什么纪律",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中(baseline 条目)",
+      "hits": [
+        {
+          "file": "feedback_deploy-frozen.md",
+          "lines": [
+            13,
+            15
+          ],
+          "score": 29.6175,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "feedback_deploy-frozen.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": [
+            13,
+            15
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.7242,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 13,
+        "candidates": 1
+      }
+    },
+    {
+      "id": "a06",
+      "query": "采石场索引迁移怎么分批，回退怎么做",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中",
+      "hits": [
+        {
+          "file": "project_quarry-migration.md",
+          "lines": [
+            11,
+            13
+          ],
+          "score": 35.6089,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_quarry-shard-split.md",
+          "lines": [
+            11,
+            17
+          ],
+          "score": 10.8578,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_quarry-noise-index.md",
+          "lines": null,
+          "score": 0.2857,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_quarry-migration.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            13
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 1.0087,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 17,
+        "candidates": 3
+      }
+    },
+    {
+      "id": "a07",
+      "query": "明灯快捷键有哪些",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中",
+      "hits": [
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "lines": [
+            11,
+            17
+          ],
+          "score": 22.17,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_lumen-noise-dump.md",
+          "lines": null,
+          "score": 0.1429,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_lumen-sync.md",
+          "lines": null,
+          "score": 0.1429,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_lumen-theme-tokens.md",
+          "lines": null,
+          "score": 0.1429,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            17
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.8903,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 14,
+        "candidates": 4
+      }
+    },
+    {
+      "id": "a08",
+      "query": "潮汐定时任务的时间窗与幂等约定",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中",
+      "hits": [
+        {
+          "file": "project_tide-scheduler.md",
+          "lines": [
+            11,
+            13
+          ],
+          "score": 55.0301,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_tide-failures.md",
+          "lines": null,
+          "score": 0.2143,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_tide-window.md",
+          "lines": null,
+          "score": 0.2143,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_birdwatching-log.md",
+          "lines": null,
+          "score": 0.0714,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_tide-scheduler.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            13
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [
+        "reference_birdwatching-log.md"
+      ],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 1.0427,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 45,
+        "candidates": 4
+      }
+    },
+    {
+      "id": "a09",
+      "query": "果园持续集成的步骤是什么",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中",
+      "hits": [
+        {
+          "file": "project_orchard-ci.md",
+          "lines": [
+            11,
+            13
+          ],
+          "score": 30.0871,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_orchard-cache.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_orchard-noise-log.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_orchard-timeout.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_orchard-flags.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_orchard-ci.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            13
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 1.208,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 35,
+        "candidates": 7
+      }
+    },
+    {
+      "id": "a10",
+      "query": "港口调度器有哪些指标",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中",
+      "hits": [
+        {
+          "file": "reference_harbor-metrics.md",
+          "lines": [
+            11,
+            19
+          ],
+          "score": 14.0303,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_harbor-noise-notes.md",
+          "lines": [
+            17,
+            19
+          ],
+          "score": 10.9855,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_harbor-backpressure.md",
+          "lines": null,
+          "score": 0.4444,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_harbor-config.md",
+          "lines": null,
+          "score": 0.4444,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_tide-failures.md",
+          "lines": [
+            21,
+            25
+          ],
+          "score": 4.5565,
+          "matchedBy": [
+            "body"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_harbor-metrics.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            19
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 1.2184,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 20,
+        "candidates": 5
+      }
+    },
+    {
+      "id": "a11",
+      "query": "明灯的同步冲突怎么处理",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中",
+      "hits": [
+        {
+          "file": "project_lumen-sync.md",
+          "lines": [
+            11,
+            13
+          ],
+          "score": 19.9675,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_lumen-noise-dump.md",
+          "lines": [
+            11,
+            15
+          ],
+          "score": 8.4455,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_tide-failures.md",
+          "lines": null,
+          "score": 0.1,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "lines": null,
+          "score": 0.1,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "feedback_credential-habit.md",
+          "lines": null,
+          "score": 0.1,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_lumen-sync.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            13
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.8062,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 38,
+        "candidates": 7
+      }
+    },
+    {
+      "id": "a12",
+      "query": "潮汐任务失败怎么分类处理",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中",
+      "hits": [
+        {
+          "file": "project_tide-failures.md",
+          "lines": [
+            11,
+            13
+          ],
+          "score": 24.9504,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_tide-window.md",
+          "lines": null,
+          "score": 0.2727,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_tide-scheduler.md",
+          "lines": null,
+          "score": 0.1818,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "feedback_credential-habit.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description"
+          ]
+        },
+        {
+          "file": "project_harbor-noise-notes.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_tide-failures.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            13
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.8985,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 45,
+        "candidates": 6
+      }
+    },
+    {
+      "id": "a13",
+      "query": "记忆文件的字段速查",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中",
+      "hits": [
+        {
+          "file": "reference_sagemem-frontmatter.md",
+          "lines": [
+            11,
+            17
+          ],
+          "score": 18.1075,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "reference_harbor-config.md",
+          "lines": [
+            24,
+            26
+          ],
+          "score": 9.3999,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "feedback_credential-habit.md",
+          "lines": null,
+          "score": 0.125,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "lines": null,
+          "score": 0.125,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_lumen-sync.md",
+          "lines": null,
+          "score": 0.125,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_sagemem-frontmatter.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            17
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.781,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 16,
+        "candidates": 5
+      }
+    },
+    {
+      "id": "a14",
+      "query": "复审清单有哪几条",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中(靠 aliases 的「复审清单」)",
+      "hits": [
+        {
+          "file": "feedback_review-checklist.md",
+          "lines": null,
+          "score": 0.4286,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_lantern-release.md",
+          "lines": null,
+          "score": 0.1429,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_harbor-metrics.md",
+          "lines": null,
+          "score": 0.1429,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_lumen-theme-tokens.md",
+          "lines": null,
+          "score": 0.1429,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "feedback_review-checklist.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.8789,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 8,
+        "candidates": 4
+      }
+    },
+    {
+      "id": "a15",
+      "query": "天然酵母怎么喂养，多久喂一次",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中(另一领域的无关文档，对它自己而言是正解)",
+      "hits": [
+        {
+          "file": "reference_sourdough-starter.md",
+          "lines": [
+            11,
+            15
+          ],
+          "score": 30.4009,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_ember-chunking.md",
+          "lines": null,
+          "score": 0.0833,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_sourdough-starter.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            15
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.7913,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 27,
+        "candidates": 2
+      }
+    },
+    {
+      "id": "a16",
+      "query": "观鸟记录里候鸟什么时候来",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中(另一领域)",
+      "hits": [
+        {
+          "file": "reference_birdwatching-log.md",
+          "lines": [
+            11,
+            15
+          ],
+          "score": 14.9241,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "reference_stargazing-nights.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "feedback_deploy-frozen.md",
+          "lines": [
+            20,
+            25
+          ],
+          "score": 7.317,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "project_harbor-noise-notes.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description"
+          ]
+        },
+        {
+          "file": "project_lumen-noise-dump.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_birdwatching-log.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            15
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [
+        "project_harbor-noise-notes.md",
+        "project_lumen-noise-dump.md"
+      ],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.873,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 25,
+        "candidates": 7
+      }
+    },
+    {
+      "id": "a17",
+      "query": "观星适合挑什么月相出门",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中(另一领域)",
+      "hits": [
+        {
+          "file": "reference_stargazing-nights.md",
+          "lines": null,
+          "score": 0.4,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_stargazing-nights.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.8269,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 16,
+        "candidates": 1
+      }
+    },
+    {
+      "id": "a18",
+      "query": "果园的命令行参数表",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "摘要直命中",
+      "hits": [
+        {
+          "file": "reference_orchard-flags.md",
+          "lines": [
+            11,
+            19
+          ],
+          "score": 25.0252,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_orchard-ci.md",
+          "lines": null,
+          "score": 0.25,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_orchard-cache.md",
+          "lines": null,
+          "score": 0.125,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_orchard-noise-log.md",
+          "lines": null,
+          "score": 0.125,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_orchard-timeout.md",
+          "lines": null,
+          "score": 0.125,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_orchard-flags.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            19
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.9038,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 22,
+        "candidates": 5
+      }
+    },
+    {
+      "id": "b01",
+      "query": "并行度默认几，改它的配置项在哪",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有：摘要里没有并行度",
+      "hits": [
+        {
+          "file": "reference_harbor-config.md",
+          "lines": null,
+          "score": 0.1538,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_orchard-cache.md",
+          "lines": [
+            11,
+            16
+          ],
+          "score": 19.7758,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "project_orchard-timeout.md",
+          "lines": null,
+          "score": 0.1538,
+          "matchedBy": [
+            "description"
+          ]
+        },
+        {
+          "file": "project_harbor-backpressure.md",
+          "lines": null,
+          "score": 0.0769,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_orchard-cache.md",
+          "span": [
+            14,
+            14
+          ],
+          "rank": 2,
+          "found": true,
+          "lines": [
+            11,
+            16
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.8527,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 25,
+        "candidates": 4
+      }
+    },
+    {
+      "id": "b02",
+      "query": "缓存目录的完整路径是什么",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有：摘要里没有缓存目录",
+      "hits": [
+        {
+          "file": "project_orchard-timeout.md",
+          "lines": [
+            21,
+            24
+          ],
+          "score": 11.4146,
+          "matchedBy": [
+            "description",
+            "body"
+          ]
+        },
+        {
+          "file": "project_orchard-cache.md",
+          "lines": [
+            18,
+            22
+          ],
+          "score": 23.0151,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "reference_orchard-flags.md",
+          "lines": [
+            21,
+            25
+          ],
+          "score": 13.7759,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "feedback_review-checklist.md",
+          "lines": [
+            11,
+            19
+          ],
+          "score": 10.9644,
+          "matchedBy": [
+            "body"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_orchard-cache.md",
+          "span": [
+            13,
+            13
+          ],
+          "rank": 2,
+          "found": true,
+          "lines": [
+            18,
+            22
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 1.2571,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 24,
+        "candidates": 4
+      }
+    },
+    {
+      "id": "b03",
+      "query": "单步重试上限是几，超过会怎样",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有：答案在参数说明里",
+      "hits": [
+        {
+          "file": "reference_orchard-flags.md",
+          "lines": [
+            11,
+            19
+          ],
+          "score": 21.0007,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "project_harbor-noise-notes.md",
+          "lines": null,
+          "score": 0.0833,
+          "matchedBy": [
+            "description"
+          ]
+        },
+        {
+          "file": "project_tide-failures.md",
+          "lines": null,
+          "score": 0.0833,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_orchard-flags.md",
+          "span": [
+            15,
+            15
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            19
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.6606,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 20,
+        "candidates": 3
+      }
+    },
+    {
+      "id": "b04",
+      "query": "输出各步耗时的那个开关叫什么",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有：摘要没写任何参数名",
+      "hits": [
+        {
+          "file": "reference_orchard-flags.md",
+          "lines": [
+            11,
+            19
+          ],
+          "score": 24.6262,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "project_lumen-noise-dump.md",
+          "lines": [
+            24,
+            29
+          ],
+          "score": 13.5276,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "feedback_credential-habit.md",
+          "lines": null,
+          "score": 0.0769,
+          "matchedBy": [
+            "description"
+          ]
+        },
+        {
+          "file": "feedback_review-checklist.md",
+          "lines": null,
+          "score": 0.0769,
+          "matchedBy": [
+            "description"
+          ]
+        },
+        {
+          "file": "project_orchard-noise-log.md",
+          "lines": null,
+          "score": 0.0769,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_orchard-flags.md",
+          "span": [
+            17,
+            17
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            19
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.6906,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 28,
+        "candidates": 6
+      }
+    },
+    {
+      "id": "b05",
+      "query": "积压上限实际生效的数字是多少",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有",
+      "hits": [
+        {
+          "file": "project_harbor-backpressure.md",
+          "lines": [
+            11,
+            16
+          ],
+          "score": 20.6429,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "project_quarry-shard-split.md",
+          "lines": null,
+          "score": 0.0769,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_harbor-backpressure.md",
+          "span": [
+            13,
+            13
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            16
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.6265,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 19,
+        "candidates": 2
+      }
+    },
+    {
+      "id": "b06",
+      "query": "退避最长要等多久",
+      "scope": "all",
+      "verdict": "MISS",
+      "note": "正文独有",
+      "hits": [],
+      "needed": [
+        {
+          "file": "project_harbor-backpressure.md",
+          "span": [
+            16,
+            16
+          ],
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.5178,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 6,
+        "candidates": 0
+      }
+    },
+    {
+      "id": "b07",
+      "query": "面板底色和分隔线分别是哪个名字",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有：摘要里没有变量名",
+      "hits": [
+        {
+          "file": "reference_lumen-theme-tokens.md",
+          "lines": [
+            11,
+            20
+          ],
+          "score": 21.9266,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "lines": null,
+          "score": 0.0714,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_lumen-theme-tokens.md",
+          "span": [
+            13,
+            13
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            20
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.6094,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 11,
+        "candidates": 2
+      }
+    },
+    {
+      "id": "b08",
+      "query": "浮层投影用哪个名字",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有",
+      "hits": [
+        {
+          "file": "reference_lumen-theme-tokens.md",
+          "lines": [
+            11,
+            20
+          ],
+          "score": 13.7472,
+          "matchedBy": [
+            "body"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_lumen-theme-tokens.md",
+          "span": [
+            17,
+            17
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            20
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.5326,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 2,
+        "candidates": 1
+      }
+    },
+    {
+      "id": "b09",
+      "query": "租户编号是哪个字段，不是文档编号",
+      "scope": "all",
+      "verdict": "MISS",
+      "note": "正文独有：摘要只写「重分片的实际步骤」",
+      "hits": [
+        {
+          "file": "project_lumen-sync.md",
+          "lines": [
+            21,
+            25
+          ],
+          "score": 9.6105,
+          "matchedBy": [
+            "description",
+            "body"
+          ]
+        },
+        {
+          "file": "reference_sagemem-frontmatter.md",
+          "lines": null,
+          "score": 0.0769,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_harbor-backpressure.md",
+          "lines": null,
+          "score": 0.0769,
+          "matchedBy": [
+            "description"
+          ]
+        },
+        {
+          "file": "reference_harbor-config.md",
+          "lines": null,
+          "score": 0.0769,
+          "matchedBy": [
+            "description"
+          ]
+        },
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "lines": null,
+          "score": 0.0769,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_quarry-shard-split.md",
+          "span": [
+            13,
+            13
+          ],
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.7273,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 48,
+        "candidates": 5
+      }
+    },
+    {
+      "id": "b10",
+      "query": "双写、回填、切读这三个动作的顺序",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有",
+      "hits": [
+        {
+          "file": "project_quarry-shard-split.md",
+          "lines": [
+            11,
+            17
+          ],
+          "score": 14.7128,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "feedback_review-checklist.md",
+          "lines": null,
+          "score": 0.0769,
+          "matchedBy": [
+            "description"
+          ]
+        },
+        {
+          "file": "project_ember-nightpass.md",
+          "lines": null,
+          "score": 0.0769,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_quarry-shard-split.md",
+          "span": [
+            14,
+            14
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            17
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.6586,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 25,
+        "candidates": 3
+      }
+    },
+    {
+      "id": "b11",
+      "query": "出错时怎样才算留下了可读的原因",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有：摘要只说「五条检查线」",
+      "hits": [
+        {
+          "file": "feedback_review-checklist.md",
+          "lines": [
+            11,
+            19
+          ],
+          "score": 30.9796,
+          "matchedBy": [
+            "body"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "feedback_review-checklist.md",
+          "span": [
+            15,
+            15
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            19
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.5865,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 12,
+        "candidates": 1
+      }
+    },
+    {
+      "id": "b12",
+      "query": "命名要写清什么才算合格",
+      "scope": "all",
+      "verdict": "MISS",
+      "note": "正文独有：第 1 条在正文第 13 行",
+      "hits": [
+        {
+          "file": "feedback_deploy-frozen.md",
+          "lines": [
+            20,
+            25
+          ],
+          "score": 6.6174,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "reference_harbor-metrics.md",
+          "lines": [
+            21,
+            25
+          ],
+          "score": 5.4313,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "reference_birdwatching-log.md",
+          "lines": [
+            17,
+            23
+          ],
+          "score": 4.4557,
+          "matchedBy": [
+            "body"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "feedback_review-checklist.md",
+          "span": [
+            13,
+            13
+          ],
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [
+        "reference_birdwatching-log.md"
+      ],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.6249,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 14,
+        "candidates": 3
+      }
+    },
+    {
+      "id": "b13",
+      "query": "默认允许运行的时段是几点到几点",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有：摘要只说「两个细节」",
+      "hits": [
+        {
+          "file": "reference_harbor-config.md",
+          "lines": [
+            15,
+            18
+          ],
+          "score": 13.8685,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "project_tide-window.md",
+          "lines": [
+            18,
+            22
+          ],
+          "score": 10.8531,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "project_tide-scheduler.md",
+          "lines": null,
+          "score": 0.0769,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_tide-window.md",
+          "span": [
+            13,
+            13
+          ],
+          "rank": 2,
+          "found": true,
+          "lines": [
+            18,
+            22
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 1.0517,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 18,
+        "candidates": 3
+      }
+    },
+    {
+      "id": "b14",
+      "query": "和备份重叠时让出多少时间",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有",
+      "hits": [
+        {
+          "file": "project_tide-scheduler.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_tide-window.md",
+          "lines": [
+            11,
+            16
+          ],
+          "score": 16.803,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "reference_birdwatching-log.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_tide-window.md",
+          "span": [
+            14,
+            14
+          ],
+          "rank": 2,
+          "found": true,
+          "lines": [
+            11,
+            16
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [
+        "reference_birdwatching-log.md"
+      ],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.6378,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 28,
+        "candidates": 3
+      }
+    },
+    {
+      "id": "b15",
+      "query": "手写日期和系统时间冲突时听谁的",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有：摘要只列字段名",
+      "hits": [
+        {
+          "file": "project_lumen-sync.md",
+          "lines": null,
+          "score": 0.0714,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_tide-scheduler.md",
+          "lines": null,
+          "score": 0.0714,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_sagemem-frontmatter.md",
+          "lines": [
+            11,
+            17
+          ],
+          "score": 16.3935,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "reference_birdwatching-log.md",
+          "lines": null,
+          "score": 0.0714,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_sagemem-frontmatter.md",
+          "span": [
+            17,
+            17
+          ],
+          "rank": 3,
+          "found": true,
+          "lines": [
+            11,
+            17
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [
+        "reference_birdwatching-log.md"
+      ],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.6603,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 36,
+        "candidates": 4
+      }
+    },
+    {
+      "id": "b16",
+      "query": "检索先看的是哪一项",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有：正文第 22 行才说「检索先看它」",
+      "hits": [
+        {
+          "file": "reference_sagemem-frontmatter.md",
+          "lines": [
+            22,
+            23
+          ],
+          "score": 16.7495,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "lines": null,
+          "score": 0.25,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_sagemem-frontmatter.md",
+          "span": [
+            22,
+            22
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            22,
+            23
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.5681,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 22,
+        "candidates": 2
+      }
+    },
+    {
+      "id": "b17",
+      "query": "任务被拒之后落在哪个目录",
+      "scope": "all",
+      "verdict": "MISS",
+      "note": "正文独有：摘要只写「字段含义速查」",
+      "hits": [
+        {
+          "file": "project_tide-failures.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description"
+          ]
+        },
+        {
+          "file": "project_tide-scheduler.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description"
+          ]
+        },
+        {
+          "file": "project_tide-window.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_harbor-config.md",
+          "span": [
+            18,
+            18
+          ],
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.6809,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 48,
+        "candidates": 3
+      }
+    },
+    {
+      "id": "b18",
+      "query": "重放不成功的条目去哪了",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有",
+      "hits": [
+        {
+          "file": "project_lumen-sync.md",
+          "lines": [
+            15,
+            19
+          ],
+          "score": 10.8303,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "project_quarry-migration.md",
+          "lines": [
+            22,
+            25
+          ],
+          "score": 9.0338,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "project_ember-nightpass.md",
+          "lines": [
+            11,
+            14
+          ],
+          "score": 6.5557,
+          "matchedBy": [
+            "body"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_lumen-sync.md",
+          "span": [
+            17,
+            17
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            15,
+            19
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.5684,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 8,
+        "candidates": 3
+      }
+    },
+    {
+      "id": "b19",
+      "query": "断网期间的改动怎么排",
+      "scope": "all",
+      "verdict": "MISS",
+      "note": "正文独有",
+      "hits": [
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "lines": [
+            19,
+            24
+          ],
+          "score": 4.9204,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "feedback_deploy-frozen.md",
+          "lines": null,
+          "score": 0.1111,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_lumen-sync.md",
+          "span": [
+            16,
+            16
+          ],
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.5908,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 22,
+        "candidates": 2
+      }
+    },
+    {
+      "id": "b20",
+      "query": "每晚额外多跑一遍的是什么",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有",
+      "hits": [
+        {
+          "file": "feedback_review-checklist.md",
+          "lines": [
+            11,
+            19
+          ],
+          "score": 8.3507,
+          "matchedBy": [
+            "description",
+            "body"
+          ]
+        },
+        {
+          "file": "project_orchard-ci.md",
+          "lines": [
+            15,
+            17
+          ],
+          "score": 10.5605,
+          "matchedBy": [
+            "body"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_orchard-ci.md",
+          "span": [
+            17,
+            17
+          ],
+          "rank": 2,
+          "found": true,
+          "lines": [
+            15,
+            17
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.5938,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 26,
+        "candidates": 2
+      }
+    },
+    {
+      "id": "b21",
+      "query": "静态检查和构建共用哪份东西",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有",
+      "hits": [
+        {
+          "file": "project_lantern-release.md",
+          "lines": null,
+          "score": 0.0833,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_orchard-noise-log.md",
+          "lines": null,
+          "score": 0.0833,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_orchard-timeout.md",
+          "lines": null,
+          "score": 0.0833,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_orchard-ci.md",
+          "lines": [
+            15,
+            17
+          ],
+          "score": 21.7027,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "feedback_review-checklist.md",
+          "lines": null,
+          "score": 0.0833,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_orchard-ci.md",
+          "span": [
+            16,
+            16
+          ],
+          "rank": 4,
+          "found": true,
+          "lines": [
+            15,
+            17
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.8983,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 28,
+        "candidates": 7
+      }
+    },
+    {
+      "id": "b22",
+      "query": "瞬时错误该怎么处置",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有",
+      "hits": [
+        {
+          "file": "project_tide-failures.md",
+          "lines": [
+            15,
+            19
+          ],
+          "score": 15.5385,
+          "matchedBy": [
+            "body"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_tide-failures.md",
+          "span": [
+            15,
+            15
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            15,
+            19
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.5629,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 3,
+        "candidates": 1
+      }
+    },
+    {
+      "id": "b23",
+      "query": "把三类分开之后哪个统计口径才有意义",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有",
+      "hits": [
+        {
+          "file": "project_tide-failures.md",
+          "lines": [
+            21,
+            25
+          ],
+          "score": 28.4949,
+          "matchedBy": [
+            "body"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_tide-failures.md",
+          "span": [
+            21,
+            21
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            21,
+            25
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.6259,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 28,
+        "candidates": 1
+      }
+    },
+    {
+      "id": "c01",
+      "query": "长度本身会不会影响排序",
+      "scope": "all",
+      "verdict": "MISS",
+      "note": "[lexfail] 词法失败边界：正文说的是「篇幅不再自带优势」，query 与正文无词面重合",
+      "hits": [
+        {
+          "file": "project_orchard-ci.md",
+          "lines": [
+            19,
+            23
+          ],
+          "score": 7.1569,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "reference_sourdough-starter.md",
+          "lines": [
+            17,
+            24
+          ],
+          "score": 5.7563,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "reference_orchard-flags.md",
+          "lines": [
+            11,
+            19
+          ],
+          "score": 5.7541,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "project_quarry-noise-index.md",
+          "lines": [
+            40,
+            42
+          ],
+          "score": 5.6473,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "lines": [
+            19,
+            24
+          ],
+          "score": 3.9489,
+          "matchedBy": [
+            "body"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_ember-chunking.md",
+          "span": [
+            14,
+            14
+          ],
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.6766,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 20,
+        "candidates": 5
+      }
+    },
+    {
+      "id": "c02",
+      "query": "睡着以后谁在替我收拾东西",
+      "scope": "all",
+      "verdict": "MISS",
+      "note": "[lexfail] 词法失败边界：正文说的是「设定时刻自动跑一遍，把重复条目并到一处」",
+      "hits": [],
+      "needed": [
+        {
+          "file": "project_ember-nightpass.md",
+          "span": [
+            13,
+            13
+          ],
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 1.1004,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 6,
+        "candidates": 0
+      }
+    },
+    {
+      "id": "c03",
+      "query": "接触装着密钥的材料时，第一步该做什么",
+      "scope": "all",
+      "verdict": "MISS",
+      "note": "[lexfail] 词法失败边界：正文说的是「先只列键名」，与 query 用词完全不同",
+      "hits": [
+        {
+          "file": "project_ember-nightpass.md",
+          "lines": [
+            16,
+            18
+          ],
+          "score": 11.3008,
+          "matchedBy": [
+            "body"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "feedback_credential-habit.md",
+          "span": [
+            13,
+            13
+          ],
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.6743,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 25,
+        "candidates": 1
+      }
+    },
+    {
+      "id": "c04",
+      "query": "分块大小的上限是怎么定的",
+      "scope": "all",
+      "verdict": "MISS",
+      "note": "[lexfail] 词法失败边界：正文说的是「片长定在一段话说得完的量级」",
+      "hits": [],
+      "needed": [
+        {
+          "file": "project_ember-chunking.md",
+          "span": [
+            19,
+            19
+          ],
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.5689,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 19,
+        "candidates": 0
+      }
+    },
+    {
+      "id": "d01",
+      "query": "ERR_ORCHARD_42 是哪一层抛的",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "精确错误码：摘要里没有这个码",
+      "hits": [
+        {
+          "file": "project_orchard-noise-log.md",
+          "lines": [
+            25,
+            29
+          ],
+          "score": 16.2995,
+          "matchedBy": [
+            "alias",
+            "filename",
+            "body"
+          ]
+        },
+        {
+          "file": "project_orchard-cache.md",
+          "lines": null,
+          "score": 0.4118,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_orchard-ci.md",
+          "lines": null,
+          "score": 0.4118,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_orchard-timeout.md",
+          "lines": null,
+          "score": 0.4118,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "reference_orchard-flags.md",
+          "lines": null,
+          "score": 0.4118,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_orchard-noise-log.md",
+          "span": [
+            29,
+            29
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            25,
+            29
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.8347,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 11,
+        "candidates": 10
+      }
+    },
+    {
+      "id": "d02",
+      "query": "FS_STALE_VERSION 来自哪个写路径",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "精确错误码：摘要里没有这个码",
+      "hits": [
+        {
+          "file": "project_harbor-noise-notes.md",
+          "lines": [
+            29,
+            31
+          ],
+          "score": 15.3819,
+          "matchedBy": [
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_ember-nightpass.md",
+          "lines": null,
+          "score": 0.15,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "reference_sourdough-starter.md",
+          "lines": null,
+          "score": 0.15,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "reference_stargazing-nights.md",
+          "lines": null,
+          "score": 0.15,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "user_preferences-writing.md",
+          "lines": null,
+          "score": 0.15,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_harbor-noise-notes.md",
+          "span": [
+            27,
+            27
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            29,
+            31
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [
+        "reference_sourdough-starter.md",
+        "reference_stargazing-nights.md"
+      ],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.8411,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 6,
+        "candidates": 10
+      }
+    },
+    {
+      "id": "d03",
+      "query": "SAGE_MEM_DEBUG 那个开关是干什么的",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "精确错误码：摘要里没有这个开关名",
+      "hits": [
+        {
+          "file": "project_lumen-noise-dump.md",
+          "lines": [
+            24,
+            29
+          ],
+          "score": 26.9264,
+          "matchedBy": [
+            "alias",
+            "filename",
+            "body"
+          ]
+        },
+        {
+          "file": "reference_lumen-theme-tokens.md",
+          "lines": null,
+          "score": 0.1053,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "feedback_credential-habit.md",
+          "lines": null,
+          "score": 0.0526,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_ember-chunking.md",
+          "lines": null,
+          "score": 0.0526,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_ember-nightpass.md",
+          "lines": null,
+          "score": 0.0526,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_lumen-noise-dump.md",
+          "span": [
+            29,
+            29
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            24,
+            29
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.9534,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 13,
+        "candidates": 10
+      }
+    },
+    {
+      "id": "d04",
+      "query": "ERR_QUARRY_7 在什么条件下出现",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "精确错误码",
+      "hits": [
+        {
+          "file": "project_quarry-noise-index.md",
+          "lines": [
+            30,
+            32
+          ],
+          "score": 16.0606,
+          "matchedBy": [
+            "alias",
+            "filename",
+            "body"
+          ]
+        },
+        {
+          "file": "project_quarry-migration.md",
+          "lines": null,
+          "score": 0.3125,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_quarry-shard-split.md",
+          "lines": null,
+          "score": 0.3125,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "reference_sourdough-starter.md",
+          "lines": null,
+          "score": 0.1875,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_harbor-noise-notes.md",
+          "lines": null,
+          "score": 0.125,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_quarry-noise-index.md",
+          "span": [
+            28,
+            28
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            30,
+            32
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [
+        "reference_sourdough-starter.md"
+      ],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.8486,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 24,
+        "candidates": 10
+      }
+    },
+    {
+      "id": "d05",
+      "query": "超时阈值默认是多少秒",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "正文独有：摘要里没有阈值",
+      "hits": [
+        {
+          "file": "project_orchard-timeout.md",
+          "lines": [
+            21,
+            24
+          ],
+          "score": 9.9387,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_orchard-cache.md",
+          "lines": [
+            11,
+            16
+          ],
+          "score": 17.5135,
+          "matchedBy": [
+            "body"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_orchard-cache.md",
+          "span": [
+            15,
+            15
+          ],
+          "rank": 2,
+          "found": true,
+          "lines": [
+            11,
+            16
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.5716,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 12,
+        "candidates": 2
+      }
+    },
+    {
+      "id": "d06",
+      "query": "--max-retries 5 是哪个参数，默认几",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "精确参数名（exact-term 信号）",
+      "hits": [
+        {
+          "file": "reference_orchard-flags.md",
+          "lines": [
+            11,
+            19
+          ],
+          "score": 32.6831,
+          "matchedBy": [
+            "description",
+            "alias",
+            "filename",
+            "body"
+          ]
+        },
+        {
+          "file": "reference_harbor-metrics.md",
+          "lines": null,
+          "score": 0.2222,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "reference_sagemem-frontmatter.md",
+          "lines": null,
+          "score": 0.2222,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "user_preferences-writing.md",
+          "lines": null,
+          "score": 0.1667,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "feedback_review-checklist.md",
+          "lines": null,
+          "score": 0.1111,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_orchard-flags.md",
+          "span": [
+            15,
+            15
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            19
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.8264,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 12,
+        "candidates": 10
+      }
+    },
+    {
+      "id": "d07",
+      "query": "tenant_id 为什么不能换成文档 id",
+      "scope": "all",
+      "verdict": "MISS",
+      "note": "精确标识符",
+      "hits": [
+        {
+          "file": "project_tide-window.md",
+          "lines": null,
+          "score": 0.2353,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "feedback_credential-habit.md",
+          "lines": null,
+          "score": 0.1765,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_lantern-release.md",
+          "lines": null,
+          "score": 0.1765,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "reference_sagemem-frontmatter.md",
+          "lines": null,
+          "score": 0.1765,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_harbor-backpressure.md",
+          "lines": null,
+          "score": 0.1176,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_quarry-shard-split.md",
+          "span": [
+            13,
+            13
+          ],
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 1.3387,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 23,
+        "candidates": 11
+      }
+    },
+    {
+      "id": "d08",
+      "query": "queue_depth 指的是什么",
+      "scope": "all",
+      "verdict": "MISS",
+      "note": "精确标识符",
+      "hits": [
+        {
+          "file": "feedback_credential-habit.md",
+          "lines": null,
+          "score": 0.1538,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_harbor-noise-notes.md",
+          "lines": null,
+          "score": 0.1538,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_quarry-noise-index.md",
+          "lines": null,
+          "score": 0.1538,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_tide-scheduler.md",
+          "lines": null,
+          "score": 0.1538,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_quarry-migration.md",
+          "lines": null,
+          "score": 0.0769,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_harbor-metrics.md",
+          "span": [
+            13,
+            13
+          ],
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.8108,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 20,
+        "candidates": 11
+      }
+    },
+    {
+      "id": "d09",
+      "query": "harbor.yml 里的字段都有哪些",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "精确文件名",
+      "hits": [
+        {
+          "file": "reference_harbor-config.md",
+          "lines": [
+            11,
+            13
+          ],
+          "score": 20.8039,
+          "matchedBy": [
+            "description",
+            "alias",
+            "filename",
+            "body"
+          ]
+        },
+        {
+          "file": "project_harbor-backpressure.md",
+          "lines": null,
+          "score": 0.3125,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_harbor-noise-notes.md",
+          "lines": null,
+          "score": 0.3125,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "reference_harbor-metrics.md",
+          "lines": null,
+          "score": 0.3125,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_orchard-cache.md",
+          "lines": null,
+          "score": 0.1875,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_harbor-config.md",
+          "span": [
+            13,
+            13
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            13
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.8744,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 20,
+        "candidates": 10
+      }
+    },
+    {
+      "id": "d10",
+      "query": "Ctrl+Alt+T 是干什么的",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "精确键位（tokenize 会切成 ctrl/alt/t）",
+      "hits": [
+        {
+          "file": "project_lantern-release.md",
+          "lines": null,
+          "score": 0.1667,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "feedback_credential-habit.md",
+          "lines": null,
+          "score": 0.0833,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "lines": [
+            11,
+            17
+          ],
+          "score": 20.9224,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "project_tide-failures.md",
+          "lines": null,
+          "score": 0.1667,
+          "matchedBy": [
+            "filename"
+          ]
+        },
+        {
+          "file": "project_tide-scheduler.md",
+          "lines": null,
+          "score": 0.1667,
+          "matchedBy": [
+            "filename"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "span": [
+            13,
+            13
+          ],
+          "rank": 3,
+          "found": true,
+          "lines": [
+            11,
+            17
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.7866,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 13,
+        "candidates": 11
+      }
+    },
+    {
+      "id": "d11",
+      "query": "--lm-bg 控制的是哪一块颜色",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "精确变量名",
+      "hits": [
+        {
+          "file": "project_ember-chunking.md",
+          "lines": null,
+          "score": 0.0833,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_ember-nightpass.md",
+          "lines": null,
+          "score": 0.0833,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "reference_lumen-theme-tokens.md",
+          "lines": [
+            11,
+            20
+          ],
+          "score": 21.1643,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "lines": null,
+          "score": 0.1667,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_lumen-theme-tokens.md",
+          "span": [
+            13,
+            13
+          ],
+          "rank": 3,
+          "found": true,
+          "lines": [
+            11,
+            20
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.6769,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 19,
+        "candidates": 4
+      }
+    },
+    {
+      "id": "d12",
+      "query": "metadata.updated 缺失时会怎样",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "精确字段名",
+      "hits": [
+        {
+          "file": "reference_sagemem-frontmatter.md",
+          "lines": [
+            19,
+            20
+          ],
+          "score": 29.1814,
+          "matchedBy": [
+            "alias",
+            "filename",
+            "body"
+          ]
+        },
+        {
+          "file": "reference_lumen-theme-tokens.md",
+          "lines": null,
+          "score": 0.1765,
+          "matchedBy": [
+            "description",
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_harbor-noise-notes.md",
+          "lines": null,
+          "score": 0.1176,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "project_lumen-noise-dump.md",
+          "lines": null,
+          "score": 0.1176,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        },
+        {
+          "file": "reference_harbor-metrics.md",
+          "lines": null,
+          "score": 0.1176,
+          "matchedBy": [
+            "alias",
+            "filename"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_sagemem-frontmatter.md",
+          "span": [
+            17,
+            17
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            19,
+            20
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.9048,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 1,
+        "candidates": 11
+      }
+    },
+    {
+      "id": "e01",
+      "query": "索引刷新和批量写入的窗口重叠是怎么回事",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "长文噪音竞争：长文档重复「数据/索引/查询/分片」，答案在中段",
+      "hits": [
+        {
+          "file": "project_quarry-noise-index.md",
+          "lines": [
+            30,
+            32
+          ],
+          "score": 29.1428,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_quarry-migration.md",
+          "lines": null,
+          "score": 0.0556,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_tide-window.md",
+          "lines": null,
+          "score": 0.0556,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_quarry-noise-index.md",
+          "span": [
+            30,
+            30
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            30,
+            32
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.8166,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 25,
+        "candidates": 3
+      }
+    },
+    {
+      "id": "e02",
+      "query": "明灯面板状态收敛成快照之后解决了什么",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "长文噪音竞争：长文档重复「界面/主题/渲染/状态」",
+      "hits": [
+        {
+          "file": "project_lumen-noise-dump.md",
+          "lines": [
+            24,
+            29
+          ],
+          "score": 25.0652,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_lumen-sync.md",
+          "lines": null,
+          "score": 0.0588,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "lines": null,
+          "score": 0.0588,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_quarry-noise-index.md",
+          "lines": null,
+          "score": 0.0588,
+          "matchedBy": [
+            "description"
+          ]
+        },
+        {
+          "file": "reference_lumen-theme-tokens.md",
+          "lines": null,
+          "score": 0.0588,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_lumen-noise-dump.md",
+          "span": [
+            24,
+            24
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            24,
+            29
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.771,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 51,
+        "candidates": 5
+      }
+    },
+    {
+      "id": "e03",
+      "query": "队列重试高峰会不会放大别的错误",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "长文噪音竞争：长文档重复「任务/队列/重试/状态」",
+      "hits": [
+        {
+          "file": "project_harbor-noise-notes.md",
+          "lines": [
+            29,
+            31
+          ],
+          "score": 27.9085,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_tide-failures.md",
+          "lines": null,
+          "score": 0.0714,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_harbor-noise-notes.md",
+          "span": [
+            31,
+            31
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            29,
+            31
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.6292,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 30,
+        "candidates": 2
+      }
+    },
+    {
+      "id": "e04",
+      "query": "构建系统的状态字段为什么短暂变成未知",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "长文噪音竞争：长文档重复「构建/任务/系统/处理」",
+      "hits": [
+        {
+          "file": "project_orchard-noise-log.md",
+          "lines": [
+            17,
+            19
+          ],
+          "score": 45.2235,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_orchard-timeout.md",
+          "lines": null,
+          "score": 0.0588,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_sagemem-frontmatter.md",
+          "lines": null,
+          "score": 0.0588,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_lumen-noise-dump.md",
+          "lines": null,
+          "score": 0.0588,
+          "matchedBy": [
+            "description"
+          ]
+        },
+        {
+          "file": "project_lumen-sync.md",
+          "lines": null,
+          "score": 0.0588,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_orchard-noise-log.md",
+          "span": [
+            18,
+            18
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            17,
+            19
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 1.0885,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 50,
+        "candidates": 8
+      }
+    },
+    {
+      "id": "f01",
+      "query": "继续",
+      "scope": "all",
+      "verdict": "EMPTY",
+      "note": "无答案意图：只有「继续」两个字，不该拉进任何记忆",
+      "hits": [],
+      "needed": [],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.5428,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 2,
+        "candidates": 0
+      }
+    },
+    {
+      "id": "f02",
+      "query": "嗯",
+      "scope": "all",
+      "verdict": "EMPTY",
+      "note": "无答案意图：单字应答",
+      "hits": [],
+      "needed": [],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.2463,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 0,
+        "candidates": 0
+      }
+    },
+    {
+      "id": "f03",
+      "query": "好的",
+      "scope": "all",
+      "verdict": "EMPTY",
+      "note": "无答案意图：单字应答",
+      "hits": [],
+      "needed": [],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.4506,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 1,
+        "candidates": 0
+      }
+    },
+    {
+      "id": "f04",
+      "query": "接着来",
+      "scope": "all",
+      "verdict": "EMPTY",
+      "note": "无答案意图：承接语",
+      "hits": [],
+      "needed": [],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.4648,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 0,
+        "candidates": 0
+      }
+    },
+    {
+      "id": "f05",
+      "query": "然后呢",
+      "scope": "all",
+      "verdict": "EMPTY",
+      "note": "无答案意图：承接语",
+      "hits": [],
+      "needed": [],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.4406,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 1,
+        "candidates": 0
+      }
+    },
+    {
+      "id": "f06",
+      "query": "？",
+      "scope": "all",
+      "verdict": "EMPTY",
+      "note": "无答案意图：纯标点，词元为空",
+      "hits": [],
+      "needed": [],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.1766,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 0,
+        "candidates": 0
+      }
+    },
+    {
+      "id": "g01",
+      "query": "明天会不会下雨",
+      "scope": "all",
+      "verdict": "EMPTY",
+      "note": "无关新问题：语料里没有天气，不该注入",
+      "hits": [],
+      "needed": [],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.5038,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 7,
+        "candidates": 0
+      }
+    },
+    {
+      "id": "g02",
+      "query": "帮我推荐一部电影",
+      "scope": "all",
+      "verdict": "INJ",
+      "note": "无关新问题：语料里没有影视内容",
+      "hits": [
+        {
+          "file": "user_preferences-writing.md",
+          "lines": [
+            21,
+            26
+          ],
+          "score": 9.3028,
+          "matchedBy": [
+            "body"
+          ]
+        }
+      ],
+      "needed": [],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.515,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 1,
+        "candidates": 1
+      }
+    },
+    {
+      "id": "g03",
+      "query": "介绍一下量子纠缠",
+      "scope": "all",
+      "verdict": "EMPTY",
+      "note": "无关新问题：语料里没有物理内容",
+      "hits": [],
+      "needed": [],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.5647,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 0,
+        "candidates": 0
+      }
+    },
+    {
+      "id": "g04",
+      "query": "附近有什么好吃的",
+      "scope": "all",
+      "verdict": "EMPTY",
+      "note": "无关新问题：语料里没有餐饮内容",
+      "hits": [],
+      "needed": [],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.5691,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 13,
+        "candidates": 0
+      }
+    },
+    {
+      "id": "h01",
+      "query": "果园相关的笔记都有哪些",
+      "scope": "all",
+      "verdict": "HIT",
+      "note": "预算不足：needed 5 条与 limit 5 打平，用 --limit 3 必然出现缺口",
+      "hits": [
+        {
+          "file": "project_ember-nightpass.md",
+          "lines": [
+            11,
+            14
+          ],
+          "score": 12.2035,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_tide-window.md",
+          "lines": null,
+          "score": 0.3,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_orchard-cache.md",
+          "lines": null,
+          "score": 0.2,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_ember-chunking.md",
+          "lines": null,
+          "score": 0.1,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_harbor-backpressure.md",
+          "lines": null,
+          "score": 0.1,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_orchard-noise-log.md",
+          "span": null,
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        },
+        {
+          "file": "project_orchard-timeout.md",
+          "span": null,
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        },
+        {
+          "file": "project_orchard-cache.md",
+          "span": null,
+          "rank": 3,
+          "found": true,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        },
+        {
+          "file": "reference_orchard-flags.md",
+          "span": null,
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        },
+        {
+          "file": "project_orchard-ci.md",
+          "span": null,
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.7677,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 32,
+        "candidates": 10
+      }
+    },
+    {
+      "id": "h02",
+      "query": "潮汐相关的记录",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "预算不足：--limit 2 时必然有缺口",
+      "hits": [
+        {
+          "file": "project_tide-window.md",
+          "lines": null,
+          "score": 0.5,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_tide-failures.md",
+          "lines": null,
+          "score": 0.1667,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_tide-scheduler.md",
+          "lines": null,
+          "score": 0.1667,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_birdwatching-log.md",
+          "lines": null,
+          "score": 0.1667,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_stargazing-nights.md",
+          "lines": null,
+          "score": 0.1667,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_tide-scheduler.md",
+          "span": null,
+          "rank": 3,
+          "found": true,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        },
+        {
+          "file": "project_tide-window.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        },
+        {
+          "file": "project_tide-failures.md",
+          "span": null,
+          "rank": 2,
+          "found": true,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [
+        "reference_birdwatching-log.md",
+        "reference_stargazing-nights.md"
+      ],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.6741,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 24,
+        "candidates": 10
+      }
+    },
+    {
+      "id": "h03",
+      "query": "港口调度器相关的记录",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "预算不足：needed 4 条，--limit 3 时有缺口",
+      "hits": [
+        {
+          "file": "project_harbor-noise-notes.md",
+          "lines": null,
+          "score": 0.5556,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_harbor-backpressure.md",
+          "lines": null,
+          "score": 0.4444,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_harbor-config.md",
+          "lines": null,
+          "score": 0.4444,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_harbor-metrics.md",
+          "lines": null,
+          "score": 0.4444,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_birdwatching-log.md",
+          "lines": null,
+          "score": 0.1111,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_harbor-noise-notes.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        },
+        {
+          "file": "reference_harbor-config.md",
+          "span": null,
+          "rank": 3,
+          "found": true,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        },
+        {
+          "file": "project_harbor-backpressure.md",
+          "span": null,
+          "rank": 2,
+          "found": true,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        },
+        {
+          "file": "reference_harbor-metrics.md",
+          "span": null,
+          "rank": 4,
+          "found": true,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [
+        "reference_birdwatching-log.md"
+      ],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.7452,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 35,
+        "candidates": 11
+      }
+    },
+    {
+      "id": "h04",
+      "query": "明灯相关的记录",
+      "scope": "all",
+      "verdict": "HIT",
+      "note": "预算不足：needed 4 条，--limit 3 时有缺口",
+      "hits": [
+        {
+          "file": "project_lumen-noise-dump.md",
+          "lines": null,
+          "score": 0.3333,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_lumen-sync.md",
+          "lines": null,
+          "score": 0.1667,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_birdwatching-log.md",
+          "lines": null,
+          "score": 0.1667,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "lines": null,
+          "score": 0.1667,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_stargazing-nights.md",
+          "lines": null,
+          "score": 0.1667,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_lumen-noise-dump.md",
+          "span": null,
+          "rank": 1,
+          "found": true,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        },
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "span": null,
+          "rank": 4,
+          "found": true,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        },
+        {
+          "file": "reference_lumen-theme-tokens.md",
+          "span": null,
+          "rank": 0,
+          "found": false,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        },
+        {
+          "file": "project_lumen-sync.md",
+          "span": null,
+          "rank": 2,
+          "found": true,
+          "lines": null,
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [
+        "reference_birdwatching-log.md",
+        "reference_stargazing-nights.md"
+      ],
+      "whitelistHit": [],
+      "dupExtra": 0,
+      "ms": 0.7838,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 29,
+        "candidates": 11
+      }
+    },
+    {
+      "id": "i01",
+      "query": "潮汐任务的时间窗写死在哪",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "白名单：只有这三份潮汐笔记算在范围内",
+      "hits": [
+        {
+          "file": "project_tide-scheduler.md",
+          "lines": [
+            15,
+            17
+          ],
+          "score": 25.1509,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_tide-failures.md",
+          "lines": [
+            15,
+            19
+          ],
+          "score": 13.7594,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_tide-window.md",
+          "lines": [
+            18,
+            22
+          ],
+          "score": 9.6702,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "reference_birdwatching-log.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_tide-scheduler.md",
+          "span": [
+            15,
+            15
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            15,
+            17
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [
+        "reference_birdwatching-log.md"
+      ],
+      "dupExtra": 0,
+      "ms": 1.0646,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 44,
+        "candidates": 4
+      }
+    },
+    {
+      "id": "i02",
+      "query": "果园构建的缓存目录是哪个",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "白名单：只有这三份果园构建笔记算在范围内",
+      "hits": [
+        {
+          "file": "project_orchard-cache.md",
+          "lines": [
+            18,
+            22
+          ],
+          "score": 18.6083,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_orchard-timeout.md",
+          "lines": [
+            21,
+            24
+          ],
+          "score": 18.1308,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "reference_orchard-flags.md",
+          "lines": [
+            21,
+            25
+          ],
+          "score": 13.7304,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_orchard-noise-log.md",
+          "lines": null,
+          "score": 0.2727,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_orchard-ci.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "project_orchard-cache.md",
+          "span": [
+            13,
+            13
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            18,
+            22
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [
+        "reference_orchard-flags.md",
+        "project_orchard-noise-log.md"
+      ],
+      "dupExtra": 0,
+      "ms": 0.749,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 23,
+        "candidates": 6
+      }
+    },
+    {
+      "id": "i03",
+      "query": "港口调度的失败任务落在哪",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "白名单：允许跨到潮汐的失败处理，因为它同名",
+      "hits": [
+        {
+          "file": "reference_harbor-config.md",
+          "lines": [
+            15,
+            18
+          ],
+          "score": 13.5747,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_harbor-backpressure.md",
+          "lines": null,
+          "score": 0.2727,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_harbor-noise-notes.md",
+          "lines": null,
+          "score": 0.2727,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "project_tide-failures.md",
+          "lines": null,
+          "score": 0.2727,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_harbor-metrics.md",
+          "lines": null,
+          "score": 0.2727,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_harbor-config.md",
+          "span": [
+            18,
+            18
+          ],
+          "rank": 1,
+          "found": true,
+          "lines": [
+            15,
+            18
+          ],
+          "spanOk": true,
+          "overlapOk": true
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [
+        "reference_harbor-metrics.md"
+      ],
+      "dupExtra": 0,
+      "ms": 0.6865,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 46,
+        "candidates": 7
+      }
+    },
+    {
+      "id": "i04",
+      "query": "明灯的面板颜色变量在哪查",
+      "scope": "all",
+      "verdict": "ALL",
+      "note": "白名单：只有这三份明灯文档算在范围内",
+      "hits": [
+        {
+          "file": "project_lumen-noise-dump.md",
+          "lines": [
+            17,
+            19
+          ],
+          "score": 14.2725,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "reference_lumen-theme-tokens.md",
+          "lines": [
+            22,
+            26
+          ],
+          "score": 12.4105,
+          "matchedBy": [
+            "description",
+            "alias",
+            "body"
+          ]
+        },
+        {
+          "file": "project_lumen-sync.md",
+          "lines": null,
+          "score": 0.1818,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        },
+        {
+          "file": "reference_lumen-shortcuts.md",
+          "lines": null,
+          "score": 0.0909,
+          "matchedBy": [
+            "description",
+            "alias"
+          ]
+        }
+      ],
+      "needed": [
+        {
+          "file": "reference_lumen-theme-tokens.md",
+          "span": [
+            13,
+            13
+          ],
+          "rank": 2,
+          "found": true,
+          "lines": [
+            22,
+            26
+          ],
+          "spanOk": false,
+          "overlapOk": false
+        }
+      ],
+      "blacklistHit": [],
+      "whitelistHit": [
+        "project_lumen-noise-dump.md"
+      ],
+      "dupExtra": 0,
+      "ms": 0.7066,
+      "coverage": {
+        "searched": 30,
+        "skipped": 0,
+        "complete": true,
+        "chunks": 104,
+        "filteredBelowFloor": 16,
+        "candidates": 4
+      }
+    }
+  ],
+  "problems": [],
+  "structural": [],
+  "baseline": null,
+  "failed": false
+}
