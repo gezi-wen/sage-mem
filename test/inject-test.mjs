@@ -48,6 +48,8 @@ const MOD = new URL('../lib/index.js', import.meta.url).href
 const mod = await import(MOD)
 const MemoryGateway = mod.default
 const T = mod.__testables
+// 检查点与注入链共用同一个状态根（config.js 的 STATE_ROOT = SAGE_MEM_STATE_DIR）。
+const { writeCheckpoint } = await import(new URL('../lib/memory/checkpoint.js', import.meta.url).href)
 
 // ── 造记忆 ──────────────────────────────────────────────────
 const LONG = '甲'.repeat(1200)   // 中文 3 字节/字 → 注入 part 约 3.6 KB
@@ -365,6 +367,136 @@ group('8. 默认值与覆写口')
   ok(T.limits.MAX_SESSION_BYTES === 5120, '环境变量覆写口生效（本进程是 5120）')
   ok(T.limits.STALE_DAYS === 1, '新鲜度门槛默认 1 天')
   ok(String(T.recallDiscipline).includes('引用纪律'), '__testables 暴露了引用纪律文本')
+}
+
+// ═══ 9. R02：控制提示独立于候选（外部复审 F02 / F03） ═══
+// 根因：旧代码在 `picked.length === 0` 时提前返回，而检查点句柄与未命中提示都在那之后
+// 才计算 —— 于是「目录为空」与「零命中」这两种最需要说话的场合，插件一个字都不说。
+group('9. R02：控制提示不依赖候选')
+{
+  // 9a. 空目录 + 有效检查点 → 句柄必须出现
+  resetDir()
+  const CP_TEXT = [
+    '# 任务检查点 task-cp-a',
+    '- 任务：task-cp-a',
+    '- 项目：sample-project',
+    '- revision：1',
+    '',
+    '## 目标与约束',
+    '',
+    '目标：把合成样例的交接材料读回来。',
+    '',
+    '约束：',
+    '- 只用合成夹具',
+    '',
+    '## 已完成与证据',
+    '',
+    '- `sample/a.md` 已建立',
+    '',
+    '## 未完成',
+    '',
+    '- 复核结果',
+    '',
+    '## 关键决定',
+    '',
+    '- 保持模板结构不变',
+    '',
+    '## 记忆引用',
+    '',
+    '- sample/a.md',
+    '',
+    '## 待核实',
+    '',
+    '- 句柄是否出现在注入文本里',
+    '',
+  ].join('\n')
+  const wrote = await writeCheckpoint('task-cp-a', CP_TEXT, { stateRoot: process.env.SAGE_MEM_STATE_DIR })
+  ok(wrote.ok, '夹具自检：合成检查点写得进去', JSON.stringify(wrote))
+
+  const { handler: h1 } = newGateway()
+  const cpOut = await step(h1, 'task-cp-a', '继续上次任务')
+  ok(!!cpOut && cpOut.includes('tasks/task-cp-a/WORKING.md'),
+    '空目录 + 有效检查点 → 发出检查点句柄（旧行为在这里一条都不注）', String(cpOut))
+  ok(!!cpOut && /检查点 task-cp-a（revision 1）/.test(cpOut), '句柄带任务 id 与 revision')
+  ok(!!cpOut && countEntries(cpOut) === 0, '这条路上没有任何正文（目录本来就是空的）')
+
+  // 9b. 非空目录、零命中、历史依赖问题 → 未命中提示
+  resetDir()
+  mem('unrelated.md', { desc: '合成样例：与下面那句问题毫无关系', body: SHORT })
+  const { handler: h2 } = newGateway()
+  const miss = await step(h2, 's-r02-miss', '上次的火箭燃料约定是什么')
+  ok(!!miss && /sage-mem：/.test(miss), '零命中 + 历史问题 → 有未命中提示', String(miss))
+  ok(!!miss && /没有命中/.test(miss), '提示说清「摘要里没有命中」，而不是静默')
+  ok(!!miss && countEntries(miss) === 0, '零命中确实没有正文可注')
+
+  // 9c. 反向对照：同样是零命中，但问题不依赖历史 → 一个字都不说
+  resetDir()
+  mem('unrelated.md', { desc: '合成样例：与下面那句问题毫无关系', body: SHORT })
+  const { handler: h3 } = newGateway()
+  const quiet = await step(h3, 's-r02-plain', '现在窗外的天气怎么样')
+  ok(quiet === null,
+    '【反向对照】普通问题零命中时不插「你可能遗漏记忆」（否则提示会变成噪音）', String(quiet))
+}
+
+// ═══ 10. R03：生命周期先于去重（外部复审 F04） ═══
+// 根因：压缩的账本重置写在去重**之后**，于是同题在压缩后仍被上一代的检索签名挡住；
+// 而且 R02 的提前返回让那段重置根本不可达。下面每条都配一个相邻对照，
+// 证明「恢复」来自代次处理，不是把去重整个关掉了。
+group('10. R03：生命周期先于去重')
+{
+  // 10a. 同题压缩恢复
+  resetDir()
+  mem('base-q.md', { desc: 'quartz nebula', body: 'quartz nebula evidence', baseline: true })
+  const { handler: h1 } = newGateway()
+  const before = await step(h1, 's-life-same', 'quartz nebula', 10)
+  ok(!!before && before.includes('### base-q.md'), '压缩前：同题注得进去')
+  const after = await step(h1, 's-life-same', 'quartz nebula', 1)
+  ok(!!after && after.includes('### base-q.md'),
+    '压缩后**同题**重新开放注入（复审 F04 的反例）', String(after))
+
+  // 10b. 换题 + 压缩
+  resetDir()
+  mem('topic-a.md', { desc: 'quartz nebula', body: SHORT })
+  mem('topic-b.md', { desc: 'cobalt prism', body: SHORT })
+  const { handler: h2 } = newGateway()
+  const ta = await step(h2, 's-life-swap', 'quartz nebula', 20)
+  ok(!!ta && ta.includes('### topic-a.md'), '压缩前注的是 A 题')
+  const tb = await step(h2, 's-life-swap', 'cobalt prism', 1)
+  ok(!!tb && tb.includes('### topic-b.md') && !tb.includes('### topic-a.md'),
+    '换题 + 压缩：新题注得进去，旧题不连坐', String(tb))
+
+  // 10c. 卡已发送后恢复（卡签名随代次一起归零）
+  // 顺带把「正文预算耗尽 → 卡仍发出」这条既有行为钉在这里：单条记忆就超过正文池，
+  // 一条正文都进不去，但卡池照发。
+  resetDir()
+  mem('huge-x.md', { body: '甲'.repeat(1500) })
+  const { handler: h3 } = newGateway()
+  const card1 = await step(h3, 's-life-card', 'sagebound', 20)
+  ok(!!card1 && /sage-mem：/.test(card1) && countEntries(card1) === 0,
+    '正文预算耗尽 → 没有正文，但卡仍发出（既有行为不退）', String(card1))
+  const card2 = await step(h3, 's-life-card', 'sagebound', 1)
+  ok(!!card2 && /sage-mem：/.test(card2),
+    '压缩后同一张卡能再发一次（卡签名随代次归零，否则恢复入口永久失效）', String(card2))
+
+  // 10d. 反向对照：条数没降 → 相邻重复仍然去重
+  resetDir()
+  mem('note-q.md', { desc: 'quartz nebula', body: SHORT })
+  const { handler: h4 } = newGateway()
+  const first = await step(h4, 's-life-dup', 'quartz nebula', 1)
+  ok(!!first && first.includes('### note-q.md'), '首次注入')
+  const again = await step(h4, 's-life-dup', 'quartz nebula', 3)
+  ok(again === null,
+    '【反向对照】条数不降 → 同题相邻重复仍然不重复注入（去重没被关掉）', String(again))
+
+  // 10e. 不同会话隔离
+  resetDir()
+  mem('iso.md', { desc: 'quartz nebula', body: SHORT, baseline: true })
+  const { handler: h5 } = newGateway()
+  const s1 = await step(h5, 's-iso-1', 'quartz nebula', 1)
+  const s2 = await step(h5, 's-iso-2', 'quartz nebula', 1)
+  ok(!!s1 && !!s2, '两个会话各自都拿得到 baseline（会话级标记不互相顶掉）')
+  const s1again = await step(h5, 's-iso-1', 'quartz nebula', 2)
+  ok(s1again === null, 'A 会话的同题重复仍被自己那条签名挡住（状态按会话分账）')
 }
 
 // ── 收尾 ────────────────────────────────────────────────────

@@ -45,14 +45,19 @@ const USAGE = `sage-mem 检索评测（离线：不联网、不调模型）
   --per-file <N>                   每文件最多贡献几条（默认 ${PER_FILE_CHUNKS}）
   --json <path>                    把完整结果（含逐题明细）写成 JSON
   --baseline <path>                与一份旧的 --json 产物对比，出现退化时退出码 1
+  --allow-baseline-skip            允许「显式给了 --baseline 但比较没完成」时放行（默认不允许）
   --strict                         任何黑/白名单误注入都算失败（默认只如实报告）
   --corpus <dir>                   语料目录（默认 test/eval/corpus）
   --questions <path>               问题集（默认 test/eval/questions.jsonl）
   --help                           打印本说明
 
-退出码 1 的四种情形：结构性错误（标注越界 / 语料缺失 / retrieve 抛错 / 同一次结果里
+退出码 1 的五种情形：结构性错误（标注越界 / 语料缺失 / retrieve 抛错 / 同一次结果里
 同一文件重复 / 切分不全）、对照退化（all 的召回低于 summary）、--strict 下出现误注入、
---baseline 判定指标退化。`
+--baseline 判定指标退化、以及**显式给了 --baseline 但比较没完成**。
+
+最后一条是**失败关闭**（fail closed）：基线读不到 / JSON 坏了 / 指标缺项 / mode 或指纹对不上，
+一律算失败而不是「跳过」，否则 CI 会把「没比较」当成「比较通过」。
+那是探索场景时用 --allow-baseline-skip 显式放行，结构化输出里会留 status: inconclusive。`
 
 // ─────────────────────────── 命令行 ───────────────────────────
 
@@ -63,6 +68,7 @@ function parseArgs(argv) {
     perFile: PER_FILE_CHUNKS,
     json: '',
     baseline: '',
+    allowBaselineSkip: false,
     strict: false,
     corpus: DEFAULT_CORPUS,
     questions: DEFAULT_QUESTIONS,
@@ -84,6 +90,7 @@ function parseArgs(argv) {
     else if (key === '--per-file') opts.perFile = Number(take())
     else if (key === '--json') opts.json = take()
     else if (key === '--baseline') opts.baseline = take()
+    else if (key === '--allow-baseline-skip') opts.allowBaselineSkip = true
     else if (key === '--corpus') opts.corpus = resolve(process.cwd(), take())
     else if (key === '--questions') opts.questions = resolve(process.cwd(), take())
     else if (key === '--strict') opts.strict = true
@@ -162,12 +169,18 @@ function loadQuestions(path) {
 }
 
 /**
- * 标注自检：在跑指标之前先把「标注本身站不站得住」查一遍。
+ * 标注自检：在跑指标之前先把「标注本身站不站得住」查一遍（文件在不在、span 越不越界）。
  *
- * 最要紧的一项不是文件在不在，而是**黑名单标注在词法上安不安全**：
- * 断言「这份文件绝不该被召回」时，如果 query 的词元本来就出现在那份文件里，
- * 那么召回它不是检索错了，是标注错了。把这类检查单独计数，
- * 否则误注入率会混进一堆注定要误报的东西，读数的人分不清哪一半是真的。
+ * ⚠️ 这里还额外算出「query 与黑名单文件共享词元」的检查项集合，但它**只是诊断切片**，
+ * 不是「真实的误注入子集」。曾经的写法把共享词元等同于「标注不牢靠」，再拿剩下的项
+ * 算一个「安全子集」——那是错的：共享的往往是「时间」「一次」或中文双字切出来的
+ * 「器的」「别是」这类通用碎片，**从它推不出「这份文件与这个问题语义无关」**。
+ * 更糟的是，这么过滤会**系统性地把词法检索最容易犯错的难负例筛掉**：
+ * 「同名不同项目」「相同实体不同时间」「已失效内容」这三类难负例，
+ * 恰恰是靠共享词元才暴露出来的。切片读数归零，什么都证明不了。
+ *
+ * 所以：完整误注入率（全部检查项）是主指标；切片只能用来回答
+ * 「这些命中里有多少连一个共享词元都没有」——那是最不需要解释、也最不费劲的那一半。
  */
 function auditAnnotations(questions, corpus) {
   const byFile = new Map(corpus.map(f => [f.file, f]))
@@ -176,8 +189,8 @@ function auditAnnotations(questions, corpus) {
   const missingBlacklist = []
   const missingWhitelist = []
   const whitelistMissingNeeded = []
-  const unsafePairs = new Set()
-  const unsafeSamples = []
+  const sharedTokenPairs = new Set()
+  const sharedTokenSamples = []
 
   for (const q of questions) {
     const qTerms = new Set(tokenize(q.query))
@@ -208,8 +221,8 @@ function auditAnnotations(questions, corpus) {
       const terms = fileTerms(file)
       const shared = [...qTerms].filter(t => terms.has(t))
       if (shared.length) {
-        unsafePairs.add(`${q.id}\u0000${file}`)
-        if (unsafeSamples.length < 8) unsafeSamples.push(`${q.id} × ${file} ← ${shared.slice(0, 4).join('/')}`)
+        sharedTokenPairs.add(`${q.id}\u0000${file}`)
+        if (sharedTokenSamples.length < 8) sharedTokenSamples.push(`${q.id} × ${file} ← ${shared.slice(0, 4).join('/')}`)
       }
     }
     for (const file of q.allowFiles) {
@@ -223,12 +236,12 @@ function auditAnnotations(questions, corpus) {
   }
 
   const blacklistChecks = questions.reduce((n, q) => n + q.mustNotInject.length, 0)
-  const safeChecks = questions.reduce(
-    (n, q) => n + q.mustNotInject.filter(f => !unsafePairs.has(`${q.id}\u0000${f}`)).length,
+  const noSharedTokenChecks = questions.reduce(
+    (n, q) => n + q.mustNotInject.filter(f => !sharedTokenPairs.has(`${q.id}\u0000${f}`)).length,
     0,
   )
-  const safeQuestions = questions.filter(
-    q => q.mustNotInject.filter(f => !unsafePairs.has(`${q.id}\u0000${f}`)).length > 0,
+  const noSharedTokenQuestions = questions.filter(
+    q => q.mustNotInject.filter(f => !sharedTokenPairs.has(`${q.id}\u0000${f}`)).length > 0,
   ).length
 
   return {
@@ -237,17 +250,17 @@ function auditAnnotations(questions, corpus) {
     missingBlacklist,
     missingWhitelist,
     whitelistMissingNeeded,
-    unsafePairs,
-    unsafeSamples,
+    sharedTokenPairs,
+    sharedTokenSamples,
     blacklistChecks,
-    safeChecks,
-    safeQuestions,
+    noSharedTokenChecks,
+    noSharedTokenQuestions,
   }
 }
 
 // ─────────────────────────── 逐题求值 ───────────────────────────
 
-function evaluateQuestion(q, scope, corpus, limit, perFile, unsafePairs) {
+function evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs) {
   const started = performance.now()
   let result = null
   let error = ''
@@ -291,10 +304,12 @@ function evaluateQuestion(q, scope, corpus, limit, perFile, unsafePairs) {
   const bestRank = ranks.length ? Math.min(...ranks) : 0
 
   const blacklistHit = q.mustNotInject.filter(f => firstAt.has(f))
-  // 词法安全的黑名单项才配得上「这份文件绝不该被召回」这个断言；不牢靠的那部分单独计数，
-  // 否则误注入率里会混进注定要误报的项，读数的人分不清哪一半是真的。
-  const blacklistUnsafeEntries = q.mustNotInject.filter(f => unsafePairs.has(`${q.id}\u0000${f}`))
-  const blacklistHitUnsafe = blacklistHit.filter(f => unsafePairs.has(`${q.id}\u0000${f}`))
+  // 共享词元只说明「这条命中不需要任何语义解释」，**不说明标注错了**：
+  // 通用词碎片（时间 / 一次 / 器的）与跨词假词元都会命中，而真正的难负例
+  // （同名不同项目、同实体不同时间、已失效内容）同样常常共享词元。
+  // 所以这组计数只当诊断切片，主指标仍是全部检查项上的误注入。
+  const blacklistSharedTokenEntries = q.mustNotInject.filter(f => sharedTokenPairs.has(`${q.id}\u0000${f}`))
+  const blacklistHitSharedToken = blacklistHit.filter(f => sharedTokenPairs.has(`${q.id}\u0000${f}`))
   const whitelistHit = q.allowFiles.length ? hits.map(h => h.file).filter(f => !q.allowFiles.includes(f)) : []
 
   // 同一文件在同一次结果里重复出现 = 候选位被同一份证据重复占用。
@@ -329,9 +344,9 @@ function evaluateQuestion(q, scope, corpus, limit, perFile, unsafePairs) {
     allFound,
     bestRank,
     blacklistHit,
-    blacklistHitUnsafe,
-    blacklistSafeCount: q.mustNotInject.length - blacklistUnsafeEntries.length,
-    blacklistSafeViolations: blacklistHit.filter(f => !unsafePairs.has(`${q.id}\u0000${f}`)).length,
+    blacklistHitSharedToken,
+    blacklistNoSharedTokenCount: q.mustNotInject.length - blacklistSharedTokenEntries.length,
+    blacklistNoSharedTokenViolations: blacklistHit.filter(f => !sharedTokenPairs.has(`${q.id}\u0000${f}`)).length,
     whitelistHit,
     dupExtra,
     dupExtraBytes,
@@ -341,8 +356,8 @@ function evaluateQuestion(q, scope, corpus, limit, perFile, unsafePairs) {
 }
 
 /** 同一题集跑一遍某个 scope —— 用于「all 是否真的比 summary 好」这条对照。 */
-function runAll(questions, corpus, scope, limit, perFile, unsafePairs) {
-  return questions.map(q => evaluateQuestion(q, scope, corpus, limit, perFile, unsafePairs))
+function runAll(questions, corpus, scope, limit, perFile, sharedTokenPairs) {
+  return questions.map(q => evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs))
 }
 
 // ─────────────────────────── 指标 ───────────────────────────
@@ -368,10 +383,10 @@ function summarize(rows) {
     blacklistChecks: 0,
     blacklistViolationQuestions: 0,
     blacklistViolations: 0,
-    blacklistSafeChecks: 0,
-    blacklistSafeQuestions: 0,
-    blacklistSafeViolationQuestions: 0,
-    blacklistUnsafeViolations: 0,
+    blacklistNoSharedTokenChecks: 0,
+    blacklistNoSharedTokenQuestions: 0,
+    blacklistNoSharedTokenViolationQuestions: 0,
+    blacklistSharedTokenViolations: 0,
     whitelistQuestions: 0,
     whitelistViolationQuestions: 0,
     whitelistViolations: 0,
@@ -418,15 +433,15 @@ function summarize(rows) {
     if (q.mustNotInject.length) {
       m.blacklistQuestions++
       m.blacklistChecks += q.mustNotInject.length
-      m.blacklistUnsafeViolations += row.blacklistHitUnsafe.length
+      m.blacklistSharedTokenViolations += row.blacklistHitSharedToken.length
       if (row.blacklistHit.length) m.blacklistViolationQuestions++
       m.blacklistViolations += row.blacklistHit.length
     }
-    const safeChecks = row.blacklistSafeCount
-    if (safeChecks > 0) {
-      m.blacklistSafeQuestions++
-      m.blacklistSafeChecks += safeChecks
-      if (row.blacklistSafeViolations > 0) m.blacklistSafeViolationQuestions++
+    const noSharedTokenChecks = row.blacklistNoSharedTokenCount
+    if (noSharedTokenChecks > 0) {
+      m.blacklistNoSharedTokenQuestions++
+      m.blacklistNoSharedTokenChecks += noSharedTokenChecks
+      if (row.blacklistNoSharedTokenViolations > 0) m.blacklistNoSharedTokenViolationQuestions++
     }
     if (q.allowFiles.length) {
       m.whitelistQuestions++
@@ -449,7 +464,7 @@ function rates(m) {
     spanOverlapRate: div(m.spanOverlap, m.spanItems),
     mrr: div(m.mrrSum, m.neededQuestions),
     falseInjectRate: div(m.blacklistViolationQuestions, m.blacklistQuestions),
-    falseInjectSafeRate: div(m.blacklistSafeViolationQuestions, m.blacklistSafeQuestions),
+    noSharedTokenSubsetRate: div(m.blacklistNoSharedTokenViolationQuestions, m.blacklistNoSharedTokenQuestions),
     whitelistViolationRate: div(m.whitelistViolationQuestions, m.whitelistQuestions),
     dupQuestionRate: div(m.dupQuestions, m.questions),
     overInjectRate: div(m.overInjectQuestions, m.unresolvedQuestions),
@@ -519,9 +534,11 @@ function printMetrics(title, rows, m, r) {
   line('段落命中（严格包含）', `${frac(m.spanStrict, m.spanItems)}   [带 span 条目 ${m.spanItems}]`)
   line('段落命中（区间相交）', frac(m.spanOverlap, m.spanItems))
   line('MRR', `${r.mrr.toFixed(4)}   [Σ1/rank = ${m.mrrSum.toFixed(4)} / ${m.neededQuestions}]`)
-  line('误注入率（黑名单）', `${frac(m.blacklistViolationQuestions, m.blacklistQuestions)}   [检查项 ${m.blacklistChecks}，命中 ${m.blacklistViolations}]`)
-  line('误注入率（标注安全子集）', `${frac(m.blacklistSafeViolationQuestions, m.blacklistSafeQuestions)}   [安全检查项 ${m.blacklistSafeChecks}]`)
-  line('误注入（标注不牢靠）', `${m.blacklistUnsafeViolations} 次   [这些行的 query 词元本来就在文件里]`)
+  line('误注入率（全部检查项·主指标）', `${frac(m.blacklistViolationQuestions, m.blacklistQuestions)}   [检查项 ${m.blacklistChecks}，命中 ${m.blacklistViolations}]`)
+  line('误注入率（无共享词元子集·切片）', `${frac(m.blacklistNoSharedTokenViolationQuestions, m.blacklistNoSharedTokenQuestions)}   [切片检查项 ${m.blacklistNoSharedTokenChecks}]`)
+  line('切片排除的检查项（难负例所在）', `${m.blacklistChecks - m.blacklistNoSharedTokenChecks} 项，其中命中 ${m.blacklistSharedTokenViolations} 次`)
+  console.log('      ⚠️ 切片只是诊断：共享词元 ≠ 语义无关，切片排掉的恰恰是词法检索最容易犯错的难负例；')
+  console.log('         不能由「无共享词元子集 = 0」推出「真实误注入为零」。')
   line('白名单外误注入', frac(m.whitelistViolationQuestions, m.whitelistQuestions))
   line('重复文件（题数／多余条）', `${m.dupQuestions} / ${m.dupExtra}   [重复字节 ${m.dupExtraBytes}]`)
   line('无答案题仍注入', `${frac(m.overInjectQuestions, m.unresolvedQuestions)}   [只说「继续」这类题]`)
@@ -574,12 +591,12 @@ function main(argv) {
   line('黑名单文件缺失', String(audit.missingBlacklist.length))
   line('白名单文件缺失', String(audit.missingWhitelist.length))
   line('白名单缺 needed', String(audit.whitelistMissingNeeded.length))
-  line('黑名单检查项', `${audit.blacklistChecks} 项，其中词法安全 ${audit.safeChecks} 项，涉及题数 ${audit.safeQuestions}`)
-  line('标注不牢靠的检查项', `${audit.blacklistChecks - audit.safeChecks} 项（query 词元与文件重合）`)
-  for (const s of audit.unsafeSamples) console.log(`      ${s}`)
+  line('黑名单检查项', `${audit.blacklistChecks} 项，其中无共享词元 ${audit.noSharedTokenChecks} 项，涉及题数 ${audit.noSharedTokenQuestions}`)
+  line('切片排除的检查项', `${audit.blacklistChecks - audit.noSharedTokenChecks} 项（query 词元与文件重合 —— 难负例候选）`)
+  for (const s of audit.sharedTokenSamples) console.log(`      ${s}`)
 
   const rows = questions.map(q =>
-    evaluateQuestion(q, opts.mode === 'mixed' ? q.scope : opts.mode, corpus, limit, perFile, audit.unsafePairs))
+    evaluateQuestion(q, opts.mode === 'mixed' ? q.scope : opts.mode, corpus, limit, perFile, audit.sharedTokenPairs))
 
   console.log('\n== 逐题明细 ==')
   for (const row of rows) for (const l of detailLines(row)) console.log(l)
@@ -592,7 +609,7 @@ function main(argv) {
   // 不依赖任何历史基线，所以第一次跑就能看出问题。
   let reference = null
   if (opts.mode !== 'summary') {
-    const refRows = runAll(questions, corpus, 'summary', limit, perFile, audit.unsafePairs)
+    const refRows = runAll(questions, corpus, 'summary', limit, perFile, audit.sharedTokenPairs)
     const refM = summarize(refRows)
     const refR = rates(refM)
     reference = { mode: 'summary', raw: refM, rates: refR }
@@ -618,7 +635,9 @@ function main(argv) {
       `  ${name}\n` +
         `      Recall@L ${frac(gm.anyHit, gm.neededQuestions)} | 全中 ${frac(gm.allHit, gm.neededQuestions)} | ` +
         `段落严格 ${frac(gm.spanStrict, gm.spanItems)} | MRR ${gr.mrr.toFixed(4)}（Σ ${gm.mrrSum.toFixed(4)}/${gm.neededQuestions}）| ` +
-        `误注入 ${frac(gm.blacklistViolationQuestions, gm.blacklistQuestions)} | 仍注入 ${frac(gm.overInjectQuestions, gm.unresolvedQuestions)}`,
+        `误注入（全部检查项）${frac(gm.blacklistViolationQuestions, gm.blacklistQuestions)} | ` +
+        `误注入切片 ${frac(gm.blacklistNoSharedTokenViolationQuestions, gm.blacklistNoSharedTokenQuestions)} | ` +
+        `仍注入 ${frac(gm.overInjectQuestions, gm.unresolvedQuestions)}`,
     )
   }
 
@@ -648,8 +667,16 @@ function main(argv) {
   if (opts.baseline) {
     baselineReport = compareBaseline(opts.baseline, { mode: opts.mode, limit, profile: { corpusHash, questionHash } }, m, r)
     console.log('\n== 与基线对比 ==')
-    if (baselineReport.skipped) {
-      line('已跳过', baselineReport.reason)
+    line('基线', opts.baseline)
+    line('状态', baselineReport.status)
+    if (baselineReport.status === 'inconclusive') {
+      line('原因', baselineReport.reason)
+      if (opts.allowBaselineSkip) {
+        line('处理', '已按 --allow-baseline-skip 放行（此项不影响退出码）')
+      } else {
+        line('处理', '显式要求了比较却没有比成 → 按失败关闭处理（退出码 1）')
+        console.log('      探索场景确实要跳过时再加 --allow-baseline-skip。')
+      }
     } else {
       for (const row of baselineReport.rows) {
         line(`${row.key}（${row.dir === 'up' ? '越高越好' : '越低越好'}）`, `${row.before} → ${row.after} ${row.verdict}`)
@@ -663,9 +690,21 @@ function main(argv) {
   line('结构性错误', String(structural.length))
   line('strict 误注入题', strictViolations.length ? strictViolations.join(', ') : '0')
   line('all vs summary 对照', reference ? (comparisonRegression ? '退化（all 低于 summary）' : '未退化') : '未跑（当前就是 summary）')
+  line('基线比较', baselineReport ? baselineReport.status : '未要求')
   for (const p of [...problems, ...structural]) console.log(`      ! ${p}`)
+  if (baselineReport?.status === 'inconclusive' && !opts.allowBaselineSkip) {
+    console.log(`      ! 显式给了 --baseline 但比较没完成（${baselineReport.reason}）`)
+  }
 
-  const failed = problems.length > 0 || structural.length > 0 || strictViolations.length > 0 || comparisonRegression || Boolean(baselineReport && !baselineReport.skipped && baselineReport.regressions.length)
+  const baselineRegressed = Boolean(baselineReport && baselineReport.status === 'compared' && baselineReport.regressions.length)
+  const baselineUnresolved = Boolean(baselineReport && baselineReport.status === 'inconclusive' && !opts.allowBaselineSkip)
+  const failed =
+    problems.length > 0 ||
+    structural.length > 0 ||
+    strictViolations.length > 0 ||
+    comparisonRegression ||
+    baselineRegressed ||
+    baselineUnresolved
 
   if (opts.json) {
     const payload = {
@@ -683,8 +722,19 @@ function main(argv) {
         missingWhitelist: audit.missingWhitelist,
         whitelistMissingNeeded: audit.whitelistMissingNeeded,
         blacklistChecks: audit.blacklistChecks,
-        safeChecks: audit.safeChecks,
-        unsafeSamples: audit.unsafeSamples,
+        noSharedTokenChecks: audit.noSharedTokenChecks,
+        noSharedTokenQuestions: audit.noSharedTokenQuestions,
+        sharedTokenSamples: audit.sharedTokenSamples,
+      },
+      // 指标口径写给结构化消费方：主指标是哪一个、切片叫什么、切片为什么不能当结论。
+      // 放在 JSON 里而不是只写在输出里，是因为 CI/看板往往只读这个文件。
+      metricsSemantics: {
+        primaryFalseInjection: 'falseInjectRate',
+        diagnosticSlice: 'noSharedTokenSubsetRate',
+        sliceCaveat:
+          '共享词元 ≠ 语义无关。切片只保留「query 与文件一个词元都不共享」的检查项，' +
+          '因而系统性排除了词法检索最容易犯错的难负例（共享常用词、同名不同项目、同实体不同时间、已失效内容）；' +
+          '不能由切片为 0 推出真实误注入为零。',
       },
       metrics: { raw: m, rates: r },
       groups: Object.fromEntries(
@@ -732,31 +782,76 @@ const COMPARED = [
   ['spanOverlapRate', 'up'],
   ['mrr', 'up'],
   ['falseInjectRate', 'down'],
-  ['falseInjectSafeRate', 'down'],
+  ['noSharedTokenSubsetRate', 'down'],
   ['whitelistViolationRate', 'down'],
   ['dupQuestionRate', 'down'],
   ['overInjectRate', 'down'],
 ]
 
+/**
+ * 旧产物里的别名。`noSharedTokenSubsetRate` 的前身叫 `falseInjectSafeRate`——
+ * 名字在 R08 里被改掉了（旧名暗示「这才是真实的误注入」），但**数字的含义没变**，
+ * 所以老基线仍然可比：读的时候认两个键，写的时候只写新键。
+ */
+const RATE_ALIASES = { noSharedTokenSubsetRate: ['falseInjectSafeRate'] }
+
+/**
+ * 基线 schema 校验：**缺项也算比较没完成**，不许拿 0 顶上。
+ *
+ * 为什么不能默认填 0：方向是「越高越好」的指标缺项会被填成 0，一比就成了「改善」；
+ * 方向是「越低越好」的会被填成 0，一比也成了「改善」。两种都是**假的通过**。
+ * 于是「基线文件写坏了」会被读成「这次跑得更好」，比读不到基线还危险。
+ */
+function validateBaseline(old) {
+  if (!old || typeof old !== 'object' || Array.isArray(old)) return { ok: false, why: '基线不是 JSON 对象' }
+  const rates = old.metrics?.rates
+  if (!rates || typeof rates !== 'object' || Array.isArray(rates)) return { ok: false, why: '基线缺 metrics.rates（不是一次 --json 产物？）' }
+  const missing = []
+  for (const [key] of COMPARED) {
+    const candidates = [key, ...(RATE_ALIASES[key] ?? [])]
+    const found = candidates.find(k => Number.isFinite(rates[k]))
+    if (found === undefined) missing.push(key)
+  }
+  if (missing.length) return { ok: false, why: `基线缺这些指标（或被填成非数字）：${missing.join(', ')}` }
+  if (!Number.isFinite(old.metrics?.raw?.questions) || old.metrics.raw.questions <= 0) {
+    return { ok: false, why: '基线缺 metrics.raw.questions（或不是正数）—— 指标记录不完整' }
+  }
+  if (typeof old.mode !== 'string' || !Number.isFinite(Number(old.limit))) return { ok: false, why: '基线缺 mode / limit' }
+  if (typeof old.corpus?.hash !== 'string' || !old.corpus.hash) return { ok: false, why: '基线缺 corpus.hash' }
+  if (typeof old.questions?.hash !== 'string' || !old.questions.hash) return { ok: false, why: '基线缺 questions.hash' }
+  return { ok: true, why: '' }
+}
+
+/**
+ * 与旧产物对比。
+ *
+ * 返回 `status`：`compared`（真的比了）或 `inconclusive`（没比成）。
+ * **没比成不是「没问题」**——调用方必须按失败关闭处理，除非显式给了 --allow-baseline-skip。
+ */
 function compareBaseline(path, current, m, r) {
+  const inconclusive = (reason) => ({ status: 'inconclusive', reason, rows: [], regressions: [], previousGeneratedAt: '' })
   let old
   try {
     old = JSON.parse(readFileSync(path, 'utf8'))
   } catch (err) {
-    return { skipped: true, reason: `读不到基线 ${path}：${err?.message ?? err}`, regressions: [], rows: [] }
+    return inconclusive(`读不到或读不坏基线 ${path}：${err?.message ?? err}`)
   }
-  if (old.mode !== current.mode || old.limit !== current.limit) {
-    return { skipped: true, reason: `基线是 mode=${old.mode} limit=${old.limit}，当前是 mode=${current.mode} limit=${current.limit}，不可比`, regressions: [], rows: [] }
+  const schema = validateBaseline(old)
+  if (!schema.ok) return inconclusive(`基线 schema 不合格：${schema.why}`)
+  if (old.mode !== current.mode || Number(old.limit) !== current.limit) {
+    return inconclusive(`基线是 mode=${old.mode} limit=${old.limit}，当前是 mode=${current.mode} limit=${current.limit}，不可比`)
   }
-  if (old.questions?.hash !== current.profile.questionHash || old.corpus?.hash !== current.profile.corpusHash) {
-    return { skipped: true, reason: '基线来自不同的问题集或语料，指标不可比（先重新生成基线）', regressions: [], rows: [] }
+  if (old.questions.hash !== current.profile.questionHash || old.corpus.hash !== current.profile.corpusHash) {
+    return inconclusive('基线来自不同的问题集或语料，指标不可比（先重新生成基线）')
   }
   const eps = 1e-9
   const rows = []
   const regressions = []
   for (const [key, dir] of COMPARED) {
-    const before = Number(old.metrics?.rates?.[key] ?? 0)
-    const after = Number(r[key] ?? 0)
+    const candidates = [key, ...(RATE_ALIASES[key] ?? [])]
+    const source = candidates.find(k => Number.isFinite(old.metrics.rates[k]))
+    const before = old.metrics.rates[source]
+    const after = Number(r[key])
     const worse = dir === 'up' ? after < before - eps : after > before + eps
     const better = dir === 'up' ? after > before + eps : after < before - eps
     const verdict = worse ? '✗ 退化' : better ? '✓ 改善' : '＝ 持平'
@@ -764,7 +859,7 @@ function compareBaseline(path, current, m, r) {
     if (worse) regressions.push(key)
   }
   void m
-  return { skipped: false, reason: '', rows, regressions, previousGeneratedAt: old.generatedAt ?? '' }
+  return { status: 'compared', reason: '', rows, regressions, previousGeneratedAt: old.generatedAt ?? '' }
 }
 
 // ─────────────────────────── 入口 ───────────────────────────
