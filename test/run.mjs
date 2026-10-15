@@ -45,6 +45,7 @@ const SUITES = [
   'status-card-test.mjs',
   'conflicts-test.mjs',
   'stale-conflict-test.mjs',
+  'watch-test.mjs',
   // 守卫放最后：它检查的是「上面这份名单完不完整」。
   'suite-registry-test.mjs',
   'checkpoint-test.mjs',
