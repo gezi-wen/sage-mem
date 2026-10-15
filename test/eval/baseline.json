@@ -1,6 +1,6 @@
 {
   "tool": "sage-mem eval-retrieval",
-  "generatedAt": "2026-10-15T10:43:18.310Z",
+  "generatedAt": "2026-10-15T12:29:45.442Z",
   "mode": "all",
   "limit": 5,
   "perFile": 2,
@@ -37,14 +37,14 @@
     "raw": {
       "questions": 79,
       "neededQuestions": 69,
-      "anyHit": 58,
-      "allHit": 56,
+      "anyHit": 60,
+      "allHit": 58,
       "neededItems": 81,
-      "foundItems": 65,
+      "foundItems": 67,
       "spanItems": 47,
-      "spanStrict": 29,
-      "spanOverlap": 29,
-      "mrrSum": 51.083333333333336,
+      "spanStrict": 30,
+      "spanOverlap": 30,
+      "mrrSum": 53.08333333333333,
       "retrieveErrors": 0,
       "zeroHitQuestions": 9,
       "dupQuestions": 0,
@@ -52,119 +52,119 @@
       "dupExtraBytes": 0,
       "blacklistQuestions": 71,
       "blacklistChecks": 229,
-      "blacklistViolationQuestions": 10,
-      "blacklistViolations": 14,
+      "blacklistViolationQuestions": 4,
+      "blacklistViolations": 4,
       "blacklistSafeChecks": 180,
       "blacklistSafeQuestions": 68,
-      "blacklistSafeViolationQuestions": 2,
-      "blacklistUnsafeViolations": 11,
+      "blacklistSafeViolationQuestions": 0,
+      "blacklistUnsafeViolations": 4,
       "whitelistQuestions": 4,
       "whitelistViolationQuestions": 4,
-      "whitelistViolations": 5,
+      "whitelistViolations": 6,
       "unresolvedQuestions": 10,
       "overInjectQuestions": 1,
       "incompleteCoverageQuestions": 0,
       "skippedFiles": 0,
-      "candidatesSum": 342,
+      "candidatesSum": 220,
       "latencies": [
-        10.497900000000001,
-        1.240399999999994,
-        1.308800000000005,
-        0.836199999999991,
-        0.7241999999999962,
-        1.0087000000000046,
-        0.8903000000000105,
-        1.0426999999999964,
-        1.2079999999999984,
-        1.2183999999999884,
-        0.8061999999999898,
-        0.8984999999999985,
-        0.7809999999999917,
-        0.8789000000000016,
-        0.7913000000000068,
-        0.8730000000000047,
-        0.8269000000000091,
-        0.9038000000000039,
-        0.8526999999999987,
-        1.257099999999994,
-        0.6606000000000023,
-        0.6906000000000034,
-        0.6265000000000072,
-        0.517799999999994,
-        0.6094000000000079,
-        0.5326000000000022,
-        0.7272999999999996,
-        0.658600000000007,
-        0.5865000000000009,
-        0.6248999999999967,
-        1.0516999999999967,
-        0.6377999999999986,
-        0.6602999999999923,
-        0.5681000000000012,
-        0.6808999999999941,
-        0.5683999999999969,
-        0.5908000000000015,
-        0.5938000000000017,
-        0.8982999999999919,
-        0.5628999999999991,
-        0.6259000000000015,
-        0.6766000000000076,
-        1.1003999999999934,
-        0.6743000000000023,
-        0.5688999999999993,
-        0.834699999999998,
-        0.8410999999999973,
-        0.953400000000002,
-        0.8485999999999905,
-        0.5716000000000037,
-        0.8263999999999925,
-        1.3386999999999887,
-        0.8108000000000004,
-        0.8743999999999943,
-        0.7865999999999929,
-        0.6769000000000034,
-        0.9047999999999945,
-        0.816599999999994,
-        0.7710000000000008,
-        0.6291999999999973,
-        1.0885000000000105,
-        0.5427999999999997,
-        0.24629999999999086,
-        0.45060000000000855,
-        0.46479999999999677,
-        0.4405999999999892,
-        0.17659999999997922,
-        0.503799999999984,
-        0.5149999999999864,
-        0.5646999999999878,
-        0.5690999999999917,
-        0.7676999999999907,
-        0.6740999999999815,
-        0.7451999999999828,
-        0.7838000000000136,
-        1.0646000000000129,
-        0.7489999999999952,
-        0.6864999999999952,
-        0.7066000000000088
+        10.089300000000001,
+        1.2997999999999905,
+        1.3892000000000024,
+        1.1103999999999985,
+        1.0489000000000033,
+        1.2192000000000007,
+        1.475999999999999,
+        0.939700000000002,
+        1.300699999999992,
+        1.0914999999999964,
+        1.1169999999999902,
+        1.412700000000001,
+        1.098700000000008,
+        0.7875000000000085,
+        0.8506,
+        0.7612000000000023,
+        0.7425999999999959,
+        1.2245999999999952,
+        1.112099999999998,
+        0.7240999999999929,
+        0.7409999999999997,
+        0.7790999999999997,
+        0.8141999999999996,
+        0.49379999999999313,
+        1.0296999999999912,
+        0.48169999999998936,
+        1.0709000000000088,
+        0.8400999999999925,
+        0.550699999999992,
+        0.5379000000000076,
+        0.8183999999999969,
+        0.7379999999999995,
+        1.0345999999999975,
+        0.6765000000000043,
+        0.7257999999999925,
+        0.5028999999999968,
+        0.6715000000000089,
+        0.7382999999999953,
+        0.9983000000000004,
+        0.5407000000000011,
+        0.9497999999999962,
+        0.622099999999989,
+        0.6066999999999894,
+        0.7115000000000009,
+        0.5394000000000005,
+        0.883899999999997,
+        0.8141999999999996,
+        1.0065000000000026,
+        1.0947000000000031,
+        1.0896000000000043,
+        0.8530999999999977,
+        0.917199999999994,
+        0.7179999999999893,
+        0.9037000000000006,
+        0.7380999999999887,
+        0.7909999999999968,
+        1.0944000000000074,
+        0.8629000000000104,
+        0.8995000000000033,
+        0.7783000000000015,
+        1.0460000000000065,
+        0.48260000000001924,
+        0.23559999999997672,
+        0.4420000000000073,
+        0.7621999999999787,
+        0.48339999999998895,
+        0.16450000000000387,
+        0.48599999999999,
+        0.6966999999999928,
+        0.5090000000000146,
+        0.46930000000000405,
+        0.7604000000000042,
+        0.8125999999999749,
+        0.8094000000000108,
+        0.7442000000000064,
+        1.1885000000000048,
+        0.8432999999999993,
+        0.8660000000000139,
+        0.8166999999999973
       ]
     },
     "rates": {
-      "recallAny": 0.8405797101449275,
-      "recallAll": 0.8115942028985508,
-      "itemRecall": 0.8024691358024691,
-      "spanStrictRate": 0.6170212765957447,
-      "spanOverlapRate": 0.6170212765957447,
-      "mrr": 0.7403381642512078,
-      "falseInjectRate": 0.14084507042253522,
-      "falseInjectSafeRate": 0.029411764705882353,
+      "recallAny": 0.8695652173913043,
+      "recallAll": 0.8405797101449275,
+      "itemRecall": 0.8271604938271605,
+      "spanStrictRate": 0.6382978723404256,
+      "spanOverlapRate": 0.6382978723404256,
+      "mrr": 0.7693236714975845,
+      "falseInjectRate": 0.056338028169014086,
+      "falseInjectSafeRate": 0,
       "whitelistViolationRate": 1,
       "dupQuestionRate": 0,
       "overInjectRate": 0.1,
       "errorRate": 0,
       "incompleteRate": 0,
-      "candidatesAvg": 4.329113924050633,
-      "latencyP50": 0.7451999999999828,
-      "latencyP95": 1.257099999999994
+      "candidatesAvg": 2.7848101265822787,
+      "latencyP50": 0.8141999999999996,
+      "latencyP95": 1.3892000000000024
     }
   },
   "groups": {
@@ -179,7 +179,7 @@
         "spanItems": 0,
         "spanStrict": 0,
         "spanOverlap": 0,
-        "mrrSum": 21.333333333333332,
+        "mrrSum": 21.5,
         "retrieveErrors": 0,
         "zeroHitQuestions": 9,
         "dupQuestions": 0,
@@ -187,12 +187,12 @@
         "dupExtraBytes": 0,
         "blacklistQuestions": 32,
         "blacklistChecks": 112,
-        "blacklistViolationQuestions": 5,
-        "blacklistViolations": 8,
+        "blacklistViolationQuestions": 1,
+        "blacklistViolations": 1,
         "blacklistSafeChecks": 85,
         "blacklistSafeQuestions": 30,
         "blacklistSafeViolationQuestions": 0,
-        "blacklistUnsafeViolations": 8,
+        "blacklistUnsafeViolations": 1,
         "whitelistQuestions": 0,
         "whitelistViolationQuestions": 0,
         "whitelistViolations": 0,
@@ -200,40 +200,40 @@
         "overInjectQuestions": 1,
         "incompleteCoverageQuestions": 0,
         "skippedFiles": 0,
-        "candidatesSum": 122,
+        "candidatesSum": 85,
         "latencies": [
-          10.497900000000001,
-          1.240399999999994,
-          1.308800000000005,
-          0.836199999999991,
-          0.7241999999999962,
-          1.0087000000000046,
-          0.8903000000000105,
-          1.0426999999999964,
-          1.2079999999999984,
-          1.2183999999999884,
-          0.8061999999999898,
-          0.8984999999999985,
-          0.7809999999999917,
-          0.8789000000000016,
-          0.7913000000000068,
-          0.8730000000000047,
-          0.8269000000000091,
-          0.9038000000000039,
-          0.5427999999999997,
-          0.24629999999999086,
-          0.45060000000000855,
-          0.46479999999999677,
-          0.4405999999999892,
-          0.17659999999997922,
-          0.503799999999984,
-          0.5149999999999864,
-          0.5646999999999878,
-          0.5690999999999917,
-          0.7676999999999907,
-          0.6740999999999815,
-          0.7451999999999828,
-          0.7838000000000136
+          10.089300000000001,
+          1.2997999999999905,
+          1.3892000000000024,
+          1.1103999999999985,
+          1.0489000000000033,
+          1.2192000000000007,
+          1.475999999999999,
+          0.939700000000002,
+          1.300699999999992,
+          1.0914999999999964,
+          1.1169999999999902,
+          1.412700000000001,
+          1.098700000000008,
+          0.7875000000000085,
+          0.8506,
+          0.7612000000000023,
+          0.7425999999999959,
+          1.2245999999999952,
+          0.48260000000001924,
+          0.23559999999997672,
+          0.4420000000000073,
+          0.7621999999999787,
+          0.48339999999998895,
+          0.16450000000000387,
+          0.48599999999999,
+          0.6966999999999928,
+          0.5090000000000146,
+          0.46930000000000405,
+          0.7604000000000042,
+          0.8125999999999749,
+          0.8094000000000108,
+          0.7442000000000064
         ]
       },
       "rates": {
@@ -242,31 +242,31 @@
         "itemRecall": 0.8529411764705882,
         "spanStrictRate": 0,
         "spanOverlapRate": 0,
-        "mrr": 0.9696969696969696,
-        "falseInjectRate": 0.15625,
+        "mrr": 0.9772727272727273,
+        "falseInjectRate": 0.03125,
         "falseInjectSafeRate": 0,
         "whitelistViolationRate": 0,
         "dupQuestionRate": 0,
         "overInjectRate": 0.1,
         "errorRate": 0,
         "incompleteRate": 0,
-        "candidatesAvg": 3.8125,
-        "latencyP50": 0.7838000000000136,
-        "latencyP95": 1.308800000000005
+        "candidatesAvg": 2.65625,
+        "latencyP50": 0.8094000000000108,
+        "latencyP95": 1.475999999999999
       }
     },
     "正文题（shouldReturn=body）": {
       "raw": {
         "questions": 47,
         "neededQuestions": 47,
-        "anyHit": 36,
-        "allHit": 36,
+        "anyHit": 38,
+        "allHit": 38,
         "neededItems": 47,
-        "foundItems": 36,
+        "foundItems": 38,
         "spanItems": 47,
-        "spanStrict": 29,
-        "spanOverlap": 29,
-        "mrrSum": 29.75,
+        "spanStrict": 30,
+        "spanOverlap": 30,
+        "mrrSum": 31.583333333333336,
         "retrieveErrors": 0,
         "zeroHitQuestions": 0,
         "dupQuestions": 0,
@@ -274,87 +274,87 @@
         "dupExtraBytes": 0,
         "blacklistQuestions": 39,
         "blacklistChecks": 117,
-        "blacklistViolationQuestions": 5,
-        "blacklistViolations": 6,
+        "blacklistViolationQuestions": 3,
+        "blacklistViolations": 3,
         "blacklistSafeChecks": 95,
         "blacklistSafeQuestions": 38,
-        "blacklistSafeViolationQuestions": 2,
+        "blacklistSafeViolationQuestions": 0,
         "blacklistUnsafeViolations": 3,
         "whitelistQuestions": 4,
         "whitelistViolationQuestions": 4,
-        "whitelistViolations": 5,
+        "whitelistViolations": 6,
         "unresolvedQuestions": 0,
         "overInjectQuestions": 0,
         "incompleteCoverageQuestions": 0,
         "skippedFiles": 0,
-        "candidatesSum": 220,
+        "candidatesSum": 135,
         "latencies": [
-          0.8526999999999987,
-          1.257099999999994,
-          0.6606000000000023,
-          0.6906000000000034,
-          0.6265000000000072,
-          0.517799999999994,
-          0.6094000000000079,
-          0.5326000000000022,
-          0.7272999999999996,
-          0.658600000000007,
-          0.5865000000000009,
-          0.6248999999999967,
-          1.0516999999999967,
-          0.6377999999999986,
-          0.6602999999999923,
-          0.5681000000000012,
-          0.6808999999999941,
-          0.5683999999999969,
-          0.5908000000000015,
-          0.5938000000000017,
-          0.8982999999999919,
-          0.5628999999999991,
-          0.6259000000000015,
-          0.6766000000000076,
-          1.1003999999999934,
-          0.6743000000000023,
-          0.5688999999999993,
-          0.834699999999998,
-          0.8410999999999973,
-          0.953400000000002,
-          0.8485999999999905,
-          0.5716000000000037,
-          0.8263999999999925,
-          1.3386999999999887,
-          0.8108000000000004,
-          0.8743999999999943,
-          0.7865999999999929,
-          0.6769000000000034,
-          0.9047999999999945,
-          0.816599999999994,
-          0.7710000000000008,
-          0.6291999999999973,
-          1.0885000000000105,
-          1.0646000000000129,
-          0.7489999999999952,
-          0.6864999999999952,
-          0.7066000000000088
+          1.112099999999998,
+          0.7240999999999929,
+          0.7409999999999997,
+          0.7790999999999997,
+          0.8141999999999996,
+          0.49379999999999313,
+          1.0296999999999912,
+          0.48169999999998936,
+          1.0709000000000088,
+          0.8400999999999925,
+          0.550699999999992,
+          0.5379000000000076,
+          0.8183999999999969,
+          0.7379999999999995,
+          1.0345999999999975,
+          0.6765000000000043,
+          0.7257999999999925,
+          0.5028999999999968,
+          0.6715000000000089,
+          0.7382999999999953,
+          0.9983000000000004,
+          0.5407000000000011,
+          0.9497999999999962,
+          0.622099999999989,
+          0.6066999999999894,
+          0.7115000000000009,
+          0.5394000000000005,
+          0.883899999999997,
+          0.8141999999999996,
+          1.0065000000000026,
+          1.0947000000000031,
+          1.0896000000000043,
+          0.8530999999999977,
+          0.917199999999994,
+          0.7179999999999893,
+          0.9037000000000006,
+          0.7380999999999887,
+          0.7909999999999968,
+          1.0944000000000074,
+          0.8629000000000104,
+          0.8995000000000033,
+          0.7783000000000015,
+          1.0460000000000065,
+          1.1885000000000048,
+          0.8432999999999993,
+          0.8660000000000139,
+          0.8166999999999973
         ]
       },
       "rates": {
-        "recallAny": 0.7659574468085106,
-        "recallAll": 0.7659574468085106,
-        "itemRecall": 0.7659574468085106,
-        "spanStrictRate": 0.6170212765957447,
-        "spanOverlapRate": 0.6170212765957447,
-        "mrr": 0.6329787234042553,
-        "falseInjectRate": 0.1282051282051282,
-        "falseInjectSafeRate": 0.05263157894736842,
+        "recallAny": 0.8085106382978723,
+        "recallAll": 0.8085106382978723,
+        "itemRecall": 0.8085106382978723,
+        "spanStrictRate": 0.6382978723404256,
+        "spanOverlapRate": 0.6382978723404256,
+        "mrr": 0.6719858156028369,
+        "falseInjectRate": 0.07692307692307693,
+        "falseInjectSafeRate": 0,
         "whitelistViolationRate": 1,
         "dupQuestionRate": 0,
         "overInjectRate": 0,
         "errorRate": 0,
         "incompleteRate": 0,
-        "candidatesAvg": 4.680851063829787,
-        "latencyP50": 0.6864999999999952,
-        "latencyP95": 1.1003999999999934
+        "candidatesAvg": 2.872340425531915,
+        "latencyP50": 0.8141999999999996,
+        "latencyP95": 1.0947000000000031
       }
     },
     "已知词法边界 [lexfail]": {
@@ -391,10 +391,10 @@
         "skippedFiles": 0,
         "candidatesSum": 6,
         "latencies": [
-          0.6766000000000076,
-          1.1003999999999934,
-          0.6743000000000023,
-          0.5688999999999993
+          0.622099999999989,
+          0.6066999999999894,
+          0.7115000000000009,
+          0.5394000000000005
         ]
       },
       "rates": {
@@ -412,8 +412,8 @@
         "errorRate": 0,
         "incompleteRate": 0,
         "candidatesAvg": 1.5,
-        "latencyP50": 0.6743000000000023,
-        "latencyP95": 1.1003999999999934
+        "latencyP50": 0.6066999999999894,
+        "latencyP95": 0.7115000000000009
       }
     },
     "无答案题（unresolved 且不该注入）": {
@@ -450,16 +450,16 @@
         "skippedFiles": 0,
         "candidatesSum": 1,
         "latencies": [
-          0.5427999999999997,
-          0.24629999999999086,
-          0.45060000000000855,
-          0.46479999999999677,
-          0.4405999999999892,
-          0.17659999999997922,
-          0.503799999999984,
-          0.5149999999999864,
-          0.5646999999999878,
-          0.5690999999999917
+          0.48260000000001924,
+          0.23559999999997672,
+          0.4420000000000073,
+          0.7621999999999787,
+          0.48339999999998895,
+          0.16450000000000387,
+          0.48599999999999,
+          0.6966999999999928,
+          0.5090000000000146,
+          0.46930000000000405
         ]
       },
       "rates": {
@@ -477,8 +477,8 @@
         "errorRate": 0,
         "incompleteRate": 0,
         "candidatesAvg": 0.1,
-        "latencyP50": 0.46479999999999677,
-        "latencyP95": 0.5690999999999917
+        "latencyP50": 0.48260000000001924,
+        "latencyP95": 0.7621999999999787
       }
     }
   },
@@ -487,14 +487,14 @@
     "raw": {
       "questions": 79,
       "neededQuestions": 69,
-      "anyHit": 35,
-      "allHit": 33,
+      "anyHit": 33,
+      "allHit": 32,
       "neededItems": 81,
-      "foundItems": 42,
+      "foundItems": 41,
       "spanItems": 47,
       "spanStrict": 0,
       "spanOverlap": 0,
-      "mrrSum": 30.28333333333333,
+      "mrrSum": 29.75,
       "retrieveErrors": 0,
       "zeroHitQuestions": 10,
       "dupQuestions": 0,
@@ -502,12 +502,12 @@
       "dupExtraBytes": 0,
       "blacklistQuestions": 71,
       "blacklistChecks": 229,
-      "blacklistViolationQuestions": 9,
-      "blacklistViolations": 14,
+      "blacklistViolationQuestions": 3,
+      "blacklistViolations": 3,
       "blacklistSafeChecks": 180,
       "blacklistSafeQuestions": 68,
-      "blacklistSafeViolationQuestions": 2,
-      "blacklistUnsafeViolations": 11,
+      "blacklistSafeViolationQuestions": 0,
+      "blacklistUnsafeViolations": 3,
       "whitelistQuestions": 4,
       "whitelistViolationQuestions": 4,
       "whitelistViolations": 5,
@@ -515,106 +515,106 @@
       "overInjectQuestions": 0,
       "incompleteCoverageQuestions": 0,
       "skippedFiles": 0,
-      "candidatesSum": 296,
+      "candidatesSum": 168,
       "latencies": [
-        0.5389000000000124,
-        0.4692000000000007,
-        0.5189000000000021,
-        0.38820000000001187,
-        0.36990000000000123,
-        0.42549999999999955,
-        0.39229999999997744,
-        0.8231999999999857,
-        0.46999999999999886,
-        0.41509999999999536,
-        0.462600000000009,
-        0.5250000000000057,
-        0.4368999999999801,
-        0.41499999999999204,
-        0.38280000000000314,
-        0.45400000000000773,
-        0.3468000000000018,
-        0.3976000000000113,
-        0.4222000000000037,
-        0.36019999999999186,
-        0.518100000000004,
-        0.7561999999999784,
-        0.3760000000000048,
-        0.32159999999998945,
-        0.36410000000000764,
-        0.3143000000000029,
-        0.4128999999999792,
-        0.3623999999999796,
-        0.36299999999999955,
-        0.31110000000001037,
-        0.35829999999998563,
-        0.34360000000000923,
-        0.3710999999999842,
-        0.4163999999999817,
-        0.3960999999999899,
-        0.3242999999999938,
-        0.33629999999999427,
-        0.33670000000000755,
-        0.7268000000000256,
-        0.44540000000000646,
-        0.3532000000000153,
-        0.32450000000000045,
-        0.30930000000000746,
-        0.33440000000001646,
-        0.31520000000000437,
-        0.5281999999999982,
-        0.5343000000000018,
-        0.5430999999999813,
-        0.5227999999999895,
-        0.35070000000001755,
+        0.6962000000000046,
+        0.5656999999999925,
+        0.917900000000003,
+        0.49440000000001305,
+        0.5146999999999764,
+        0.5704000000000065,
+        0.7363,
+        0.5628999999999849,
+        0.5376000000000261,
+        0.5908000000000015,
+        0.9714999999999918,
+        0.5579000000000178,
+        0.5193000000000154,
+        0.5015999999999963,
+        0.49269999999998504,
+        0.4713999999999885,
+        0.7493000000000052,
+        0.5339999999999918,
+        0.7300999999999931,
+        0.4718000000000018,
+        0.6148999999999774,
         0.5503999999999962,
-        0.7956000000000074,
-        0.7098000000000013,
-        0.5392999999999972,
-        0.5653999999999826,
-        0.41800000000000637,
-        0.7855000000000132,
-        0.5962999999999852,
-        0.54849999999999,
-        0.4257000000000062,
-        0.6131999999999778,
-        0.5115999999999872,
-        0.14760000000001128,
-        0.35300000000000864,
-        0.3470999999999833,
-        0.9394000000000062,
-        0.2810000000000059,
-        0.7630999999999801,
-        0.6105000000000018,
-        0.5774999999999864,
-        0.601300000000009,
-        0.7438999999999965,
-        0.5331999999999937,
-        0.540600000000012,
-        0.5793000000000177,
-        0.4690000000000225,
-        0.4830000000000041,
-        0.4836999999999989,
-        0.44259999999999877
+        0.4841000000000122,
+        0.290300000000002,
+        0.46170000000000755,
+        0.2925999999999931,
+        0.5713000000000079,
+        0.731899999999996,
+        0.42219999999997526,
+        0.3440999999999974,
+        0.4776999999999987,
+        0.5524000000000058,
+        0.5317000000000007,
+        0.458500000000015,
+        0.5,
+        0.3018999999999892,
+        0.5093000000000245,
+        0.70150000000001,
+        0.6876000000000033,
+        0.30740000000000123,
+        0.39099999999999113,
+        0.3605000000000018,
+        0.3210000000000264,
+        0.33600000000001273,
+        0.3119000000000085,
+        0.5631999999999948,
+        0.5535999999999888,
+        0.5121000000000038,
+        0.8163999999999874,
+        0.48730000000000473,
+        0.6184000000000083,
+        0.8023000000000025,
+        0.6343999999999994,
+        0.6920000000000073,
+        0.4975000000000023,
+        0.5067000000000235,
+        0.8311000000000206,
+        0.551700000000011,
+        0.5689000000000135,
+        0.619499999999988,
+        0.7238000000000113,
+        0.31860000000000355,
+        0.10939999999999372,
+        0.28589999999999804,
+        0.28350000000000364,
+        0.28650000000001796,
+        0.1074999999999875,
+        0.30570000000000164,
+        0.29690000000002215,
+        0.30570000000000164,
+        0.6612999999999829,
+        0.6420000000000243,
+        0.5810000000000173,
+        0.6107000000000085,
+        0.5760999999999967,
+        0.5685000000000002,
+        0.7470000000000141,
+        0.7154999999999916,
+        0.6684999999999945
       ]
     },
     "rates": {
-      "recallAny": 0.5072463768115942,
-      "recallAll": 0.4782608695652174,
-      "itemRecall": 0.5185185185185185,
+      "recallAny": 0.4782608695652174,
+      "recallAll": 0.463768115942029,
+      "itemRecall": 0.5061728395061729,
       "spanStrictRate": 0,
       "spanOverlapRate": 0,
-      "mrr": 0.4388888888888889,
-      "falseInjectRate": 0.1267605633802817,
-      "falseInjectSafeRate": 0.029411764705882353,
+      "mrr": 0.4311594202898551,
+      "falseInjectRate": 0.04225352112676056,
+      "falseInjectSafeRate": 0,
       "whitelistViolationRate": 1,
       "dupQuestionRate": 0,
       "overInjectRate": 0,
       "errorRate": 0,
       "incompleteRate": 0,
-      "candidatesAvg": 3.7468354430379747,
-      "latencyP50": 0.4368999999999801,
-      "latencyP95": 0.7855000000000132
+      "candidatesAvg": 2.1265822784810124,
+      "latencyP50": 0.5376000000000261,
+      "latencyP95": 0.8163999999999874
     }
   },
   "detail": [
@@ -690,7 +690,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 10.4979,
+      "ms": 10.0893,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -737,24 +737,6 @@
             "description",
             "alias"
           ]
-        },
-        {
-          "file": "project_orchard-ci.md",
-          "lines": null,
-          "score": 0.0833,
-          "matchedBy": [
-            "description",
-            "alias"
-          ]
-        },
-        {
-          "file": "reference_orchard-flags.md",
-          "lines": null,
-          "score": 0.0833,
-          "matchedBy": [
-            "description",
-            "alias"
-          ]
         }
       ],
       "needed": [
@@ -774,14 +756,14 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 1.2404,
+      "ms": 1.2998,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 22,
-        "candidates": 5
+        "candidates": 3
       }
     },
     {
@@ -862,7 +844,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 1.3088,
+      "ms": 1.3892,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -903,7 +885,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.8362,
+      "ms": 1.1104,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -951,7 +933,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.7242,
+      "ms": 1.0489,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -1021,7 +1003,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 1.0087,
+      "ms": 1.2192,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -1095,7 +1077,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.8903,
+      "ms": 1.476,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -1171,7 +1153,7 @@
       ],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 1.0427,
+      "ms": 0.9397,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -1202,39 +1184,19 @@
           ]
         },
         {
-          "file": "project_orchard-cache.md",
+          "file": "project_lantern-release.md",
           "lines": null,
           "score": 0.0909,
           "matchedBy": [
-            "description",
-            "alias"
+            "description"
           ]
         },
         {
-          "file": "project_orchard-noise-log.md",
+          "file": "project_quarry-shard-split.md",
           "lines": null,
           "score": 0.0909,
           "matchedBy": [
-            "description",
-            "alias"
-          ]
-        },
-        {
-          "file": "project_orchard-timeout.md",
-          "lines": null,
-          "score": 0.0909,
-          "matchedBy": [
-            "description",
-            "alias"
-          ]
-        },
-        {
-          "file": "reference_orchard-flags.md",
-          "lines": null,
-          "score": 0.0909,
-          "matchedBy": [
-            "description",
-            "alias"
+            "description"
           ]
         }
       ],
@@ -1255,14 +1217,14 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 1.208,
+      "ms": 1.3007,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 35,
-        "candidates": 7
+        "candidates": 3
       }
     },
     {
@@ -1345,7 +1307,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 1.2184,
+      "ms": 1.0915,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -1432,7 +1394,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.8062,
+      "ms": 1.117,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -1514,7 +1476,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.8985,
+      "ms": 1.4127,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -1601,7 +1563,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.781,
+      "ms": 1.0987,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -1668,7 +1630,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.8789,
+      "ms": 0.7875,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -1724,7 +1686,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.7913,
+      "ms": 0.8506,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -1755,15 +1717,6 @@
           ]
         },
         {
-          "file": "reference_stargazing-nights.md",
-          "lines": null,
-          "score": 0.0909,
-          "matchedBy": [
-            "description",
-            "alias"
-          ]
-        },
-        {
           "file": "feedback_deploy-frozen.md",
           "lines": [
             20,
@@ -1772,22 +1725,6 @@
           "score": 7.317,
           "matchedBy": [
             "body"
-          ]
-        },
-        {
-          "file": "project_harbor-noise-notes.md",
-          "lines": null,
-          "score": 0.0909,
-          "matchedBy": [
-            "description"
-          ]
-        },
-        {
-          "file": "project_lumen-noise-dump.md",
-          "lines": null,
-          "score": 0.0909,
-          "matchedBy": [
-            "description"
           ]
         }
       ],
@@ -1805,20 +1742,17 @@
           "overlapOk": false
         }
       ],
-      "blacklistHit": [
-        "project_harbor-noise-notes.md",
-        "project_lumen-noise-dump.md"
-      ],
+      "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.873,
+      "ms": 0.7612,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 25,
-        "candidates": 7
+        "candidates": 2
       }
     },
     {
@@ -1852,7 +1786,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.8269,
+      "ms": 0.7426,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -1890,33 +1824,6 @@
             "description",
             "alias"
           ]
-        },
-        {
-          "file": "project_orchard-cache.md",
-          "lines": null,
-          "score": 0.125,
-          "matchedBy": [
-            "description",
-            "alias"
-          ]
-        },
-        {
-          "file": "project_orchard-noise-log.md",
-          "lines": null,
-          "score": 0.125,
-          "matchedBy": [
-            "description",
-            "alias"
-          ]
-        },
-        {
-          "file": "project_orchard-timeout.md",
-          "lines": null,
-          "score": 0.125,
-          "matchedBy": [
-            "description",
-            "alias"
-          ]
         }
       ],
       "needed": [
@@ -1936,14 +1843,14 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.9038,
+      "ms": 1.2246,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 22,
-        "candidates": 5
+        "candidates": 2
       }
     },
     {
@@ -2010,7 +1917,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.8527,
+      "ms": 1.1121,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -2093,7 +2000,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 1.2571,
+      "ms": 0.7241,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -2158,7 +2065,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.6606,
+      "ms": 0.741,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -2242,7 +2149,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.6906,
+      "ms": 0.7791,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -2299,7 +2206,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.6265,
+      "ms": 0.8142,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -2333,7 +2240,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.5178,
+      "ms": 0.4938,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -2390,7 +2297,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.6094,
+      "ms": 1.0297,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -2439,7 +2346,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.5326,
+      "ms": 0.4817,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -2519,7 +2426,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.7273,
+      "ms": 1.0709,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -2584,7 +2491,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.6586,
+      "ms": 0.8401,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -2633,7 +2540,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.5865,
+      "ms": 0.5507,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -2703,7 +2610,7 @@
       ],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.6249,
+      "ms": 0.5379,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -2771,7 +2678,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 1.0517,
+      "ms": 0.8184,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -2839,7 +2746,7 @@
       ],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.6378,
+      "ms": 0.738,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -2916,7 +2823,7 @@
       ],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.6603,
+      "ms": 1.0346,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -2973,7 +2880,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.5681,
+      "ms": 0.6765,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -3032,7 +2939,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.6809,
+      "ms": 0.7258,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -3103,7 +3010,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.5684,
+      "ms": 0.5029,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -3157,7 +3064,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.5908,
+      "ms": 0.6715,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -3218,7 +3125,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.5938,
+      "ms": 0.7383,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -3302,7 +3209,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.8983,
+      "ms": 0.9983,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -3351,7 +3258,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.5629,
+      "ms": 0.5407,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -3400,7 +3307,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.6259,
+      "ms": 0.9498,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -3490,7 +3397,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.6766,
+      "ms": 0.6221,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -3524,7 +3431,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 1.1004,
+      "ms": 0.6067,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -3570,7 +3477,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.6743,
+      "ms": 0.7115,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -3604,7 +3511,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.5689,
+      "ms": 0.5394,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -3622,52 +3529,24 @@
       "note": "精确错误码：摘要里没有这个码",
       "hits": [
         {
+          "file": "reference_lumen-shortcuts.md",
+          "lines": null,
+          "score": 0.2353,
+          "matchedBy": [
+            "description",
+            "alias",
+            "filename"
+          ]
+        },
+        {
           "file": "project_orchard-noise-log.md",
           "lines": [
             25,
             29
           ],
-          "score": 16.2995,
+          "score": 15.8877,
           "matchedBy": [
-            "alias",
-            "filename",
             "body"
-          ]
-        },
-        {
-          "file": "project_orchard-cache.md",
-          "lines": null,
-          "score": 0.4118,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "project_orchard-ci.md",
-          "lines": null,
-          "score": 0.4118,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "project_orchard-timeout.md",
-          "lines": null,
-          "score": 0.4118,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "reference_orchard-flags.md",
-          "lines": null,
-          "score": 0.4118,
-          "matchedBy": [
-            "alias",
-            "filename"
           ]
         }
       ],
@@ -3678,7 +3557,7 @@
             29,
             29
           ],
-          "rank": 1,
+          "rank": 2,
           "found": true,
           "lines": [
             25,
@@ -3691,14 +3570,14 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.8347,
+      "ms": 0.8839,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 11,
-        "candidates": 10
+        "candidates": 2
       }
     },
     {
@@ -3714,46 +3593,9 @@
             29,
             31
           ],
-          "score": 15.3819,
+          "score": 15.2319,
           "matchedBy": [
-            "alias",
             "body"
-          ]
-        },
-        {
-          "file": "project_ember-nightpass.md",
-          "lines": null,
-          "score": 0.15,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "reference_sourdough-starter.md",
-          "lines": null,
-          "score": 0.15,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "reference_stargazing-nights.md",
-          "lines": null,
-          "score": 0.15,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "user_preferences-writing.md",
-          "lines": null,
-          "score": 0.15,
-          "matchedBy": [
-            "alias",
-            "filename"
           ]
         }
       ],
@@ -3774,20 +3616,17 @@
           "overlapOk": false
         }
       ],
-      "blacklistHit": [
-        "reference_sourdough-starter.md",
-        "reference_stargazing-nights.md"
-      ],
+      "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.8411,
+      "ms": 0.8142,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 6,
-        "candidates": 10
+        "candidates": 1
       }
     },
     {
@@ -3803,47 +3642,9 @@
             24,
             29
           ],
-          "score": 26.9264,
+          "score": 26.8738,
           "matchedBy": [
-            "alias",
-            "filename",
             "body"
-          ]
-        },
-        {
-          "file": "reference_lumen-theme-tokens.md",
-          "lines": null,
-          "score": 0.1053,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "feedback_credential-habit.md",
-          "lines": null,
-          "score": 0.0526,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "project_ember-chunking.md",
-          "lines": null,
-          "score": 0.0526,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "project_ember-nightpass.md",
-          "lines": null,
-          "score": 0.0526,
-          "matchedBy": [
-            "alias",
-            "filename"
           ]
         }
       ],
@@ -3867,14 +3668,14 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.9534,
+      "ms": 1.0065,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 13,
-        "candidates": 10
+        "candidates": 1
       }
     },
     {
@@ -3914,24 +3715,6 @@
             "alias",
             "filename"
           ]
-        },
-        {
-          "file": "reference_sourdough-starter.md",
-          "lines": null,
-          "score": 0.1875,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "project_harbor-noise-notes.md",
-          "lines": null,
-          "score": 0.125,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
         }
       ],
       "needed": [
@@ -3951,19 +3734,17 @@
           "overlapOk": false
         }
       ],
-      "blacklistHit": [
-        "reference_sourdough-starter.md"
-      ],
+      "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.8486,
+      "ms": 1.0947,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 24,
-        "candidates": 10
+        "candidates": 3
       }
     },
     {
@@ -4018,7 +3799,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.5716,
+      "ms": 1.0896,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -4050,38 +3831,11 @@
           ]
         },
         {
-          "file": "reference_harbor-metrics.md",
-          "lines": null,
-          "score": 0.2222,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "reference_sagemem-frontmatter.md",
-          "lines": null,
-          "score": 0.2222,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "user_preferences-writing.md",
-          "lines": null,
-          "score": 0.1667,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "feedback_review-checklist.md",
+          "file": "reference_lumen-shortcuts.md",
           "lines": null,
           "score": 0.1111,
           "matchedBy": [
-            "alias",
+            "description",
             "filename"
           ]
         }
@@ -4106,59 +3860,23 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.8264,
+      "ms": 0.8531,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 12,
-        "candidates": 10
+        "candidates": 2
       }
     },
     {
       "id": "d07",
       "query": "tenant_id 为什么不能换成文档 id",
       "scope": "all",
-      "verdict": "MISS",
+      "verdict": "ALL",
       "note": "精确标识符",
       "hits": [
-        {
-          "file": "project_tide-window.md",
-          "lines": null,
-          "score": 0.2353,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "feedback_credential-habit.md",
-          "lines": null,
-          "score": 0.1765,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "project_lantern-release.md",
-          "lines": null,
-          "score": 0.1765,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "reference_sagemem-frontmatter.md",
-          "lines": null,
-          "score": 0.1765,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
         {
           "file": "project_harbor-backpressure.md",
           "lines": null,
@@ -4166,6 +3884,17 @@
           "matchedBy": [
             "description",
             "alias"
+          ]
+        },
+        {
+          "file": "project_quarry-shard-split.md",
+          "lines": [
+            19,
+            22
+          ],
+          "score": 17.4088,
+          "matchedBy": [
+            "body"
           ]
         }
       ],
@@ -4176,9 +3905,12 @@
             13,
             13
           ],
-          "rank": 0,
-          "found": false,
-          "lines": null,
+          "rank": 2,
+          "found": true,
+          "lines": [
+            19,
+            22
+          ],
           "spanOk": false,
           "overlapOk": false
         }
@@ -4186,66 +3918,32 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 1.3387,
+      "ms": 0.9172,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 23,
-        "candidates": 11
+        "candidates": 2
       }
     },
     {
       "id": "d08",
       "query": "queue_depth 指的是什么",
       "scope": "all",
-      "verdict": "MISS",
+      "verdict": "ALL",
       "note": "精确标识符",
       "hits": [
         {
-          "file": "feedback_credential-habit.md",
-          "lines": null,
-          "score": 0.1538,
+          "file": "reference_harbor-metrics.md",
+          "lines": [
+            11,
+            19
+          ],
+          "score": 13.6308,
           "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "project_harbor-noise-notes.md",
-          "lines": null,
-          "score": 0.1538,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "project_quarry-noise-index.md",
-          "lines": null,
-          "score": 0.1538,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "project_tide-scheduler.md",
-          "lines": null,
-          "score": 0.1538,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "project_quarry-migration.md",
-          "lines": null,
-          "score": 0.0769,
-          "matchedBy": [
-            "alias",
-            "filename"
+            "body"
           ]
         }
       ],
@@ -4256,24 +3954,27 @@
             13,
             13
           ],
-          "rank": 0,
-          "found": false,
-          "lines": null,
-          "spanOk": false,
-          "overlapOk": false
+          "rank": 1,
+          "found": true,
+          "lines": [
+            11,
+            19
+          ],
+          "spanOk": true,
+          "overlapOk": true
         }
       ],
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.8108,
+      "ms": 0.718,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 20,
-        "candidates": 11
+        "candidates": 1
       }
     },
     {
@@ -4325,12 +4026,12 @@
           ]
         },
         {
-          "file": "project_orchard-cache.md",
+          "file": "reference_sagemem-frontmatter.md",
           "lines": null,
-          "score": 0.1875,
+          "score": 0.125,
           "matchedBy": [
-            "alias",
-            "filename"
+            "description",
+            "alias"
           ]
         }
       ],
@@ -4354,14 +4055,14 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.8744,
+      "ms": 0.9037,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 20,
-        "candidates": 10
+        "candidates": 6
       }
     },
     {
@@ -4372,24 +4073,6 @@
       "note": "精确键位（tokenize 会切成 ctrl/alt/t）",
       "hits": [
         {
-          "file": "project_lantern-release.md",
-          "lines": null,
-          "score": 0.1667,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "feedback_credential-habit.md",
-          "lines": null,
-          "score": 0.0833,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
           "file": "reference_lumen-shortcuts.md",
           "lines": [
             11,
@@ -4398,22 +4081,6 @@
           "score": 20.9224,
           "matchedBy": [
             "body"
-          ]
-        },
-        {
-          "file": "project_tide-failures.md",
-          "lines": null,
-          "score": 0.1667,
-          "matchedBy": [
-            "filename"
-          ]
-        },
-        {
-          "file": "project_tide-scheduler.md",
-          "lines": null,
-          "score": 0.1667,
-          "matchedBy": [
-            "filename"
           ]
         }
       ],
@@ -4424,7 +4091,7 @@
             13,
             13
           ],
-          "rank": 3,
+          "rank": 1,
           "found": true,
           "lines": [
             11,
@@ -4437,14 +4104,14 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.7866,
+      "ms": 0.7381,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 13,
-        "candidates": 11
+        "candidates": 1
       }
     },
     {
@@ -4454,24 +4121,6 @@
       "verdict": "ALL",
       "note": "精确变量名",
       "hits": [
-        {
-          "file": "project_ember-chunking.md",
-          "lines": null,
-          "score": 0.0833,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "project_ember-nightpass.md",
-          "lines": null,
-          "score": 0.0833,
-          "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
         {
           "file": "reference_lumen-theme-tokens.md",
           "lines": [
@@ -4499,7 +4148,7 @@
             13,
             13
           ],
-          "rank": 3,
+          "rank": 1,
           "found": true,
           "lines": [
             11,
@@ -4512,14 +4161,14 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.6769,
+      "ms": 0.791,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 19,
-        "candidates": 4
+        "candidates": 2
       }
     },
     {
@@ -4529,19 +4178,6 @@
       "verdict": "ALL",
       "note": "精确字段名",
       "hits": [
-        {
-          "file": "reference_sagemem-frontmatter.md",
-          "lines": [
-            19,
-            20
-          ],
-          "score": 29.1814,
-          "matchedBy": [
-            "alias",
-            "filename",
-            "body"
-          ]
-        },
         {
           "file": "reference_lumen-theme-tokens.md",
           "lines": null,
@@ -4553,30 +4189,25 @@
           ]
         },
         {
-          "file": "project_harbor-noise-notes.md",
-          "lines": null,
-          "score": 0.1176,
+          "file": "reference_sagemem-frontmatter.md",
+          "lines": [
+            19,
+            20
+          ],
+          "score": 29.0049,
           "matchedBy": [
-            "alias",
-            "filename"
+            "body"
           ]
         },
         {
-          "file": "project_lumen-noise-dump.md",
-          "lines": null,
-          "score": 0.1176,
+          "file": "reference_orchard-flags.md",
+          "lines": [
+            21,
+            25
+          ],
+          "score": 10.4517,
           "matchedBy": [
-            "alias",
-            "filename"
-          ]
-        },
-        {
-          "file": "reference_harbor-metrics.md",
-          "lines": null,
-          "score": 0.1176,
-          "matchedBy": [
-            "alias",
-            "filename"
+            "body"
           ]
         }
       ],
@@ -4587,7 +4218,7 @@
             17,
             17
           ],
-          "rank": 1,
+          "rank": 2,
           "found": true,
           "lines": [
             19,
@@ -4600,14 +4231,14 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.9048,
+      "ms": 1.0944,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 1,
-        "candidates": 11
+        "candidates": 3
       }
     },
     {
@@ -4668,7 +4299,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.8166,
+      "ms": 0.8629,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -4753,7 +4384,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.771,
+      "ms": 0.8995,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -4812,7 +4443,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.6292,
+      "ms": 0.7783,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -4897,7 +4528,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 1.0885,
+      "ms": 1.046,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -4918,7 +4549,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.5428,
+      "ms": 0.4826,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -4939,7 +4570,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.2463,
+      "ms": 0.2356,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -4960,7 +4591,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.4506,
+      "ms": 0.442,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -4981,7 +4612,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.4648,
+      "ms": 0.7622,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -5002,7 +4633,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.4406,
+      "ms": 0.4834,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -5023,7 +4654,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.1766,
+      "ms": 0.1645,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -5044,7 +4675,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.5038,
+      "ms": 0.486,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -5077,7 +4708,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.515,
+      "ms": 0.6967,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -5098,7 +4729,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.5647,
+      "ms": 0.509,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -5119,7 +4750,7 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.5691,
+      "ms": 0.4693,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -5136,19 +4767,6 @@
       "verdict": "HIT",
       "note": "预算不足：needed 5 条与 limit 5 打平，用 --limit 3 必然出现缺口",
       "hits": [
-        {
-          "file": "project_ember-nightpass.md",
-          "lines": [
-            11,
-            14
-          ],
-          "score": 12.2035,
-          "matchedBy": [
-            "description",
-            "alias",
-            "body"
-          ]
-        },
         {
           "file": "project_tide-window.md",
           "lines": null,
@@ -5168,21 +4786,14 @@
           ]
         },
         {
-          "file": "project_ember-chunking.md",
-          "lines": null,
-          "score": 0.1,
+          "file": "project_ember-nightpass.md",
+          "lines": [
+            11,
+            14
+          ],
+          "score": 12.1035,
           "matchedBy": [
-            "description",
-            "alias"
-          ]
-        },
-        {
-          "file": "project_harbor-backpressure.md",
-          "lines": null,
-          "score": 0.1,
-          "matchedBy": [
-            "description",
-            "alias"
+            "body"
           ]
         }
       ],
@@ -5208,7 +4819,7 @@
         {
           "file": "project_orchard-cache.md",
           "span": null,
-          "rank": 3,
+          "rank": 2,
           "found": true,
           "lines": null,
           "spanOk": false,
@@ -5236,14 +4847,14 @@
       "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.7677,
+      "ms": 0.7604,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 32,
-        "candidates": 10
+        "candidates": 3
       }
     },
     {
@@ -5281,21 +4892,14 @@
           ]
         },
         {
-          "file": "reference_birdwatching-log.md",
-          "lines": null,
-          "score": 0.1667,
+          "file": "project_ember-nightpass.md",
+          "lines": [
+            11,
+            14
+          ],
+          "score": 9.0554,
           "matchedBy": [
-            "description",
-            "alias"
-          ]
-        },
-        {
-          "file": "reference_stargazing-nights.md",
-          "lines": null,
-          "score": 0.1667,
-          "matchedBy": [
-            "description",
-            "alias"
+            "body"
           ]
         }
       ],
@@ -5328,20 +4932,17 @@
           "overlapOk": false
         }
       ],
-      "blacklistHit": [
-        "reference_birdwatching-log.md",
-        "reference_stargazing-nights.md"
-      ],
+      "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.6741,
+      "ms": 0.8126,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 24,
-        "candidates": 10
+        "candidates": 4
       }
     },
     {
@@ -5388,12 +4989,14 @@
           ]
         },
         {
-          "file": "reference_birdwatching-log.md",
-          "lines": null,
-          "score": 0.1111,
+          "file": "project_ember-nightpass.md",
+          "lines": [
+            11,
+            14
+          ],
+          "score": 9.0332,
           "matchedBy": [
-            "description",
-            "alias"
+            "body"
           ]
         }
       ],
@@ -5435,19 +5038,17 @@
           "overlapOk": false
         }
       ],
-      "blacklistHit": [
-        "reference_birdwatching-log.md"
-      ],
+      "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.7452,
+      "ms": 0.8094,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 35,
-        "candidates": 11
+        "candidates": 6
       }
     },
     {
@@ -5476,15 +5077,6 @@
           ]
         },
         {
-          "file": "reference_birdwatching-log.md",
-          "lines": null,
-          "score": 0.1667,
-          "matchedBy": [
-            "description",
-            "alias"
-          ]
-        },
-        {
           "file": "reference_lumen-shortcuts.md",
           "lines": null,
           "score": 0.1667,
@@ -5494,12 +5086,22 @@
           ]
         },
         {
-          "file": "reference_stargazing-nights.md",
-          "lines": null,
-          "score": 0.1667,
+          "file": "project_ember-nightpass.md",
+          "lines": [
+            11,
+            14
+          ],
+          "score": 9.0554,
           "matchedBy": [
-            "description",
-            "alias"
+            "body"
+          ]
+        },
+        {
+          "file": "project_tide-window.md",
+          "lines": null,
+          "score": 0.3333,
+          "matchedBy": [
+            "description"
           ]
         }
       ],
@@ -5516,7 +5118,7 @@
         {
           "file": "reference_lumen-shortcuts.md",
           "span": null,
-          "rank": 4,
+          "rank": 3,
           "found": true,
           "lines": null,
           "spanOk": false,
@@ -5541,20 +5143,17 @@
           "overlapOk": false
         }
       ],
-      "blacklistHit": [
-        "reference_birdwatching-log.md",
-        "reference_stargazing-nights.md"
-      ],
+      "blacklistHit": [],
       "whitelistHit": [],
       "dupExtra": 0,
-      "ms": 0.7838,
+      "ms": 0.7442,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 29,
-        "candidates": 11
+        "candidates": 6
       }
     },
     {
@@ -5634,7 +5233,7 @@
         "reference_birdwatching-log.md"
       ],
       "dupExtra": 0,
-      "ms": 1.0646,
+      "ms": 1.1885,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -5678,19 +5277,6 @@
           ]
         },
         {
-          "file": "reference_orchard-flags.md",
-          "lines": [
-            21,
-            25
-          ],
-          "score": 13.7304,
-          "matchedBy": [
-            "description",
-            "alias",
-            "body"
-          ]
-        },
-        {
           "file": "project_orchard-noise-log.md",
           "lines": null,
           "score": 0.2727,
@@ -5700,12 +5286,22 @@
           ]
         },
         {
-          "file": "project_orchard-ci.md",
+          "file": "reference_orchard-flags.md",
+          "lines": [
+            21,
+            25
+          ],
+          "score": 13.6395,
+          "matchedBy": [
+            "body"
+          ]
+        },
+        {
+          "file": "reference_lumen-shortcuts.md",
           "lines": null,
           "score": 0.0909,
           "matchedBy": [
-            "description",
-            "alias"
+            "description"
           ]
         }
       ],
@@ -5728,18 +5324,19 @@
       ],
       "blacklistHit": [],
       "whitelistHit": [
+        "project_orchard-noise-log.md",
         "reference_orchard-flags.md",
-        "project_orchard-noise-log.md"
+        "reference_lumen-shortcuts.md"
       ],
       "dupExtra": 0,
-      "ms": 0.749,
+      "ms": 0.8433,
       "coverage": {
         "searched": 30,
         "skipped": 0,
         "complete": true,
         "chunks": 104,
         "filteredBelowFloor": 23,
-        "candidates": 6
+        "candidates": 5
       }
     },
     {
@@ -5821,7 +5418,7 @@
         "reference_harbor-metrics.md"
       ],
       "dupExtra": 0,
-      "ms": 0.6865,
+      "ms": 0.866,
       "coverage": {
         "searched": 30,
         "skipped": 0,
@@ -5905,7 +5502,7 @@
         "project_lumen-noise-dump.md"
       ],
       "dupExtra": 0,
-      "ms": 0.7066,
+      "ms": 0.8167,
       "coverage": {
         "searched": 30,
         "skipped": 0,

@@ -200,6 +200,38 @@ group('6. 异常一律退化成「不管」')
   ok(got === undefined, 'target 是 undefined 也不抛', String(got))
 }
 
+// ═══ 7. 注册方式守卫（源代码级） ═══
+group('7. 注册方式：不许挪进 ctx.inject（注册窗口）')
+{
+  // 这一组补的是**真实宿主才暴露的那类失败**：`fs/write-intent` 有注册窗口，
+  // 窗口在 fs 服务就绪之前就关了。按本仓库自己的 D5 规范（可选服务用 ctx.inject 挂子 fiber）
+  // 去「顺手规范化」这段注册，写门会**静默失效** —— 编译过、上面的 DOM 断言全绿、
+  // 事件永远不来。套件里那几条行为断言**结构上抓不到**这种改动，只能看源码。
+  //
+  // 依据：docs/host-facts.md 3.3 节的七组对照（不 inject 收到 1 次；顶层 inject / 子 fiber / 晚挂都是 0 次）。
+  const { readFileSync } = await import('node:fs')
+  const src = readFileSync(new URL('../lib/index.js', import.meta.url), 'utf8')
+  // ⚠️ 判「有没有做某件坏事」必须**先剥掉注释**：那段警示注释里正写着
+  // `ctx.inject(['fs'], …)` 这个反例，不剥就会把自己的警告当成违规（初版就这么红的）。
+  // 剥法很朴素（`//` 到行尾、`/* */` 成对），可能误伤字符串里的 `//`；
+  // 但这里只用于「不存在」判断，误伤的后果是**漏报**不是误报 —— 方向是安全的。
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+
+  ok(/ctx\.on\('fs\/write-intent'/.test(code), '直接在 apply 里注册 fs/write-intent')
+  ok(/ctx\.on\('fs\/edit-intent'/.test(code), '直接在 apply 里注册 fs/edit-intent')
+  ok(!/ctx\.inject\(\s*\[\s*'fs'/.test(code),
+    '**没有**把写门挪进 ctx.inject([\'fs\']) —— 那会让它静默失效（七组对照）')
+  ok(!/inject\s*=\s*\[[^\]]*'fs'/.test(code),
+    '**没有**给插件加含 fs 的静态 inject（同样是注册窗口问题）')
+  ok(/ctx\.get\('fs'\)/.test(code), '服务在**处理器内部**用 ctx.get 取（所以不需要 inject）')
+  ok(/注册窗口/.test(src),
+    '代码旁留着「注册窗口」的警示 —— 删了它，下一个人就会顺手把这段改规范')
+  // 反向对照：判据本身要能认出「被挪进 inject」的写法，否则上面那两条可能是空转
+  const movedSrc = src.replace("ctx.on('fs/write-intent'", "ctx.inject(['fs'], () => { ctx.on('fs/write-intent'")
+  ok(/ctx\.inject\(\s*\[\s*'fs'/.test(movedSrc),
+    '【反向对照】把注册挪进 inject 之后，判据确实会命中')
+}
+
 rmSync(sandbox, { recursive: true, force: true })
 console.log('')
 console.log(`结果：${pass} passed, ${fail} failed`)
