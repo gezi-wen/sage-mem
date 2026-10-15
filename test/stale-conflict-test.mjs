@@ -12,6 +12,8 @@
  * 用法: node stale-conflict-test.mjs
  */
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { readFile, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -103,6 +105,8 @@ async function attempt(mode, opts = {}) {
   const ctx = makeCtx(mode, opts)
   const runner = createToolRunner({ memoryDir: memDir, sessionsRoot: '', apply: true, withSessions: false, ctx })
   try {
+    // `readFirst`：先真的读一次，让「读时版本」被记下来 —— 这才是守卫该有的来源（R01）。
+    if (opts.readFirst) await runner.run('read_memory', { file: 'project_alpha.md' })
     return { result: await runner.run('write_memory', { file: 'project_alpha.md', content: body, reason: '合并重复段落' }), threw: null, seen: ctx.seen }
   } catch (err) {
     return { result: null, threw: err, seen: ctx.seen }
@@ -113,7 +117,7 @@ async function attempt(mode, opts = {}) {
 group('1. FS_STALE_VERSION → 一条待判定的冲突记录')
 {
   const before = readConflicts().length
-  const { result, threw } = await attempt('stale')
+  const { result, threw } = await attempt('stale', { readFirst: true })
   const after = readConflicts()
 
   // 写失败必须**看得见**：要么抛出，要么回一句带错误的结果 —— 不能是「已写入」
@@ -137,7 +141,7 @@ group('1. FS_STALE_VERSION → 一条待判定的冲突记录')
 group('2. 非版本过期的失败不落冲突')
 {
   const before = readConflicts().length
-  const { result, threw } = await attempt('boom')
+  const { result, threw } = await attempt('boom', { readFirst: true })
   // 工具运行器会把异常转成给模型看的错误字符串（这是对的：模型要看到原因，不是整轮崩掉），
   // 所以判「浮出来了」而不是判「抛出来了」。
   const surfaced = !!threw || (typeof result === 'string' && !result.startsWith('已写入'))
@@ -149,7 +153,7 @@ group('2. 非版本过期的失败不落冲突')
 group('3. 成功路径不产生副作用')
 {
   const before = readConflicts().length
-  const { result, threw } = await attempt('ok')
+  const { result, threw } = await attempt('ok', { readFirst: true })
   ok(!threw && typeof result === 'string' && result.startsWith('已写入'), '走宿主写入成功', JSON.stringify(result))
   ok(readConflicts().length === before, '成功时不落冲突记录')
 }
@@ -171,20 +175,110 @@ group('5. 写入时必须自己带上版本守卫')
   // 所以那条路**完全不设防**，冲突记录在生产里根本不可达。
   // 更糟的是当时的假 writeText 无条件抛错，**没验证 expected 传没传**，套件全绿却漏掉了它。
   // 现在假 fs 记录 `expected`，这组断言钉死它。
-  const { seen } = await attempt('ok')
-  ok(seen.statCalls === 1, '写入前 stat 一次（守卫要靠它算）', String(seen.statCalls))
-  ok(seen.expected && seen.expected.kind === 'replaceIfVersion' && seen.expected.version === 'fsv:current',
-    '文件存在 → 传 replaceIfVersion + 当前版本（不是无守卫写入）', JSON.stringify(seen.expected))
+  // ⚠️ 这一组是**替换**掉旧的「文件存在 → 传当前版本」断言 —— 旧断言编码的正是复审者 R01
+  // 指出的缺陷（拿写时的版本当守卫）。现在契约是「没读过就不许覆盖」。
+  const { result, seen } = await attempt('ok')
+  ok(seen.expected === 'NOT_CALLED', '**没有**发起写入（没读过就不盲写）', JSON.stringify(seen.expected))
+  ok(typeof result === 'string' && !result.startsWith('已写入'), '如实拒绝，不谎报成功', String(result).slice(0, 70))
 }
 {
   const { seen } = await attempt('ok', { fileAbsent: true })
   ok(seen.expected && seen.expected.kind === 'createIfAbsent',
-    '文件不存在 → 传 createIfAbsent', JSON.stringify(seen.expected))
+    '文件不存在 → createIfAbsent（新建不受影响）', JSON.stringify(seen.expected))
 }
 {
-  // 探不到版本 → **不猜**：不传守卫（宿主按默认语义走），尤其不许退化成 createIfAbsent
+  // stat 抛错 = **不知道盘上是什么**。不知道就不写，而不是「不传守卫让宿主随便写」。
   const { seen } = await attempt('ok', { statThrows: true })
-  ok(seen.expected === undefined, 'stat 抛错 → 不传守卫（拿不准就不碰，不退化）', JSON.stringify(seen.expected))
+  ok(seen.expected === 'NOT_CALLED', 'stat 抛错 → 不写（拿不准就不碰）', JSON.stringify(seen.expected))
+}
+
+// ═══ 6. 读时版本绑定（外部复审 R01，P1 数据丢失） ═══
+group('6. 守卫必须是「读到内容那一刻」的版本，不是「现在」的版本')
+{
+  // 复审者的反例：读 A → 人工改成 B → 自动整理基于 A 生成 C → 写时 stat 拿到 B 的版本
+  // → 守卫通过 → **B 被覆盖**。危险窗口是 `读 → 生成 → 写`，不是 `stat → writeText`。
+  // 下面这个假宿主**真的按内容哈希比较 CAS**，不是一个无条件成功或无条件报错的桩。
+  const hash = (s) => createHash('sha256').update(s, 'utf8').digest('hex')
+  // ⚠️ 契约里 stat / readText 收的是 **FsTarget 对象**（不是路径字符串）。这里统一解一层，
+  // 免得类型不匹配抛出来的错被误当成「守卫生效」——初版就这么假通过过一次。
+  const pathOf = (p) => (p && typeof p === 'object' ? p.displayPath : p)
+  function liveHost(state) {
+    return {
+      resolve: async (p) => ({ targetKey: 'k:' + p, displayPath: p }),
+      stat: async (p) => {
+        const s = await readFile(pathOf(p), 'utf8').catch(() => null)
+        return s === null ? undefined : { version: hash(s), type: 'file' }
+      },
+      readText: (p) => readFile(pathOf(p), 'utf8'),
+      writeText: async (p, content, expected) => {
+        const file = pathOf(p)
+        const old = await readFile(file, 'utf8').catch(() => null)
+        state.seen.push(expected)
+        if (expected?.kind === 'replaceIfVersion' && expected.version !== hash(old ?? '')) {
+          const e = new Error('file changed since it was read')
+          e.code = 'FS_STALE_VERSION'
+          throw e
+        }
+        if (expected?.kind === 'createIfAbsent' && old !== null) {
+          const e = new Error('already exists')
+          e.code = 'FS_EXISTS'
+          throw e
+        }
+        await writeFile(file, content, 'utf8')
+        return { operation: old === null ? 'create' : 'update', version: hash(content), before: old, after: content }
+      },
+    }
+  }
+  const liveCtx = (state) => ({ get: (n) => (n === 'fs' ? liveHost(state) : undefined), logger: { warn: () => {} } })
+  const runnerWith = (state) => createToolRunner({ memoryDir: memDir, sessionsRoot: '', apply: true, withSessions: false, ctx: liveCtx(state) })
+
+  // ① 读过之后别人改了 → 必须拒绝，人工内容保住
+  {
+    rmSync(CONFLICTS_DIR, { recursive: true, force: true })
+    seed()
+    const state = { seen: [] }
+    const runner = runnerWith(state)
+    const read = await runner.run('read_memory', { file: 'project_alpha.md' })
+    ok(typeof read === 'string' && read.includes('盘上这一版'), '先真的读到了 A 版', String(read).slice(0, 40))
+    writeFileSync(MEM, '---\nname: project_alpha\ntype: project\n---\n\n人工新增的重要内容\n', 'utf8')
+    const res = await runner.run('write_memory', { file: 'project_alpha.md', content: body, reason: '基于读到的那版改写' })
+    const onDisk = readFileSync(MEM, 'utf8')
+    ok(onDisk.includes('人工新增的重要内容'), '**人工新增的内容没有被覆盖**（这是 R01 的要害）', onDisk.slice(-30))
+    ok(typeof res === 'string' && !res.startsWith('已写入'), '写入被拒绝而不是谎报成功', String(res).slice(0, 60))
+    ok(state.seen[0]?.kind === 'replaceIfVersion', '传出去的是 replaceIfVersion 守卫', JSON.stringify(state.seen[0]?.kind))
+    const conflicts = readConflicts()
+    ok(conflicts.some((c) => c.kind === 'stale_version' && c.status === 'open'),
+      '落成了一条待人工处理的冲突记录', JSON.stringify(conflicts.map((c) => c.kind)))
+  }
+
+  // ② 没读过的既有文件 → 不许盲写（以前会拿当前版本当守卫，等于替调用方担保）
+  {
+    rmSync(CONFLICTS_DIR, { recursive: true, force: true })
+    seed()
+    const state = { seen: [] }
+    const res = await runnerWith(state).run('write_memory', { file: 'project_alpha.md', content: body, reason: '没读就改' })
+    ok(!readFileSync(MEM, 'utf8').includes('自动做梦想写的新内容'), '没读过就不许覆盖（内容没变）')
+    ok(typeof res === 'string' && !res.startsWith('已写入'), '如实拒绝', String(res).slice(0, 70))
+    ok(readConflicts().length >= 1, '这次拒绝也留了一条记录（人能看到它想写什么）')
+  }
+
+  // ③ 反向对照：读过且没人改 → 正常更新必须成功（别把门做成永远关着）
+  {
+    const state = { seen: [] }
+    const runner = runnerWith(state)
+    await runner.run('read_memory', { file: 'project_alpha.md' })
+    const res = await runner.run('write_memory', { file: 'project_alpha.md', content: body, reason: '正常更新' })
+    ok(typeof res === 'string' && res.startsWith('已写入'), '读过且版本没变 → 正常写入成功', String(res).slice(0, 50))
+    ok(readFileSync(MEM, 'utf8').includes('自动做梦想写的新内容'), '内容真的落盘了')
+  }
+
+  // ④ 反向对照：新建（文件本来不存在）必须成功
+  {
+    const state = { seen: [] }
+    const res = await runnerWith(state).run('write_memory', { file: 'brand_new.md', content: body, reason: '新建' })
+    ok(typeof res === 'string' && res.startsWith('已写入'), '新建不受影响', String(res).slice(0, 50))
+    ok(state.seen[0]?.kind === 'createIfAbsent', '新建走 createIfAbsent', JSON.stringify(state.seen[0]?.kind))
+  }
 }
 
 rmSync(sandbox, { recursive: true, force: true })
