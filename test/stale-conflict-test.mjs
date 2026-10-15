@@ -57,20 +57,27 @@ const seed = () => {
  *   'ok'    → 正常返回 FsWriteOutcome
  * 没有 `get`（`fs: null`）时走回落路径。
  */
-function makeCtx(mode) {
+function makeCtx(mode, opts = {}) {
+  const seen = { expected: 'NOT_CALLED', statCalls: 0 }
   const ctx = {
     logger: { warn: () => {}, error: () => {}, info: () => {}, debug: () => {} },
     effect: () => {},
     on: () => {},
+    seen,
   }
   if (mode === null) return ctx
   ctx.get = (name) => {
     if (name !== 'fs') return undefined
     return {
       resolve: async (p) => ({ targetKey: 'k:' + p, displayPath: p }),
-      stat: async () => ({ version: 'fsv:current', type: 'file' }),
+      stat: async () => {
+        seen.statCalls++
+        if (opts.statThrows) throw new Error('stat 炸了')
+        return opts.fileAbsent ? undefined : { version: 'fsv:current', type: 'file' }
+      },
       readText: async () => '盘上这一版\n',
-      writeText: async () => {
+      writeText: async (_t, _c, expected) => {
+        seen.expected = expected === undefined ? undefined : expected
         if (mode === 'stale') {
           const e = new Error('file changed since it was read')
           e.code = 'FS_STALE_VERSION'
@@ -90,14 +97,15 @@ function makeCtx(mode) {
 
 const body = '---\nname: project_alpha\ntype: project\n---\n\n自动做梦想写的新内容\n'
 
-/** 跑一次写入；返回 `{result, threw}` —— 两种失败表达都要能观察。 */
-async function attempt(mode) {
+/** 跑一次写入；返回 `{result, threw, seen}` —— 三种观察都要有，缺一种就会漏掉一整类缺陷。 */
+async function attempt(mode, opts = {}) {
   seed()
-  const runner = createToolRunner({ memoryDir: memDir, sessionsRoot: '', apply: true, withSessions: false, ctx: makeCtx(mode) })
+  const ctx = makeCtx(mode, opts)
+  const runner = createToolRunner({ memoryDir: memDir, sessionsRoot: '', apply: true, withSessions: false, ctx })
   try {
-    return { result: await runner.run('write_memory', { file: 'project_alpha.md', content: body, reason: '合并重复段落' }), threw: null }
+    return { result: await runner.run('write_memory', { file: 'project_alpha.md', content: body, reason: '合并重复段落' }), threw: null, seen: ctx.seen }
   } catch (err) {
-    return { result: null, threw: err }
+    return { result: null, threw: err, seen: ctx.seen }
   }
 }
 
@@ -146,14 +154,37 @@ group('3. 成功路径不产生副作用')
   ok(readConflicts().length === before, '成功时不落冲突记录')
 }
 
-// ═══ 4. 没有 fs 服务时走回落，行为与从前一致 ═══
-group('4. 宿主没有 fs → 回落本地原子写（既不落冲突也不报错）')
+// ═══ 4. 没有 fs 服务时走回落，行为与从前一致 ═══group('4. 宿主没有 fs → 回落本地原子写（既不落冲突也不报错）')
 {
   const before = readConflicts().length
   const { result, threw } = await attempt(null)
   ok(!threw && typeof result === 'string' && result.startsWith('已写入'), '回落路径写入成功', JSON.stringify(result))
   ok(readConflicts().length === before, '回落路径不落冲突记录')
   ok(readFileSync(MEM, 'utf8').includes('自动做梦想写的新内容'), '内容真的落盘了')
+}
+
+// ═══ 5. 守卫**真的传出去了**（这一组是补一个真实盲点） ═══
+group('5. 写入时必须自己带上版本守卫')
+{
+  // 为什么单独一组：初版实现调的是 `writeText(target, content)` —— **没传 expected**。
+  // 而 `fs/write-intent` 只为「工具发起」的写入派发，插件自己写时一次都不发，
+  // 所以那条路**完全不设防**，冲突记录在生产里根本不可达。
+  // 更糟的是当时的假 writeText 无条件抛错，**没验证 expected 传没传**，套件全绿却漏掉了它。
+  // 现在假 fs 记录 `expected`，这组断言钉死它。
+  const { seen } = await attempt('ok')
+  ok(seen.statCalls === 1, '写入前 stat 一次（守卫要靠它算）', String(seen.statCalls))
+  ok(seen.expected && seen.expected.kind === 'replaceIfVersion' && seen.expected.version === 'fsv:current',
+    '文件存在 → 传 replaceIfVersion + 当前版本（不是无守卫写入）', JSON.stringify(seen.expected))
+}
+{
+  const { seen } = await attempt('ok', { fileAbsent: true })
+  ok(seen.expected && seen.expected.kind === 'createIfAbsent',
+    '文件不存在 → 传 createIfAbsent', JSON.stringify(seen.expected))
+}
+{
+  // 探不到版本 → **不猜**：不传守卫（宿主按默认语义走），尤其不许退化成 createIfAbsent
+  const { seen } = await attempt('ok', { statThrows: true })
+  ok(seen.expected === undefined, 'stat 抛错 → 不传守卫（拿不准就不碰，不退化）', JSON.stringify(seen.expected))
 }
 
 rmSync(sandbox, { recursive: true, force: true })
