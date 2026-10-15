@@ -79,6 +79,7 @@ ok(JSON.stringify(T.selectBaseline(legacy).map((f) => f.file)) === JSON.stringif
 console.log('== 4. 名额 ==')
 ok(T.limits.MAX_RESULTS === 10, `MAX_RESULTS 默认 10（实际 ${T.limits.MAX_RESULTS}）`)
 ok(T.limits.MAX_BASELINE === 8, `MAX_BASELINE 默认 8（实际 ${T.limits.MAX_BASELINE}）`)
+// 这一组测的是「切到 MAX_RESULTS」，与相关性无关 —— 所以显式关掉证据门槛。
 const many = Array.from({ length: 30 }, (_, i) => ({
   file: `project_n${i}.md`,
   description: '待办事项清单',
@@ -87,7 +88,13 @@ const many = Array.from({ length: 30 }, (_, i) => ({
   baselinePriority: 0,
   content: '',
 }))
-ok(T.selectRelevant('待办', many).length === 10, '命中上限确实是 10 条')
+ok(T.selectRelevant('待办', many, { gate: false }).length === 10, '命中上限确实是 10 条（门槛关掉时）')
+// 门槛开着时，同一批输入**应该被全部拒掉**：30 份摘要里都有「待办」，df = N、IDF 趋近 0，
+// 这个词元在这个语料里没有任何区分度。这不是退化，正是这条门槛要防的东西
+// （真实语料上「今天天气怎么样」曾靠一个「怎么」命中 14 份、一次注入近 30 KB）。
+ok(T.selectRelevant('待办', many).length === 0,
+  '同一个词元在语料里到处都是 → 整批被证据门槛拒掉（没有区分度）',
+  JSON.stringify(T.selectRelevant('待办', many).map((f) => f.file)))
 
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

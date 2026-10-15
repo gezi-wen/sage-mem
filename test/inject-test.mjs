@@ -38,8 +38,11 @@ mkdirSync(memDir, { recursive: true })
 process.env.SAGE_MEM_DIR = memDir
 process.env.SAGE_MEM_STATE_DIR = join(sandbox, '.sage-mem')
 process.env.DSH_HOME = join(sandbox, 'dsh-home')
-// 预算压到下限（envInt 的 min 就是 4096），让「撞顶」在一两条记忆内发生
-process.env.SAGE_MEM_MAX_SESSION_BYTES = '4096'
+// 预算压到很低，让「撞顶」在一两条记忆内发生。
+// ⚠️ 5120 不是随手写的：单会话总预算现在**拆成两本账**（正文池 + 状态卡预留），
+// 预留 = clamp(总预算 × 5%, 1024, 4096)。5120 → 预留 1024 → **正文池正好 4096**，
+// 下面那些「4 KB 只装得下一条 3.6 KB 的记忆」的断言才是它们原本的意思。
+process.env.SAGE_MEM_MAX_SESSION_BYTES = '5120'
 
 const MOD = new URL('../lib/index.js', import.meta.url).href
 const mod = await import(MOD)
@@ -191,8 +194,10 @@ group('3. 注入文本的内容')
     '今天的记忆不标天数（噪声过滤）')
   ok(!!text && !/### nodate-d\.md（保存于/.test(text),
     '无 updated 的按 mtime 算 = 今天，也不标')
-  ok(!!text && /（本次注入 \d+ 条；本会话累计 \d+ KB \/ 上限 4 KB/.test(text),
-    '尾部有状态行，且上限是本次覆写的 4 KB', text && text.slice(-160))
+  // 状态行已被**缺口状态卡**取代（同一位置，不再说两遍）。这一组没有任何缺口
+  // （全注进去了、没有省略），所以卡**不该出现** —— 没有缺口就不要说话。
+  ok(!!text && !/sage-mem：/.test(text),
+    '无缺口时不发状态卡（提示不刷屏）', text && text.slice(-160))
   ok(!!text && countEntries(text) === 4, '四条都注进去了', String(text && countEntries(text)))
 }
 
@@ -207,18 +212,23 @@ group('4. 单会话累计预算')
 
   const first = await step(handler, 's-budget', 'sagebound')
   ok(!!first && countEntries(first) === 1,
-    '预算 4 KB 只装得下一条 3.6 KB 的记忆（其余省略）', String(first && countEntries(first)))
-  ok(!!first && /因预算省略 2 条/.test(first),
-    '状态行说明因预算省略了 2 条')
+    '正文池 4 KB 只装得下一条 3.6 KB 的记忆（其余省略）', String(first && countEntries(first)))
+  ok(!!first && /另有 2 条因预算省略/.test(first),
+    '状态卡说明因预算省略了 2 条', String(first && first.slice(-200)))
   ok(!!first && !/### big-2\.md/.test(first), '被省略的那条确实没进文本')
 
   // 同一问题再来一步：检索签名没变 → 不重复注入，也不补注被省略的
   const again = await step(handler, 's-budget', 'sagebound')
   ok(again === null, '同一问题重复调用不再注入（去重优先于补注）', String(again))
 
-  // 换一个问题（签名变了）但预算已满 → 仍然一条都注不进
+  // 换一个问题（签名变了）但正文池已满 —— **这一条是本次行为变更的核心**：
+  // 旧行为到这里返回 null（一个字都不注、连为什么都没有）；现在会发出**状态卡**，
+  // 说清「有候选、被预算省略了、下一步该干什么」。
   const second = await step(handler, 's-budget', 'sagebound again')
-  ok(second === null, '预算用满后换问题也注不进（账本跨步延续）', String(second))
+  ok(second !== null, '正文池用满后换问题也注不进正文（账本跨步延续）', String(second))
+  ok(!!second && countEntries(second) === 0, '但确实一条正文都没注', String(second && countEntries(second)))
+  ok(!!second && /sage-mem：/.test(second) && /省略/.test(second),
+    '改为发出状态卡：说清缺口与下一步（不再是静默的 null）', String(second && second.slice(-200)))
 }
 
 // ═══ 5. 压缩后账本归零 ═══
@@ -302,14 +312,22 @@ group('7. 预算挡掉全部条目')
   const { handler } = newGateway()
 
   const out = await step(handler, 's-blocked', 'sagebound')
-  ok(out === null, '一条都装不下时，不加 contexts（不塞「预算已满」噪声）', String(out))
+  // 行为变更：旧行为「正文一条都装不下」= 返回 null（连为什么都没有）。
+  // 现在只要正文池之外还有卡池额度，就会发一张卡说清缺口 —— 这正是把 60 KB
+  // 拆成两本账的目的。所以这里断言「没有正文，但有卡」。
+  ok(out !== null && countEntries(out) === 0,
+    '正文一条都装不下时不注正文（但状态卡仍会发）', String(out))
+  ok(!!out && /sage-mem：/.test(out) && /省略/.test(out),
+    '确实发了状态卡说清缺口', String(out && out.slice(-200)))
 
   const gw2 = newGateway()
   const snap = await gw2.handler({ keep: 1 }, {
     agent: { session: { id: 's-blocked2', deriveMessages: () => [{ role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'sagebound' }] }] } },
   }, async () => ({ keep: 1 }))
-  ok(snap.keep === 1 && (snap.contexts ?? []).length === 0,
-    '原 assembly 原样返回（不破坏宿主已组装好的内容）')
+  ok(snap.keep === 1, '宿主原有的字段原样保留（不破坏已组装好的内容）')
+  ok((snap.contexts ?? []).length === 1 && snap.contexts[0].name === 'sage-mem:recall',
+    'contexts 是「原有的 + 新增的一条」而不是整体替换',
+    JSON.stringify(snap.contexts?.map((c) => c?.name)))
 }
 
 // ═══ 8. 默认预算仍是 60 KB（子进程：模块顶层常量一个进程只能有一个值） ═══
@@ -321,7 +339,7 @@ group('8. 默认值与覆写口')
   ].join('\n')], { encoding: 'utf8' })
   const v = Number(String(child.stdout || '').trim())
   ok(v === 60 * 1024, '不设环境变量时默认 60 KB（与 CC 的 MAX_SESSION_BYTES 对齐）', String(child.stdout || child.stderr).slice(0, 200))
-  ok(T.limits.MAX_SESSION_BYTES === 4096, '环境变量覆写口生效（本进程是 4096）')
+  ok(T.limits.MAX_SESSION_BYTES === 5120, '环境变量覆写口生效（本进程是 5120）')
   ok(T.limits.STALE_DAYS === 1, '新鲜度门槛默认 1 天')
   ok(String(T.recallDiscipline).includes('引用纪律'), '__testables 暴露了引用纪律文本')
 }
