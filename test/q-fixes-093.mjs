@@ -84,8 +84,18 @@ console.log('== Q02b：write_memory 必须走原子写（源码结构守卫）==
   const to = src.indexOf("case 'archive_memory'")
   const seg = from >= 0 && to > from ? src.slice(from, to) : ''
   ok(seg.length > 0, '定位到 write_memory 的实现段')
-  ok(/writeFileAtomic\(/.test(seg), 'write_memory 用 writeFileAtomic 落盘')
+  // 0.9.19 起，落盘拆成了 `writeMemoryText`：**优先走宿主的 `fs.writeText`**（它同时吃到写门，
+  // 见 lib/memory/write-gate.js），宿主没有 fs 服务时回落到 `writeFileAtomic`。
+  // 所以这里断言的是**两条路径都必须原子**，而不是「必须出现某个字面调用」——
+  // 只盯字面写法会让一个更好的实现被判红（这次就发生了）。
+  ok(/writeMemoryText\(/.test(seg), 'write_memory 走 writeMemoryText 落盘')
+  const helperFrom = src.indexOf('async function writeMemoryText')
+  const helperSeg = helperFrom >= 0 ? src.slice(helperFrom, helperFrom + 1600) : ''
+  ok(helperSeg.length > 0, '定位到 writeMemoryText 的实现')
+  ok(/writeFileAtomic\(/.test(helperSeg), 'writeMemoryText 的回落分支用 writeFileAtomic（不是裸写）')
+  ok(/fs\.writeText\(/.test(helperSeg), 'writeMemoryText 优先走宿主的原子写')
   ok(!/(^|[^c])\bwriteFile\(/.test(seg), 'write_memory 里没有裸 writeFile 直写（直写会留半截 frontmatter）')
+  ok(!/(^|[^c])\bwriteFile\(/.test(helperSeg), 'writeMemoryText 里也没有裸 writeFile 直写')
 }
 
 // ────────────────────────── Q04 ──────────────────────────

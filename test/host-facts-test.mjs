@@ -308,6 +308,136 @@ group('7. 老宿主下不破坏宿主已组装的内容')
     JSON.stringify(out.contexts?.map((c) => c?.name)))
 }
 
+// ═══ 8. 探针的检查器：拿合成观测打它，证明「它会红」 ═══
+/**
+ * 为什么要在**仓库内**测探针的判定逻辑：探针只在真实宿主里跑，它的绿很容易是
+ * 「计数器根本没接上」造成的假绿（全 0 也能凑出一堆 pass）。这一组用合成观测
+ * 把 `evaluateChecks` 的两面都打一遍 —— 只有它会红，真实宿主里那份绿才算数。
+ */
+group('8. 探针检查器（evaluateChecks）的两面')
+{
+  const PROBE = await import(new URL('../scripts/host-facts-probe.mjs', import.meta.url).href)
+  const statusOf = (checks, id) => checks.find((c) => c.id === id)?.status
+
+  /** 一份「健康」观测：两个工具调用到达、名字交叉验证得上、插件写没发事件。 */
+  const healthy = () => ({
+    subscriptions: { 'fs/write-intent': true, 'fs/edit-intent': true },
+    counts: { 'fs/write-intent': 1 },
+    toolResult: {
+      count: 2,
+      names: ['write', 'read'],
+      firstExecKeys: ['token', 'callId', 'rootCallId', 'name', 'signal', 'agent', 'deferContext', 'concludeTurn', 'arguments'],
+    },
+    crossNames: ['write', 'read'],
+    preExecuteCount: 2,
+    pluginWrite: { status: 'ok', intentsBefore: 0, intentsAfter: 0 },
+  })
+
+  // ── 正面：健康观测必须全绿（检查器太严的话，真数据也会被它判死）──
+  {
+    const checks = PROBE.evaluateChecks(healthy())
+    ok(statusOf(checks, 'tools_result_arrived') === 'pass', '健康观测：到达性 pass')
+    ok(statusOf(checks, 'exec_shape_matches_baseline') === 'pass', '健康观测：exec 键名 pass')
+    ok(statusOf(checks, 'tool_event_chain_consistent') === 'pass', '健康观测：事件链一致 pass')
+    ok(statusOf(checks, 'exec_name_cross_checked') === 'pass', '健康观测：工具名交叉验证 pass')
+    ok(statusOf(checks, 'plugin_write_emits_no_intent') === 'pass', '健康观测：自己写不发写入门 pass')
+    ok(statusOf(checks, 'subscribed:fs/write-intent') === 'pass', '健康观测：写入门订阅 pass')
+    const sum = PROBE.summarizeChecks(checks)
+    ok(sum.fail === 0 && sum.inconclusive === 0 && sum.pass === checks.length,
+      '健康观测不该出现 fail / inconclusive', JSON.stringify(sum))
+  }
+
+  // ── 没触发 ≠ 不成立：全 0 的观测必须是 inconclusive，绝不能是 pass ──
+  {
+    const idle = { subscriptions: { 'fs/write-intent': true, 'fs/edit-intent': true }, counts: { 'fs/write-intent': 0 }, toolResult: { count: 0, names: [], firstExecKeys: [] }, crossNames: [], preExecuteCount: 0, pluginWrite: { status: 'skipped' } }
+    const checks = PROBE.evaluateChecks(idle)
+    for (const id of ['tools_result_arrived', 'exec_shape_matches_baseline', 'tool_event_chain_consistent', 'exec_name_cross_checked', 'plugin_write_emits_no_intent', 'fs_intent_reaches_listener']) {
+      ok(statusOf(checks, id) === 'inconclusive', `本轮没工具调用时「${id}」是 inconclusive（不是 pass）`, statusOf(checks, id))
+    }
+  }
+
+  // ── 写入门到达性：模型写了却没收到 → 必须红（这是写入门成立与否的唯一前提）──
+  {
+    const missed = healthy()
+    missed.counts = { 'fs/write-intent': 0 }        // 工具确实写了（names 里有 write），但事件没到
+    ok(statusOf(PROBE.evaluateChecks(missed), 'fs_intent_reaches_listener') === 'fail',
+      '工具写了而写入门没到 → fail（注册窗口错过了）')
+
+    const noWriteTool = healthy()
+    noWriteTool.counts = { 'fs/write-intent': 0 }
+    noWriteTool.toolResult.names = ['read']
+    ok(statusOf(PROBE.evaluateChecks(noWriteTool), 'fs_intent_reaches_listener') === 'inconclusive',
+      '本轮没有写类工具 → 写入门到达性是 inconclusive（不是 fail）')
+
+    const arrived = healthy()
+    ok(statusOf(PROBE.evaluateChecks(arrived), 'fs_intent_reaches_listener') === 'pass',
+      '写入门事件到了 → pass')
+  }
+
+  // ── 反面一：探针自己坏了，逐条都要红 ──
+  {
+    const missingKey = healthy()
+    missingKey.toolResult.firstExecKeys = ['callId', 'arguments']   // 少了 name / agent
+    ok(statusOf(PROBE.evaluateChecks(missingKey), 'exec_shape_matches_baseline') === 'fail',
+      'exec 少了 name/agent → 签名检查 fail')
+
+    const chainBroken = healthy()
+    chainBroken.preExecuteCount = 0                                 // result 有数、pre-execute 没数
+    ok(statusOf(PROBE.evaluateChecks(chainBroken), 'tool_event_chain_consistent') === 'fail',
+      'tools/result 有数而 pre-execute 没数 → 链一致性 fail（探针漏接了）')
+
+    const strayName = healthy()
+    strayName.toolResult.names = ['write', '不存在的工具']
+    ok(statusOf(PROBE.evaluateChecks(strayName), 'exec_name_cross_checked') === 'fail',
+      '只在 tools/result 出现的工具名 → 交叉验证 fail')
+
+    const badName = healthy()
+    badName.toolResult.names = ['']
+    ok(statusOf(PROBE.evaluateChecks(badName), 'exec_name_cross_checked') === 'fail',
+      'exec.name 不是可读工具名 → 交叉验证 fail')
+
+    const noCross = healthy()
+    noCross.crossNames = []
+    noCross.preExecuteCount = 1
+    ok(statusOf(PROBE.evaluateChecks(noCross), 'exec_name_cross_checked') === 'inconclusive',
+      '没有第二来源时是 inconclusive（不能凭一个来源说「名字是真的」）')
+
+    const notSubscribed = healthy()
+    notSubscribed.subscriptions = { 'fs/write-intent': false, 'fs/edit-intent': 'subscribe-failed: x' }
+    const subChecks = PROBE.evaluateChecks(notSubscribed)
+    ok(statusOf(subChecks, 'subscribed:fs/write-intent') === 'fail', '监听器没挂上 → 订阅检查 fail')
+    ok(statusOf(subChecks, 'subscribed:fs/edit-intent') === 'inconclusive', '订阅抛错 → inconclusive（不是 pass）')
+  }
+
+  // ── 反面二：写实验的三种坏法都不许变成 pass（「零除以零」那条）──
+  {
+    const failed = healthy()
+    failed.pluginWrite = { status: 'failed', error: '合成失败' }
+    ok(statusOf(PROBE.evaluateChecks(failed), 'plugin_write_emits_no_intent') === 'inconclusive',
+      '写实验失败 → inconclusive（写都没写成，0 次证明不了任何事）')
+
+    const emitted = healthy()
+    emitted.pluginWrite = { status: 'ok', intentsBefore: 3, intentsAfter: 4 }
+    ok(statusOf(PROBE.evaluateChecks(emitted), 'plugin_write_emits_no_intent') === 'fail',
+      '插件自己写却发了 1 次写入门 → fail（事实 2 不成立）')
+
+    const pending = healthy()
+    pending.pluginWrite = { status: 'pending' }
+    ok(statusOf(PROBE.evaluateChecks(pending), 'plugin_write_emits_no_intent') === 'inconclusive',
+      '写实验还没跑完 → inconclusive')
+  }
+
+  // ── 空白输入不许抛（探针在任何宿主里都得跑得完）──
+  {
+    let threw = ''
+    let checks = []
+    try { checks = PROBE.evaluateChecks() } catch (err) { threw = err?.message ?? String(err) }
+    ok(!threw, 'evaluateChecks() 空参不抛', threw)
+    ok(checks.length === 8, '无观测时仍是 8 条检查（5 条事实 + 2 条订阅 + 1 条写入门）', String(checks.length))
+    ok(PROBE.summarizeChecks(undefined).pass === 0, 'summarizeChecks(undefined) 不抛')
+  }
+}
+
 // ── 收尾 ────────────────────────────────────────────────────
 rmSync(sandbox, { recursive: true, force: true })
 console.log('')
