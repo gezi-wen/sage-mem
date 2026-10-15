@@ -186,11 +186,38 @@ console.log('== 1. createDirWatcher：起表 / 去抖 / 失败不抛 / dispose =
   const floodDeadline = Date.now() + 3000
   while (w.ok && Date.now() < floodDeadline) await sleep(20)
   ok(
-    w.ok === false && /FLOOD|出错/.test(w.reason),
-    '目录被删 → 事件洪流哨兵掐掉句柄（ok 变 false，不再空转）',
+    fired >= 1 && fired <= 3,
+    `目录被删之后不空转（实际 ${fired} 次通知，不是十几万次）`,
     JSON.stringify({ ok: w.ok, r: w.reason, fired }),
   )
-  ok(fired >= 1 && fired <= 3, `洪流期间通知仍被去抖合并（实际 ${fired} 次，不是十几万次）`)
+  /**
+   * ⚠️ **这里只能断言不变量，不能断言机制。**
+   *
+   * 洪流哨兵是 **Windows 专属**的补丁：那边句柄失效后会以每秒十几万个事件空转、且一个 `error`
+   * 都不发（实测 2.9 秒 388,196 个），哨兵是用来掐它的。
+   * 而 Linux 的 inotify 在目录被删时**直接停发事件**，根本不产生洪流 —— CI 上实测
+   * `{"ok":true,"r":"","fired":2}`，句柄**不会**自报失效。
+   *
+   * 两个平台共有的不变量是「**不空转**」（上面那条），不是「`ok` 变 false」。
+   * 「watcher 死了之后正确性怎么保证」由**兜底判据**负责：每次扫描仍做一次 `readdir`
+   * 比文件名集合，目录没了/重建了都会被它逮到（第 3 组有独立断言，且是在「事件全丢」的
+   * 假 watcher 下验的）。
+   *
+   * 教训：本仓库这个月**第二次**因为「断言了机制而不是不变量」在 CI 上翻车
+   * （上一次是 `..\a.md`：Windows 上 `\` 是路径分隔符、Linux 上只是普通字符）。
+   */
+  if (process.platform === 'win32') {
+    ok(
+      w.ok === false && /FLOOD|出错/.test(w.reason),
+      'Windows：洪流哨兵把句柄掐掉（ok 变 false，不再空转）',
+      JSON.stringify({ ok: w.ok, r: w.reason }),
+    )
+  } else {
+    ok(
+      typeof w.ok === 'boolean',
+      `非 Windows：inotify 不发洪流，句柄不一定自报失效（实际 ok=${w.ok}）—— 正确性由兜底判据负责`,
+    )
+  }
   w.dispose()
 }
 
