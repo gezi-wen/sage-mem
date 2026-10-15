@@ -300,3 +300,33 @@ baseline 排在最前 —— 除非它自己就超过正文池，否则不可能
 **召回也涨了这件事值得记**：被门槛清掉的弱摘要候选原先在**挤占前 5 名的名额**，把更好的正文命中
 挡在外面。这也是为什么**只量摘要一侧会得出错误结论**（单看摘要一路，相关题从 37/69 掉到 29/69，
 看上去是纯亏；量端到端才发现是净赚）。
+
+---
+
+## D18 · 台账路径必须跟着「它所依据的那个记忆目录」走
+
+**事实**：`flushAccess(memoryDir)` 是「按 `memoryDir` 回收死键 → 把结果写回台账」。而台账路径原本
+写死成模块常量 `ACCESS_LEDGER_FILE`。于是当调用方传入**别的**目录时，就是「扫描 A 目录、把结果写进
+B 台账」—— **A 里不存在的名字在 B 台账里全被判成死键删掉**。
+
+**怎么发现的**：真实状态根 `access.json` 从百来条真实记忆变成了两条夹具名（`a.md` / `b.md`）。
+回溯到一次全量 `npm test`。
+
+**完整因果链**（三层，缺一层都不会出事）：
+1. DSH 进程本身带着 `SAGE_MEM_DIR`（指向真实记忆目录），**子 shell 继承它**；
+2. `ad-smoke.mjs` 用**静态** `import` → 被提升到环境变量赋值之前 → `config.js` 已按真实目录加载完；
+3. 它跑 autodream，而 autodream 跑前强制 flush 台账，传的是自己的**临时** memoryDir。
+
+**修复**（三处，都要）：
+- `access.js` 新增 `ledgerFileFor(memoryDir)`：用默认目录仍走 `STATE_ROOT`（尊重 `SAGE_MEM_STATE_DIR`），
+  传别的目录则台账跟着那个目录走。`readAccessLedger(file)` 也接受路径。
+- `engine.js` 读台账时传 `ledgerFileFor(this.memoryDir)`，与写对称。
+- `test/run.mjs` 给**每个**子套件一套沙箱环境（临时 `SAGE_MEM_DIR` / `SAGE_MEM_STATE_DIR` / `DSH_HOME`），
+  这样将来任何新套件都不可能碰到真实目录 —— 包括静态 import 的那些。
+
+**影响面（已查，不夸大）**：用户的 autodream 配置是 `apply: false` + `autoArchive: 'report'`，
+**只出报告、不动文件**，所以没有任何记忆因此被删。台账是**可重建的缓存**（记录「上次被注入」），
+它会在后续会话中自己长回来；在此之前，自动归档的**候选建议**可能偏保守（把不常读的记忆算得更旧）。
+
+**为什么生产不受影响**：生产两条调用路径传的都是 `MEMORY_DIR` 本身，`ledgerFileFor` 返回的仍是
+`ACCESS_LEDGER_FILE`。这个坑只对「传了别的目录」的调用方成立 —— 也就是测试。

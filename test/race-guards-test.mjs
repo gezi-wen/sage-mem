@@ -808,9 +808,13 @@ if (WORKER) {
       JSON.stringify(events),
     )
 
-    const ledger = await acc.readAccessLedger()
+    // 回读要按**那个记忆目录对应的台账**读，不能读模块常量指向的那份：
+    // `flushAccess(memoryDir)` 现在把结果写进 `ledgerFileFor(memoryDir)`（见 access.js），
+    // 因为它一边按那个目录回收死键、一边写台账 —— 写死成单一台账就会「扫描 A、写进 B」。
+    const ledger = await acc.readAccessLedger(acc.ledgerFileFor(memoryDir))
     ok(
-      Number.isFinite(ledger['a.md']) && Number.isFinite(ledger['b.md']),
+      // 台账 v2 后条目是对象，时间戳走 `injectedAt` 取（v1 的裸数字同样吃）。
+      Number.isFinite(acc.injectedAt(ledger['a.md'])) && Number.isFinite(acc.injectedAt(ledger['b.md'])),
       '两批时间戳都在台账里（旧写法被后写的整体覆盖冲掉一条）',
       JSON.stringify({ ledger, results }),
     )

@@ -124,8 +124,9 @@ let firstStamp = 0
   await sleep(40) // 等 debounce（首次 flush 是 setTimeout 0）
   ok(existsSync(LEDGER), '台账文件出现了（状态目录下）')
   const ledger = await access.readAccessLedger()
-  firstStamp = ledger['project_a.md']
-  ok(Number.isFinite(firstStamp), '台账里有 project_a.md')
+  // 台账 v2 后条目是对象（`{injected, read, use, readRev}`），时间戳走 `injectedAt` 取。
+  firstStamp = access.injectedAt(ledger['project_a.md'])
+  ok(Number.isFinite(firstStamp), '台账里有 project_a.md', JSON.stringify(ledger['project_a.md']))
   ok(Number.isFinite(firstStamp) && Math.abs(firstStamp - t0) < 5000, '时间戳是本次注入的', String(firstStamp))
   ok(LEDGER.startsWith(stateDir), '台账落在状态目录，不在记忆目录', LEDGER)
   // 硬约束：绝不往记忆文件里写 last_accessed
@@ -140,7 +141,7 @@ let firstStamp = 0
   const flushed = await access.flushAccess()
   ok(flushed.ok === true && flushed.written >= 1, '强制 flush 把内存增量并到盘上', JSON.stringify(flushed))
   const after = await access.readAccessLedger()
-  ok(after['project_a.md'] > firstStamp, 'flush 后盘上是更新的时间戳', `${firstStamp} → ${after['project_a.md']}`)
+  ok(access.injectedAt(after['project_a.md']) > firstStamp, 'flush 后盘上是更新的时间戳', `${firstStamp} → ${access.injectedAt(after['project_a.md'])}`)
 }
 
 // ── 2. 零命中 → 台账不新增 ──────────────────────────────────
@@ -298,7 +299,7 @@ let reportPath = ''
 {
   // 先制造一条「内存里待 flush」的增量：证明 run 之前会强制 flush
   await inject(TOKEN)
-  ledgerBeforeRun = (await access.readAccessLedger())['project_a.md'] ?? 0
+  ledgerBeforeRun = access.injectedAt((await access.readAccessLedger())['project_a.md']) ?? 0
   const totalBefore = countMd(memDir)
   const { res } = await runOnce('report')
   ok(res.ok === true, 'report 模式的一趟运行成功', JSON.stringify(res).slice(0, 200))
@@ -313,7 +314,7 @@ let reportPath = ''
   const cand = manifestOf(res.runId).archive.candidates.map((c) => c.file)
   ok(JSON.stringify(cand) === JSON.stringify(['project_old.md']),
     '机读 manifest 的候选清单只含够龄的 project（feedback / 未到阈值的都不在）', JSON.stringify(cand))
-  const ledgerAfterRun = (await access.readAccessLedger())['project_a.md'] ?? 0
+  const ledgerAfterRun = access.injectedAt((await access.readAccessLedger())['project_a.md']) ?? 0
   ok(ledgerAfterRun > ledgerBeforeRun, 'autodream 运行前强制 flush 了台账（盘上时间戳前进）', `${ledgerBeforeRun} → ${ledgerAfterRun}`)
 }
 
@@ -411,8 +412,16 @@ group('12. 台账回收：归档/改名/删除后不再永远留着那条时间�
   let parsed = null
   try { parsed = JSON.parse(raw) } catch { /* 下面会判 */ }
   ok(!!parsed && typeof parsed === 'object' && !Array.isArray(parsed), '回收后仍是合法 JSON 对象')
-  ok(access.idleDays({ file: 'project_a.md', mtimeMs: 0 }, parsed, Date.now()) ===
+  // v2 落盘是 `{v:2, files:{…}}`。这里要验的是「**盘上原样的条目**与归一后的台账，
+  // `idleDays` 给出的结果一致」—— 所以拿 `parsed.files` 比，而不是拿整个包装对象比。
+  ok(parsed?.v === access.ACCESS_SCHEMA_VERSION && parsed?.files && typeof parsed.files === 'object',
+    '落盘是 v2 格式（v + files）', JSON.stringify(Object.keys(parsed ?? {})))
+  ok(access.idleDays({ file: 'project_a.md', mtimeMs: 0 }, parsed.files, Date.now()) ===
      access.idleDays({ file: 'project_a.md', mtimeMs: 0 }, ledger, Date.now()), '存活文件的 idleDays 行为不变')
+  // 反向对照：**v1 的裸数字**（老台账）也必须给出同一个结果 —— 读端兼容不是「新格式能跑就行」。
+  const asV1 = { 'project_a.md': access.injectedAt(ledger['project_a.md']) }
+  ok(access.idleDays({ file: 'project_a.md', mtimeMs: 0 }, asV1, Date.now()) ===
+     access.idleDays({ file: 'project_a.md', mtimeMs: 0 }, ledger, Date.now()), 'v1 裸数字台账给出相同的 idleDays')
 }
 
 // ── 13. 两类 ENOENT 必须分开：根目录不存在 ≠ 记忆都没了 ──────

@@ -12,6 +12,8 @@
  * 只依赖 node: 内置模块 —— 不引入任何测试框架，与各脚本手写 ok() 的风格保持一致。
  */
 import { spawnSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 
@@ -36,11 +38,14 @@ const SUITES = [
   'intent-test.mjs',
   'reader-test.mjs',
   'memory-tools-test.mjs',
+  'observe-test.mjs',
+  'checkpoint-test.mjs',
   'typert-test.mjs',
   'inject-test.mjs',
   'host-facts-test.mjs',
   'archive-test.mjs',
   'access-test.mjs',
+  'access-v2-test.mjs',
   'panel-api-test.mjs',
   'build-fresh.mjs',
   'client-exec-test.mjs',
@@ -56,8 +61,31 @@ let passed = 0
 let failed = 0
 const broken = []
 
+/**
+ * **沙箱环境**：给每个子套件一套临时目录，任何套件都不许碰真实记忆目录与真实状态根。
+ *
+ * 为什么需要它（2026-10-15 实测的事故）：DSH 进程本身带着 `SAGE_MEM_DIR`，于是
+ * **静态 `import` 的套件会在它覆盖环境变量之前就把 `lib/memory/config.js` 加载完** ——
+ * 模块常量指向真实目录。其中 `ad-smoke.mjs` 会跑 autodream，而 autodream 跑前强制 flush
+ * 访问台账，于是把用户**真实**的 `.sage-mem/access.json` 冲成了它的夹具名。
+ *
+ * 子进程从父进程继承环境，所以在这里设一次就覆盖全部套件（含将来新加的）。
+ * 各套件自己设的临时目录优先级更高，不受影响。
+ */
+const sandboxRoot = mkdtempSync(join(tmpdir(), 'sage-mem-suites-'))
+const SANDBOX_ENV = {
+  SAGE_MEM_DIR: join(sandboxRoot, 'memory'),
+  SAGE_MEM_STATE_DIR: join(sandboxRoot, '.sage-mem'),
+  DSH_HOME: join(sandboxRoot, 'dsh-home'),
+}
+mkdirSync(SANDBOX_ENV.SAGE_MEM_DIR, { recursive: true })
+mkdirSync(SANDBOX_ENV.SAGE_MEM_STATE_DIR, { recursive: true })
+
 for (const name of SUITES) {
-  const r = spawnSync(process.execPath, [join(HERE, name)], { encoding: 'utf8' })
+  const r = spawnSync(process.execPath, [join(HERE, name)], {
+    encoding: 'utf8',
+    env: { ...process.env, ...SANDBOX_ENV },
+  })
   const out = `${r.stdout ?? ''}${r.stderr ?? ''}`
   const m = out.match(SUMMARY)
   const p = m ? Number(m[1]) : 0
@@ -73,6 +101,9 @@ for (const name of SUITES) {
 
   rows.push({ name, p, f, code, bad: !m || f > 0 || code !== 0 })
 }
+
+// 沙箱用完就删。放在汇总之前也没关系 —— 断言早就跑完了。
+rmSync(sandboxRoot, { recursive: true, force: true })
 
 console.log('\n════ 汇总 ════')
 for (const r of rows) {

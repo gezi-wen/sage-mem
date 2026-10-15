@@ -304,6 +304,29 @@ group('6c. baseline 仍注入开头')
   ok(!!text && !/### base-hit\.md:\d/.test(text), 'baseline 不被替换成单个段落（仍注入开头）', String(text && text.slice(0, 160)))
 }
 
+// ═══ 6d. 门槛按意图放宽（0.9.16 欠的账） ═══
+group('6d. 历史意图放宽正文门槛')
+{
+  // 背景：0.9.16 为「无关问题零误召」加了「连续命中 ≥ 2 个词元」这条门槛，
+  // 代价是**整句只对上一个两字专名时会被拦下**。当时写明「等意图识别上线后放宽」。
+  // 这一组就是钉那条：同一个孤立命中，普通问题拿不到、历史问题拿得到。
+  resetDir()
+  for (let i = 0; i < 8; i++) {
+    mem(`reference_item${i}.md`, { desc: `第 ${i} 号参考条目`, body: `# 条目 ${i}\n\n这一段只讲通用流程：先申请、再审批、最后归档。` })
+  }
+  // 那个两字专名**只出现在正文里**（摘要里没有），所以摘要检索必然漏
+  mem('reference_itemX.md', { desc: '设备清单', body: '# 设备清单\n\n其中霁川这台机器负责夜间批处理，日志留在本地。' })
+  const { handler } = newGateway()
+
+  const plain = await step(handler, 's-gate-plain', '霁川是什么东西')
+  ok(!plain || !/### reference_itemX\.md/.test(plain),
+    '普通问题不因「孤立两字命中」就注入（误召仍然是零）', String(plain && plain.slice(-160)))
+
+  const hist = await step(handler, 's-gate-hist', '上次提到的霁川是什么')
+  ok(!!hist && /### reference_itemX\.md/.test(hist),
+    '历史意图下放宽门槛 → 那份记忆拿得到了', String(hist && hist.slice(-160)))
+}
+
 // ═══ 7. 全被挡掉 → 一条都不注 ═══
 group('7. 预算挡掉全部条目')
 {
