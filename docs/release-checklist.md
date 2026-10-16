@@ -95,6 +95,11 @@ dsh --profile web --patch $yml --port 0 --no-open
 代码里的版本号、`CHANGELOG.md` 的标题、npm 上的版本、git tag —— 四个地方必须是同一个数字。
 改完代码忘记改 `package.json` 的 `version` 是这个项目**踩过**的坑（元数据不等于事实）。
 
+⚠️ **另有一处「手写数字」不在上面四个里**：README 顶部那两条静态徽章
+（`DSH ≥ x` / `node ≥ y`）。它们不从任何地方生成，改 `package.json` 的 `engines` 而忘了改徽章，
+图会**静静地继续撒谎**。`test/doc-consistency-test.mjs` 第 5 组会核对这两处并报红 ——
+**看到那组红，先去比对 `engines`，别去改断言。**
+
 ## 7. 推上去（release）
 
 ```bash

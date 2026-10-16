@@ -12,10 +12,11 @@
  *   - `契约` 列：这一行对应契约的哪一行（编号），没有对应就写 `—`；
  *   - 守卫按这张对照表**逐行核对定性必须相同** —— 改一边忘另一边就会红。
  *
- * 同一份材料里还有第三处承诺需要被看着：`docs/review-findings.md`
- * （外部复审发现的永久账）。每条发现都必须写清**由哪条断言看着**；写 `—` 的行
- * 必须写明「谁看着」（守不住的用发布清单/人工，但必须写出来，不许留空）。
- * 复审者那句「建议暂缓把本材料中的相关能力标为 1.0.0 保证」指的就是这类留空。
+ * 同一份材料里还有两处承诺需要被看着：
+ *   - `docs/review-findings.md`（外部复审发现的永久账）：每条发现都必须写清**由哪条断言看着**；
+ *     写 `—` 的行必须写明「谁看着」（守不住的用发布清单/人工，但必须写出来，不许留空）。
+ *   - **README 顶部那两条手写徽章**（`DSH ≥ x` / `node ≥ y`）必须等于 `package.json` 的
+ *     `engines`。它们是「图永远看起来对、而声明已经过期」的那一类，没有任何东西会自然发现。
  *
  * ⚠️ 与 `contract-binding-test.mjs` 一样：消费 `run.mjs` 落的断言台账，
  * 所以必须排在 `SUITES` 后段。
@@ -196,7 +197,85 @@ group('4. 外部发现的永久账：每条都有东西看着')
   }
 }
 
-group('5. 约定本身被钉住')
+group('5. README：双语一致性 + 手写徽章 ↔ package.json 的声明')
+{
+  // 为什么单列一组：README 顶部那两条静态徽章（`DSH ≥ x`、`node ≥ y`）是**手打的字符串**。
+  // 它们是「承诺与事实对不上」最容易被放过的一类 —— 图看起来永远是对的，而
+  // `package.json` 里 `engines` 一改，徽章会**静静地继续撒谎**，没有任何东西会红。
+  // 这里把它钉住：徽章上的版本必须等于 `engines` 里的那条。
+  const pkg = JSON.parse(readFileSync(join(HERE, '..', 'package.json'), 'utf8'))
+  /** 归一：`>=18` / `≥ 18` / `>= 0.1.2-rc.1` 化成同一形状再比。 */
+  const norm = (s) => String(s ?? '').replace(/\s+/g, '').replace(/≥/g, '>=').toLowerCase()
+
+  /**
+   * 从 shields 的**静态**徽章 URL 里取 `label → message`。
+   * 静态徽章的路径是 `label-message-color`；`--` 是「字面连字符」、`_` 与 `%20` 是空格。
+   */
+  function staticBadges(md) {
+    const out = new Map()
+    for (const m of md.matchAll(/img\.shields\.io\/badge\/([^\s)"']+)/g)) {
+      const raw = decodeURIComponent(m[1].replace(/--/g, '\u0000'))
+      const parts = raw.split('-')
+      if (parts.length < 3) continue
+      const message = parts.slice(1, -1).join('-').replace(/\u0000/g, '-').replace(/_/g, ' ')
+      out.set(parts[0], message)
+    }
+    return out
+  }
+
+  const files = ['README.md', 'README.zh.md']
+  for (const f of files) {
+    let md
+    try { md = readFileSync(join(HERE, '..', f), 'utf8') } catch { ok(false, `${f} 存在（1.0.0 起中英双份）`); continue }
+    const badges = staticBadges(md)
+    ok(badges.size >= 2, `${f} 里有静态徽章（读到 ${badges.size} 条）`)
+    for (const [label, engine] of [['DSH', 'dsh'], ['node', 'node']]) {
+      const want = pkg.engines?.[engine]
+      const got = badges.get(label)
+      ok(!!got, `${f} 里有 ${label} 徽章`)
+      if (got !== undefined) {
+        ok(norm(got) === norm(want),
+          `${f} 的 ${label} 徽章 = engines.${engine}（徽章写「${got}」，package.json 写「${want}」）`)
+      }
+    }
+    // 动态徽章的存在性：版本 / 测试 / 许可证三条是读者判断「能不能用」的依据，删了要有人知道。
+    for (const p of ['npm/v/sage-mem', 'actions/workflow/status', 'npm/l/sage-mem']) {
+      ok(md.includes(p), `${f} 保留了 ${p} 徽章`)
+    }
+  }
+
+  // 【反向对照】把 engines 改一个字，判据必须报出不一致 —— 否则上面那条可能只是恒真。
+  const realDsh = pkg.engines.dsh
+  const mutated = norm(realDsh) === norm('>=9.9.9') ? '>=8.8.8' : '>=9.9.9'
+  ok(norm(mutated) !== norm(realDsh), '【反向对照】改掉 engines.dsh 后，判据确实会报不一致')
+
+  // ── 双语一致性：`README.md`（英文）与 `README.zh.md`（中文）必须同步演进 ──
+  // 为什么要有它：1.0.0 起 README 有两份，而**没有任何东西**会告诉你「这一版只改了英文」。
+  // 译文逐字比对做不到，但**结构**必须一致 —— 对不齐就说明有一边漏改。
+  const read = (f) => readFileSync(join(HERE, '..', f), 'utf8')
+  const shape = (md) => ({
+    h2: [...md.matchAll(/^## .+$/gm)].length,
+    h3: [...md.matchAll(/^### .+$/gm)].length,
+    tableRows: [...md.matchAll(/^\|/gm)].length,
+    images: [...md.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((m) => m[1]),
+  })
+  let en = null
+  let zh = null
+  try { en = shape(read('README.md')); zh = shape(read('README.zh.md')) } catch { /* 上面已判过存在性 */ }
+  if (en && zh) {
+    ok(en.h2 === zh.h2, `两份 README 的二级章节数一致（${en.h2} / ${zh.h2}）`)
+    ok(en.h3 === zh.h3, `三级章节数一致（${en.h3} / ${zh.h3}）`)
+    ok(en.tableRows === zh.tableRows, `表格行数一致（${en.tableRows} / ${zh.tableRows}）`)
+    ok(en.images.length === zh.images.length && en.images.every((u, i) => u === zh.images[i]),
+      `图片地址逐条相同且顺序一致（${en.images.length} / ${zh.images.length}）`,
+      en.images.filter((u, i) => u !== zh.images[i]).slice(0, 2).join(' , '))
+    for (const [f, needle] of [['README.md', 'blob/main/README.zh.md'], ['README.zh.md', 'blob/main/README.md']]) {
+      ok(read(f).includes(needle), `${f} 顶部有语言切换（绝对地址，npm 页面上才点得动）`)
+    }
+  }
+}
+
+group('6. 约定本身被钉住')
 {
   const idx = registered.indexOf('doc-consistency-test.mjs')
   ok(idx >= 0, '本守卫自己已登记')
