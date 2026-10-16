@@ -12,7 +12,7 @@
  * 只依赖 node: 内置模块 —— 不引入任何测试框架，与各脚本手写 ok() 的风格保持一致。
  */
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
@@ -59,6 +59,12 @@ const SUITES = [
   'build-fresh.mjs',
   'client-exec-test.mjs',
   'client-render-test.mjs',
+  // 契约 §5（环境变量）的默认值 / 越界夹取 —— 以前这半边一条断言都没有。
+  'env-contract-test.mjs',
+  // ⚠️ 下面两个必须排在最后：它们读的是**前面套件跑完落的断言台账**（见 `_passlog.mjs`），
+  // 排在前面就会读到残缺的账。它们盯的是「契约里说了不验的承诺」与「两份文档说法不一致」。
+  'contract-binding-test.mjs',
+  'doc-consistency-test.mjs',
 ]
 
 /** 各脚本收尾那行：`结果：53 passed, 0 failed`。 */
@@ -82,10 +88,26 @@ const broken = []
  * 各套件自己设的临时目录优先级更高，不受影响。
  */
 const sandboxRoot = mkdtempSync(join(tmpdir(), 'sage-mem-suites-'))
+
+/**
+ * **断言台账**：本次运行里每个套件**实际打出过**的 PASS 断言名，一行一个套件。
+ *
+ * 为什么要有它：`1.0.0-contract.md` 里每条「保证」都必须指向一条**真的存在**的断言
+ * （见 `contract-binding-test.mjs`）。守卫要核对这件事，最可靠的办法是看**本次运行的实况**，
+ * 而不是去 grep 源码 —— 源码里的字符串可能落在注释里、或在一条永远不走的 `if` 分支里。
+ * 让守卫自己再跑一遍那些套件，等于把 `npm test` 跑两遍；所以在运行器里顺手落账。
+ *
+ * 消费方：`SAGE_MEM_PASSLOG` 指向的那个文件。守卫单独跑（没这个变量）时自己起子进程补。
+ * ⚠️ 契约绑定守卫必须排在 `SUITES` **最后** —— 它要读的账在它之前才写完。
+ */
+const PASSLOG = join(sandboxRoot, 'pass-log.jsonl')
+const PASS_LINE = /^ {2}PASS (.*)$/gm
+
 const SANDBOX_ENV = {
   SAGE_MEM_DIR: join(sandboxRoot, 'memory'),
   SAGE_MEM_STATE_DIR: join(sandboxRoot, '.sage-mem'),
   DSH_HOME: join(sandboxRoot, 'dsh-home'),
+  SAGE_MEM_PASSLOG: PASSLOG,
 }
 mkdirSync(SANDBOX_ENV.SAGE_MEM_DIR, { recursive: true })
 mkdirSync(SANDBOX_ENV.SAGE_MEM_STATE_DIR, { recursive: true })
@@ -102,13 +124,21 @@ for (const name of SUITES) {
   const code = r.status === null ? 1 : r.status
   passed += p
   failed += f
+  const bad = !m || f > 0 || code !== 0
   if (!m || f > 0 || code !== 0) broken.push(name)
+
+  // 断言台账：供契约绑定守卫核对「这片保证指向的断言真的跑过」。
+  appendFileSync(PASSLOG, `${JSON.stringify({
+    name,
+    bad,
+    pass: [...out.matchAll(PASS_LINE)].map((x) => x[1]),
+  })}\n`)
 
   console.log(`\n──── ${name} ────`)
   process.stdout.write(out.endsWith('\n') || !out ? out : `${out}\n`)
   if (!m) console.log('  （没有读到汇总行，按失败计）')
 
-  rows.push({ name, p, f, code, bad: !m || f > 0 || code !== 0 })
+  rows.push({ name, p, f, code, bad })
 }
 
 // 沙箱用完就删。放在汇总之前也没关系 —— 断言早就跑完了。

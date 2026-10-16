@@ -69,6 +69,7 @@ Remove-Item Env:\SAGE_MEM_PROBE_INJECT
 | `SAGE_MEM_PROBE_SUBFIBER=1` | 改为把 `fs/*` 监听器挂在 `ctx.inject` 的**子 fiber** 里（sage-mem D5 的接法） |
 | `SAGE_MEM_PROBE_LATE_ON=1` | apply 之后 2.5 秒再挂一个 `fs/write-intent` 监听器（验证注册窗口） |
 | `SAGE_MEM_PROBE_STRICT=1` | 让 `checks` 里的 `fail` 变成非零退出码（默认只记录，不改宿主成败） |
+| `SAGE_MEM_PROBE_AFTER_MS=<毫秒>` | 补拍快照的窗口，默认 20000。**长驻 profile（web / desktop）要放大** —— 插件在回合之前就挂载了，20 秒常在真实工具调用之前拍完，读出来像「事件没到达」（见第 3.5 节） |
 
 产物（每个阶段各一份，别只看最后一份）：
 
@@ -270,6 +271,54 @@ G 是决定性的那一组：早监听器在 **t=3071ms** 收到事件，晚监�
 本探针的 `EVENTS` 表把 `mode` 写在数据里就是为了防第二条：`waterfall` 一律通用放行
 （把最后一个参数当 `next` 调）。
 
+### 3.5 `web` profile（探针，2026-10-16 —— 第一次真跑）
+
+在这之前，所有真实宿主实测都只在 headless 上做过，web 侧是**推断**（「web 与 headless
+共用同一套 DSH 包」）。2026-10-16 补上：起一个**随机端口**的长驻 web 宿主并挂上探针，
+再用浏览器真的发起一轮对话、让模型调工具。
+
+⚠️ **长驻 profile 有一个坑**：插件在**回合之前**就挂载了，而默认那份补拍快照是 20 秒后 ——
+20 秒常常在真实工具调用**之前**就拍完，于是两份快照全是 0，看起来像「事件没到达」，
+实际是「**拍早了**」。为此探针新增 `SAGE_MEM_PROBE_AFTER_MS`（默认仍是 20000）。
+**这是「拍早了」与「没到达」的区别**，也是为什么这条事实在 2026-10-15 没被看到。
+
+```powershell
+# 模式 A：不声明 inject —— 与 sage-mem 现状一致（A7 关心的就是这一种）
+$env:SAGE_MEM_PROBE_INJECT = $null      # 或干脆不设
+$env:SAGE_MEM_PROBE_AFTER_MS = '90000'
+dsh --profile web --patch $yml --port 0 --no-open   # 随机端口、不自动开浏览器
+# 再从这个宿主打印的 http://127.0.0.1:<port>/?token=… 发一句「必须用 write 工具 …」的提示词
+```
+
+结果（那一轮模型用了 `pwsh` / `write` / `read` 三个工具）：
+
+| 观测 | 值 |
+|---|---|
+| `system-prompt/assemble` | **observed 6** —— 注入主链在 web 上照常被派发 |
+| `tools/pre-execute` / `execute` / `post-execute` / `result` | **observed 5**，`toolNames = pwsh, write, read` |
+| `fs/observed` | observed 3 |
+| **`fs/write-intent`** | **observed 2** |
+| `fs/edit-intent` | observed 0（那一轮没人编辑） |
+| `checksSummary` | **pass 7 · fail 0 · inconclusive 1** |
+
+**四条结论：**
+
+1. **不声明 `inject` 的早注册监听器，在 web profile 上真的收得到 `fs/write-intent`（2 次）。**
+   这正是写门依赖的那条事实，也是第 3.3 节事实 4 那个「注册窗口」在**第二个 profile** 上的复现 ——
+   与 headless 一致。
+2. `system-prompt/assemble`（注入主链）与 `tools/*` 事件链在 web 上照常派发。
+3. 唯一的 `inconclusive` 是 `plugin_write_emits_no_intent` —— 那是**探针自己的写实验**没跑：
+   它要 `inject=fs` 才拿得到 `ctx.fs`（模式 B）。**与 web 无关**，别读成 web 的缺陷。
+4. 附带一个**观测盲区的现场例子**：那一轮模型先用 `pwsh` 写了文件，于是 `fs/observed` 记了 3、
+   而 `fs/write-intent` 只有 2 —— 差的正是 shell 那条路（执行类工具里的写入**不发**写入门）。
+
+⚠️ 这些都是**探针实测**，仍然**不是回归断言**（CI 的容器里没有 DSH 宿主）。
+所以能力边界表里 web 那一行是「**尽力**」而不是「保证」。
+
+⚠️ 两个当时的环境事实，别当成一般性结论：那一轮跑在 **Windows + Node 24.x**；
+两个宿主实例同时开着时，**先起来的那个不会因为 `job_kill` 而退出**（Windows 上进程树没被带走），
+要按监听端口找到进程显式结束。
+
 
 ---
 
@@ -338,11 +387,16 @@ G 是决定性的那一组：早监听器在 **t=3071ms** 收到事件，晚监�
 
 ## 6. 我没能验证 / 不确定的部分
 
-1. **`web` profile 没跑过探针**。`dsh --profile web --patch $yml` 会长期监听（不是一次性），
-   本次没启。web 与 headless 共用同一套 DSH 包，大概率一致，但**这是推断不是实测**。
-2. **`desktop` profile 没跑过探针**（CLI 加不了 `--patch`）。第 3.2 节的 desktop 事实来自
-   Host Inspect 查询，它证明「宿主里有这个服务 / 这个事件」，**不证明**「一个不声明 inject 的
-   插件能拿到它」—— 后者只有 headless 上的探针实测过。
+1. **~~`web` profile 没跑过探针~~ —— 2026-10-16 已跑，见第 3.5 节**。
+   结论：不声明 `inject` 的早注册监听器在 web 上**收得到** `fs/write-intent`（2 次），
+   `system-prompt/assemble` 与 `tools/*` 链照常派发，`checksSummary` **pass 7 · fail 0 · inconclusive 1**。
+   仍未做到的：这只是**一次实测**，没有回归断言（CI 里没有宿主），次数也少（一轮对话）。
+2. **`desktop` profile 没跑过探针** —— 2026-10-16 **重新确认并且更严格**：不只是「加不了 `--patch`」，
+   `dsh --profile desktop --dump-config` 与 `--dump-default-config` **都被拒绝**：
+   `error: profile "desktop" is managed exclusively by the Electron application`。
+   也就是说连**只读的配置合成**都进不去，探针只能走 GUI 侧通道或临时试验 profile。
+   第 3.2 节的 desktop 事实来自 Host Inspect 查询，它证明「宿主里有这个服务 / 这个事件」，
+   **不证明**「一个不声明 inject 的插件能拿到它」—— 后者目前只在 headless 与 web 上实测过。
 3. **`ctx.reflect.store` / `ctx.events._hooks` / `ctx.reflect.props` 都是 cordis 内部结构**
    （下划线 / 非公开字段）。它们变了只会让探针报 `null`，不会让产品出问题 ——
    但这意味着探针的某些字段会随 cordis 升级而失效。第 3.1 节里「声明表」的结论就建立在这上面。
@@ -354,8 +408,10 @@ G 是决定性的那一组：早监听器在 **t=3071ms** 收到事件，晚监�
    早注册收得到」，也排除了作用域 / 插件自己写 / fs 专属三种解释，但**没有**去读 DSH 侧
    固定监听器名单的那段实现。「窗口在 fs 服务就绪之前关闭」是从 F 组（子 fiber 在 fs 就绪时
    挂载即已错过）反推的，不是读代码读出来的。
-6. **「早注册 + 事件到达时用 `ctx.get('fs', false)` 取服务」这条折中路线没验**。
-   它是事实 4 与 D5 冲突的候选解法，需要再写一版探针才能回答。
+6. **「早注册 + 事件到达时用 `ctx.get('fs', false)` 取服务」这条折中路线 —— 已验（0.9.19 起）**。
+   不声明 `inject` 时，处理器内部 `ctx.get('fs')` 拿得到服务（`hasFs` / `hasStat` 均为真），
+   代码里走的就是这条路线。2026-10-16 的 web 那次也一致：`load` 阶段两份 `present=false`，
+   到回合那一份已经是 `present=true`（服务是一个个挂上去的），而 `fs/write-intent` 同时记到了 2 次。
 7. **`ctx.reflect.store` / `ctx.events._hooks` / `ctx.reflect.props` 都是 cordis 内部结构**
    （下划线 / 非公开字段）。它们变了只会让探针报 `null`，不会让产品出问题 ——
    但这意味着探针的某些字段会随 cordis 升级而失效。第 3.1 节里「声明表」的结论就建立在这上面。
@@ -366,4 +422,7 @@ G 是决定性的那一组：早监听器在 **t=3071ms** 收到事件，晚监�
 9. **`.length` 只是形参个数**，不是必填个数，也不含 optional 标记。第 3.1 节的签名表
    只能用来判断「方法还在不在 + 形状大致变没变」，精确签名看第 3.2 节。
 10. **模式 B / 各诊断开关里的 `inject` 都是探针自己的**（用环境变量开关），
-    不代表 sage-mem 已经声明了它 —— 仓库里 sage-mem 目前**没有**任何 `inject` 声明。
+    不代表 sage-mem 声明过它。⚠️ **2026-10-16 更正**：这里原先写「仓库里 sage-mem 目前
+    **没有**任何 `inject` 声明」——**那句是错的**，`lib/index.js` 里有 `ctx.inject(['tools'], …)`
+    （工具挂子 fiber，D5 的接法）。那句话想说的是「**`fs` 没有声明 `inject`**」，
+    而这正是第 3.3 节事实 4 那个注册窗口的由来。

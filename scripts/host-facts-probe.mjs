@@ -762,9 +762,15 @@ export function apply(ctx) {
 
   emit('load')
 
-  // 20s 后补一份快照：observed 要等宿主自己跑到那一步才有值。
+  // 补一份快照：`observed` 要等宿主自己跑到那一步才有值（工具调用 / prompt 装配）。
   // unref —— 探针不该拖住宿主退出。
-  const timer = setTimeout(() => emit('after-20s'), 20000)
+  //
+  // ⚠️ 窗口可调（2026-10-16 加）：默认 20 s 在 headless 的一次性回合里够用，但
+  // **web / desktop 上插件先于回合挂载**（`dsh --profile web` 起的是长驻服务，
+  // 回合要等人从浏览器发起），20 s 常常在真实工具调用**之前**就拍完了 —— 那样两份快照
+  // 全是 0，看起来像「事件没到达」，实际是「拍早了」。要测长驻 profile 就把窗口放大。
+  const afterMs = Number(process.env.SAGE_MEM_PROBE_AFTER_MS) || 20000
+  const timer = setTimeout(() => emit(`after-${Math.round(afterMs / 1000)}s`), afterMs)
   if (typeof timer?.unref === 'function') timer.unref()
   if (typeof ctx.effect === 'function') {
     ctx.effect(() => () => {
