@@ -22,6 +22,8 @@ const SUITES = [
   'ad-smoke.mjs',
   'ad-fixes.mjs',
   'ad-matrix.mjs',
+  // 1.0.1：报告撞上单次输出上限时的「接着写」与残篇标注（真实事故：10-17 凌晨那份报告断在半句）。
+  'autodream-continuation-test.mjs',
   'rollback-guard-test.mjs',
   'race-guards-test.mjs',
   'q-fixes-093.mjs',
