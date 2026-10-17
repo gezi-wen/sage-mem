@@ -206,6 +206,32 @@ group('4. 回归：没截断时行为与从前一致，工具路径仍通')
   ok(a2.report.includes('调用 list_memory'), '「过程」记下了工具调用')
 }
 
+// ────────────────────────────── 5. 「过程」排版：模型文本不许把标题漏出来 ──────────────────────────────
+
+group('5. 「过程」每步只占一行（模型文本里的换行与标题不许漏成真标题）')
+{
+  // 真实踩点（2026-10-17 10:42 那份报告）：「结束」那一步的文字以「这次整合已经完成。下面逐条列出建议的改动。」
+  // 开头，紧接着两个换行 + `## 一、必须修改的…`。直接对原文 slice(0,120) 会把后面的标题当成真标题渲染，
+  // 整份报告读起来像「内容重复了一遍」。
+  const stepText =
+    '这次整合已经完成。下面逐条列出建议的改动。\n\n## 一、必须修改的\n\n**文件：`a.md`**，在「gh CLI」那一节'
+  const lmm = makeLlm([stopStep(stepText)])
+  const { engine, memoryDir } = await world(lmm)
+  const r = await engine.run({ reason: 'x', force: true })
+  const { report } = await artifacts(engine, memoryDir, r.runId)
+
+  const proc = report.slice(report.indexOf('## 过程'))
+  const procLines = proc.split('\n').filter((l) => l.trim())
+  ok(procLines.length >= 2, '「过程」节存在且有内容', JSON.stringify(procLines.slice(0, 2)))
+  ok(
+    procLines.slice(1).every((l) => l.startsWith('- 第 ')),
+    '「过程」里除标题外全是「- 第 N 轮」行（换行被压平成一行）',
+    JSON.stringify(procLines.slice(1, 4)),
+  )
+  ok(!proc.includes('\n## 一、'), '模型文本里的 `## 标题` 没有漏成报告的真标题')
+  ok(report.includes('## 一、必须修改的'), '但它在「模型的收尾说明」里原样保留（那是模型的原文）')
+}
+
 console.log('')
 console.log(`结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
