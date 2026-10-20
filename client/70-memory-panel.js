@@ -198,6 +198,20 @@
 				setFormFm(null); setFormBaseType(""); setFormTags("");
 			}
 
+			function openMemoryFolder() {
+				setError(null);
+				if (!remote || typeof remote.openMemoryDir !== "function") {
+					setError("宿主侧还没有 openMemoryDir 接口（插件版本较旧）");
+					return;
+				}
+				remote.openMemoryDir()
+					.then(function (res) {
+						const result = unwrap(res);
+						if (result && result.ok === false) setError(result.error || "打开记忆目录失败");
+					})
+					.catch(function (e) { setError(String((e && e.message) || e)); });
+			}
+
 			function openEdit(file) {
 				setError(null);
 				setBusy(true);
@@ -714,6 +728,7 @@
 					// 也推到最右，看起来像"跑出格子了"）。
 					h("span", { className: "smem-head-spacer", key: "sp" }),
 					h("span", { className: "smem-head-actions", key: "act" }, tab === "files" ? [
+						h("button", { type: "button", className: "smem-btn", key: "open", disabled: busy || !dirOk, title: "在系统文件管理器里打开记忆目录", onClick: openMemoryFolder }, "打开记忆文件夹"),
 						h("button", { type: "button", className: "smem-btn", key: "refresh", disabled: busy || loading, onClick: load }, "刷新"),
 						h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "add", onClick: openAdd }, "+ 添加记忆"),
 					] : null),

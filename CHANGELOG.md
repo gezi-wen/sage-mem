@@ -7,6 +7,23 @@
 
 ---
 
+## Unreleased
+
+**主题：记忆管理页直接打开记忆文件夹。**
+
+### 行为变更
+
+- 「记忆管理 → 文件列表」头部新增「打开记忆文件夹」：host 侧用系统文件管理器打开当前记忆目录
+  （Windows `explorer.exe` / macOS `open` / 其它 `xdg-open`），进程 detached、不等待窗口。
+  路径固定为插件的记忆目录，不接受界面传入。
+
+### 新增测试
+
+- `test/open-folder-test.mjs`（15 条）：平台映射、spawn 接线（detached / ignore stdio / 不经过 shell /
+  unref）、失败路径。
+
+---
+
 ## 1.5.3
 
 **主题：继续拆 Section —— 文件列表这一屏独立成件。** 界面零变化，快照哈希为证。
