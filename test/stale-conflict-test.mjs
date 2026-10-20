@@ -34,7 +34,7 @@ process.env.SAGE_MEM_DIR = memDir
 process.env.SAGE_MEM_STATE_DIR = stateDir
 process.env.DSH_HOME = join(sandbox, 'dsh-home')
 
-const { createToolRunner } = await import(new URL('../lib/autodream-tools.js', import.meta.url).href)
+const { createToolRunner } = await import(new URL('../lib/autodream/tools.js', import.meta.url).href)
 
 const CONFLICTS_DIR = join(stateDir, 'conflicts')
 const readConflicts = () => {

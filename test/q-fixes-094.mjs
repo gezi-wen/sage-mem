@@ -172,7 +172,7 @@ console.log('== Q09d：列表与体检对同一个目录必须给出一致的条
 
 console.log('== Q01g：模型工具（autodream）这条腿也要过闸门 ==')
 {
-  const { createToolRunner } = await import(new URL('autodream-tools.js', LIB).href)
+  const { createToolRunner } = await import(new URL('autodream/tools.js', LIB).href)
   const runner = createToolRunner({ memoryDir: memDir, sessionsRoot: join(world, 'sessions'), apply: false, withSessions: false })
   // 用一个**目录联接**冒名 `.md`：注入与面板两条腿挡住了，这条腿以前是漏的
   const jdir = join(world, 'outside-head')

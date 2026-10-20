@@ -371,7 +371,7 @@ group('11. 手动 / 工具 / 自动 三条路径：留痕同一格式、都写 a
   ok(AT_RE.test(manualContent) && metaOf('project_manual.md').archivedReason === '手动写的理由', '手动路径留痕同格式、理由原样')
 
   // ③ autodream 的 archive_memory 工具
-  const { createToolRunner } = await import(new URL('autodream-tools.js', LIB).href)
+  const { createToolRunner } = await import(new URL('autodream/tools.js', LIB).href)
   writeMem('project_tool.md', { updated: daysAgo(3) })
   const runner = createToolRunner({ memoryDir: memDir, sessionsRoot: '', apply: true, withSessions: false })
   const toolOut = await runner.run('archive_memory', { file: 'project_tool.md', reason: '工具写的理由' })
@@ -391,7 +391,7 @@ group('11. 手动 / 工具 / 自动 三条路径：留痕同一格式、都写 a
     'listArchived 能看到自动归档的「何时、为什么」', JSON.stringify(listed))
 
   // 静态确认：三个入口都指向共享核心（不是各自又写了一份）
-  const srcs = ['lib/index.js', 'lib/autodream/engine.js', 'lib/autodream-tools.js']
+  const srcs = ['lib/index.js', 'lib/autodream/engine.js', 'lib/autodream/tools.js']
     .map((p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8'))
   ok(srcs.every((s) => s.includes('archiveMemory') && s.includes("memory/archive.js")),
     '三个入口都 import 共享核心 memory/archive.js（没有第二份实现）')

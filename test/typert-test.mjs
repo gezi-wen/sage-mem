@@ -85,7 +85,7 @@ check('setConfig', await engine.getConfig(), 'getConfig(改配置后)')
 console.log('== 3. 有产物之后再过一遍 ==')
 const snap = await engine.snapshot('20261001-130000-zzzz', 'run')
 check('listSnapshots', await engine.listSnapshots(), 'listSnapshots(有快照)')
-const { createToolRunner } = await import(new URL('autodream-tools.js', LIB).href)
+const { createToolRunner } = await import(new URL('autodream/tools.js', LIB).href)
 const runner = createToolRunner({ memoryDir, sessionsRoot: '', apply: true, withSessions: false })
 await runner.run('write_memory', { file: 'b.md', content: '---\nname: b\n---\n\n新\n', reason: '新增一条测试记忆' })
 await engine.writeDeclaration({

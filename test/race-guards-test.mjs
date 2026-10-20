@@ -179,7 +179,7 @@ if (WORKER) {
     (async () => {
       throw new Error('writeFileExclusive 不存在（这是修复前的代码）')
     })
-  const { createToolRunner } = await import(new URL('autodream-tools.js', LIB).href)
+  const { createToolRunner } = await import(new URL('autodream/tools.js', LIB).href)
   const { inspectMemoryEntry } = await import(new URL('memory/scan.js', LIB).href)
   const { safeName } = await import(new URL('memory/naming.js', LIB).href)
   const { PRE_ROLLBACK_KEEP } = await import(new URL('autodream/config.js', LIB).href)
@@ -742,7 +742,7 @@ if (WORKER) {
     await writeFile(join(memoryDir, 'a.md'), body('A'), 'utf8')
     // 伪造一份「归档中途崩了」的残留：私有名文件，可能装着唯一一份内容。
     await writeFile(join(memoryDir, 'a.md.archiving-deadbeef1234'), body('LOST CONTENT'), 'utf8')
-    const { auditMemoryDir, formatAudit } = await import(new URL('autodream-audit.js', LIB).href)
+    const { auditMemoryDir, formatAudit } = await import(new URL('autodream/audit.js', LIB).href)
     const rep = await auditMemoryDir(memoryDir)
     ok(
       Array.isArray(rep.strays) && rep.strays.some((s) => String(s.file).includes('.archiving-')),

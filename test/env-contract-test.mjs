@@ -175,17 +175,21 @@ group('5. 60 KiB 怎么拆成两本账（总预算 = 正文池 + 状态卡预留
 
 group('6. SAGE_MEM_TASK_ID（环境变量优先，否则回落会话 id）')
 {
-  // 这条分支写在 lib/index.js 里、没有导出，所以用**源码级**断言钉住写法 ——
+  // 这条分支写在 `lib/recall/injector.js` 里、没有导出，所以用**源码级**断言钉住写法 ——
   // 与 observe-test 的源码级断言、write-gate-wiring 组 7 是同一手法。
-  const src = readFileSync(INDEX, 'utf8')
-  ok(/process\.env\.SAGE_MEM_TASK_ID\s*\|\|\s*session\.id\s*\|\|\s*''/.test(src),
+  // ⚠️ 1.2.0 把注入链从 `lib/index.js` 搬进 `lib/recall/`：守卫的**目标文件跟着搬**，
+  // 判据本身没被删 —— 删守卫等于把真保护一起删掉。
+  const INJECTOR = new URL('../lib/recall/injector.js', import.meta.url)
+  const src = readFileSync(INJECTOR, 'utf8')
+  ok(/process\.env\.SAGE_MEM_TASK_ID\s*\|\|\s*session\?\.id\s*\|\|\s*''/.test(src),
     '任务 id 的取值是「环境变量 → 会话 id → 空串」这条链',
-    '没匹配到 process.env.SAGE_MEM_TASK_ID || session.id || \'\'')
+    '没匹配到 process.env.SAGE_MEM_TASK_ID || session?.id || \'\'')
   ok(!/SAGE_MEM_TASK_ID/.test(readFileSync(CONFIG_PATH, 'utf8')),
     'config.js 不管任务 id（它的作用域是每次 step，不是模块常量）')
-  const at = src.indexOf('SAGE_MEM_TASK_ID')
-  ok(!/query|question|prompt/i.test(src.slice(at, at + 200)),
-    '【不变量】作用域不许由查询文本决定（那句话是模型或用户写的，不该决定去读哪个目录）')
+  // 只在**取值那一行**里判：注释里可以解释「为什么不许用查询文本」，那是说明不是实现。
+  const exprLine = src.split('\n').find((l) => l.includes('process.env.SAGE_MEM_TASK_ID')) || ''
+  ok(!/query|question|prompt/i.test(exprLine),
+    '【不变量】作用域不许由查询文本决定（那句话是模型或用户写的，不该决定去读哪个目录）', exprLine.trim())
 }
 
 group('7. 反向对照：判据确实会因为真变化而变红')

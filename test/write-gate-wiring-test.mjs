@@ -209,13 +209,20 @@ group('7. 注册方式：不许挪进 ctx.inject（注册窗口）')
   // 事件永远不来。套件里那几条行为断言**结构上抓不到**这种改动，只能看源码。
   //
   // 依据：docs/host-facts.md 3.3 节的七组对照（不 inject 收到 1 次；顶层 inject / 子 fiber / 晚挂都是 0 次）。
+  //
+  // ⚠️ 1.2.0 把这段注册搬进 `lib/assembly/write-gate-mount.js`：守卫的**目标文件跟着搬**，
+  // 并**新增**一条「组合根真的调了 mountWriteGate」的断言 —— 只迁不补，等于允许
+  // 「模块写得对、但没人调用」。删守卫是错的做法，不是修红。
   const { readFileSync } = await import('node:fs')
-  const src = readFileSync(new URL('../lib/index.js', import.meta.url), 'utf8')
+  const src = readFileSync(new URL('../lib/assembly/write-gate-mount.js', import.meta.url), 'utf8')
+  const rootSrc = readFileSync(new URL('../lib/index.js', import.meta.url), 'utf8')
   // ⚠️ 判「有没有做某件坏事」必须**先剥掉注释**：那段警示注释里正写着
   // `ctx.inject(['fs'], …)` 这个反例，不剥就会把自己的警告当成违规（初版就这么红的）。
   // 剥法很朴素（`//` 到行尾、`/* */` 成对），可能误伤字符串里的 `//`；
   // 但这里只用于「不存在」判断，误伤的后果是**漏报**不是误报 —— 方向是安全的。
-  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+  const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+  const code = strip(src)
+  const rootCode = strip(rootSrc)
 
   ok(/ctx\.on\('fs\/write-intent'/.test(code), '直接在 apply 里注册 fs/write-intent')
   ok(/ctx\.on\('fs\/edit-intent'/.test(code), '直接在 apply 里注册 fs/edit-intent')
@@ -226,6 +233,11 @@ group('7. 注册方式：不许挪进 ctx.inject（注册窗口）')
   ok(/ctx\.get\('fs'\)/.test(code), '服务在**处理器内部**用 ctx.get 取（所以不需要 inject）')
   ok(/注册窗口/.test(src),
     '代码旁留着「注册窗口」的警示 —— 删了它，下一个人就会顺手把这段改规范')
+  // 关键补充：模块本身再对，没人调用也是白搭。组合根必须**同步直调** mountWriteGate。
+  ok(/mountWriteGate\(ctx,\s*MEMORY_DIR\)/.test(rootCode),
+    '组合根在构造函数里直接调用 mountWriteGate(ctx, MEMORY_DIR)')
+  ok(!/ctx\.inject\(/.test(rootCode),
+    '组合根里没有 ctx.inject（写门一旦被塞进子 fiber 就收不到事件）')
   // 反向对照：判据本身要能认出「被挪进 inject」的写法，否则上面那两条可能是空转
   const movedSrc = src.replace("ctx.on('fs/write-intent'", "ctx.inject(['fs'], () => { ctx.on('fs/write-intent'")
   ok(/ctx\.inject\(\s*\[\s*'fs'/.test(movedSrc),

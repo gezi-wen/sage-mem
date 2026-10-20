@@ -79,7 +79,7 @@ console.log('== Q02a：同一目标并发 20 次原子写，必须全部成功�
 
 console.log('== Q02b：write_memory 必须走原子写（源码结构守卫）==')
 {
-  const src = await readFile(new URL('../lib/autodream-tools.js', import.meta.url), 'utf8')
+  const src = await readFile(new URL('../lib/autodream/tools.js', import.meta.url), 'utf8')
   const from = src.indexOf("case 'write_memory'")
   const to = src.indexOf("case 'archive_memory'")
   const seg = from >= 0 && to > from ? src.slice(from, to) : ''

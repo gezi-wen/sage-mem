@@ -23,7 +23,7 @@ process.env.DSH_HOME = join(sandbox, 'dsh-home')
 
 const LIB = new URL('../lib/', import.meta.url)
 const mod = await import(new URL('index.js', LIB).href)
-const { auditMemoryDir } = await import(new URL('autodream-audit.js', LIB).href)
+const { auditMemoryDir } = await import(new URL('autodream/audit.js', LIB).href)
 const scan = await import(new URL('memory/scan.js', LIB).href)
 
 let pass = 0
@@ -156,7 +156,7 @@ group('4. 审计：指向归档 → archivedLinks（不计 problems）')
     report.dangling.length + report.unlisted.length + report.typeMismatch.length + report.crlf.length +
     report.brokenLinks.length + report.hashHazards.length + report.noFrontmatter.length + report.unreadable.length
   ok(report.problems === sum, 'problems 不含 archivedLinks（逐项重算一致）', `problems=${report.problems} sum=${sum}`)
-  const text = (await import(new URL('autodream-audit.js', LIB).href)).formatAudit(report)
+  const text = (await import(new URL('autodream/audit.js', LIB).href)).formatAudit(report)
   ok(text.includes('指向已归档') && text.includes('不计入问题'), 'formatAudit 把归档链接单独成节并写明不计问题')
 }
 

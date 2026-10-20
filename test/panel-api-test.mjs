@@ -25,7 +25,7 @@ const LIB = new URL('../lib/', import.meta.url)
 const mod = await import(new URL('index.js', LIB).href)
 const access = await import(new URL('memory/access.js', LIB).href)
 const scan = await import(new URL('memory/scan.js', LIB).href)
-const { auditMemoryDir } = await import(new URL('autodream-audit.js', LIB).href)
+const { auditMemoryDir } = await import(new URL('autodream/audit.js', LIB).href)
 const { DEFAULT_CONFIG } = await import(new URL('autodream/config.js', LIB).href)
 
 let pass = 0

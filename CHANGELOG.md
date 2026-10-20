@@ -7,6 +7,57 @@
 
 ---
 
+## 1.2.0
+
+**主题：组合根瘦身。** 把注入链从 `MemoryGateway` 构造函数里搬出来，让它能**不搭宿主就被单测**；
+行为一个字都不改（11 份 golden 逐字节证明），typert 契约与客户端零 diff。
+
+### 行为变更
+
+- **`SAGE_MEM_DEBUG` 现在可以运行时打开**：原来它只在模块加载时读一次，测试靠「用 query 重载
+  `lib/index.js`」切换；拆成独立模块后那条路失效了。改成每次调用现读环境变量 —— 成本可忽略，
+  换来的是不必重启就能打开调试（行为变化仅此一条）。
+
+### 不变
+
+- **注入输出逐字节一致**：10 个有注入的场景 + 1 个空场景，`test/recall-golden-test.mjs` 与
+  v1.1.0 生成的夹具逐字节相同。
+- **typert 契约零 diff**：31 条 invocation、31 条 `markRemote`、三个 Gateway 类仍在 `lib/index.js`
+  （`sourceLocation` 全钉在 `lib/index.js:1:1`）；`lib/typert.host.js` 与 `client/`、`lib/client.js` 未改。
+- 所有面板行为、remote 方法、环境变量语义、状态文件格式均未变。
+
+### 内部结构（给维护者）
+
+| 位置 | 变化 |
+|---|---|
+| `lib/index.js` | 1431 → **739 行**；`MemoryGateway` 构造函数 540 → **26 行**（只剩四块挂载 + 两行接线）；本地 import 16 条 |
+| `lib/recall/` | 新增：`state`（会话状态）/ `select`（选材）/ `compose`（渲染与预算）/ `text`（文本）/ `injector`（编排）/ `debug` + barrel |
+| `lib/assembly/` | 新增：autodream / 检索工具 / 观测 / 写入门 四块挂载，各一个 `mountXxx` |
+| `lib/settings.js` | 新增：`LIMIT_SPECS` / 设置文件 / 保留名名单 / 原样读写名字校验 |
+| `lib/autodream/{audit,tools,prompt}.js` | 从 `lib/` 根移入子目录（纯搬移；`lib/autodream.js` 的再导出面不变） |
+
+### 新增测试（+60 条，2742 → 2802）
+
+- `test/recall-golden-test.mjs`（12 条）：11 个场景逐字节比对（夹具由 `scripts/gen-recall-golden.mjs`
+  从 1.1.0 生成后入库）。
+- `test/recall-unit-test.mjs`（27 条）：**没有一条需要 `new MemoryGateway`** —— 代次归零、baseline
+  只来一次、摘要/正文并集、签名去重、意图放宽、截断、两本账、卡去重、纯卡输出。
+- `test/structure-test.mjs`（19 条）：体积（index ≤800 行 / 构造函数 ≤60 行 / 单文件 ≤1100 行）、
+  依赖方向（memory 不认识 autodream；recall 只依赖 memory；assembly 不反向依赖组合根）、
+  typert 契约位置、barrel 接线。
+- `test/write-gate-wiring-test.mjs`（+2）：迁移目标文件到 `lib/assembly/write-gate-mount.js`，
+  并新增「组合根真的调了 `mountWriteGate`」与「组合根里没有 `ctx.inject`」。
+- `test/env-contract-test.mjs`：`SAGE_MEM_TASK_ID` 的源码断言迁移到 `lib/recall/injector.js`
+  （判据从 200 字符窗口收窄到**取值那一行**，避免误伤注释）。
+
+### 实测
+
+- `npm test`：**2802 passed, 0 failed**。
+- 反向对照（一次性，手工跑）：把 golden 夹具改一个词 → `recall-golden` 变红；
+  把 `mountWriteGate` 挪进 `ctx.inject` → `write-gate-wiring` 变红（并因监听器没注册而崩溃）。
+  **两条守卫都不是空转。**
+- `node scripts/structure-report.mjs`：见上表数字，`sourceLocation` 全部 `lib/index.js:1:1 = true`。
+
 ## 1.1.0
 
 **主题：档案馆终于有了「彻底删除」。** 一个新入口 + 它的两道闸门；归档本身仍然只移不删。

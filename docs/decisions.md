@@ -483,3 +483,29 @@ B 台账」—— **A 里不存在的名字在 B 台账里全被判成死键删�
 
 **为什么生产不受影响**：生产两条调用路径传的都是 `MEMORY_DIR` 本身，`ledgerFileFor` 返回的仍是
 `ACCESS_LEDGER_FILE`。这个坑只对「传了别的目录」的调用方成立 —— 也就是测试。
+
+## D21 · 注入链搬出组合根，但**三个 Gateway 类留在 `lib/index.js`**
+
+**背景**：1.1.0 的 `lib/index.js` 有 1431 行，`MemoryGateway` 构造函数 540 行里塞着整条注入链
+（约 348 行监听器 + 四块挂载 + 设置工具）。想测「压缩后 baseline 会不会重来」这类分支，
+只能先造一个万能 Proxy ctx 再 `new MemoryGateway(ctx)` —— 测的其实是「组合根能不能被构造」。
+
+**决定**：
+
+- 注入链搬进 `lib/recall/`（`state` / `select` / `compose` / `text` / `injector` / `debug` + barrel），
+  四块挂载搬进 `lib/assembly/`，面板设置与保留名工具搬进 `lib/settings.js`；
+- **三个 Gateway 类不动**：`typert.host.js` 的 31 条 `sourceLocation` 全硬编码
+  `lib/index.js:1:1`，搬类就是契约漂移。组合根能从 1431 行降到 739 行、构造函数从 540 行降到 26 行，
+  靠的正是「只搬函数，不搬类」；
+- 行为由 11 份 golden 夹具逐字节守（生成于 1.1.0 的行为，`scripts/gen-recall-golden.mjs`），
+  搬完 11/11 相同；
+- 三处**读源码的守卫**（`write-gate-wiring-test` 第 7 组、`env-contract-test` 第 6 组、
+  `access-test` 的 `archiveMemory` 导入）改的是**目标文件**，不是删守卫；
+  `write-gate-wiring-test` 另加一条「组合根真的调了 `mountWriteGate(ctx, MEMORY_DIR)`」——
+  只迁不补，等于允许「模块写得对、但没人调用」。
+
+**为什么 `SAGE_MEM_DEBUG` 从模块常量改成每次现读**：原来测试靠「用 query 重载 `lib/index.js`」
+切换开关；拆成独立模块后重载 index.js 不会重载它，常量永远停在旧值（`access-test` 第 4 组当场变红）。
+现读一次环境变量的成本可以忽略，换来的是「运行时也能打开调试」这个更诚实的行为。
+
+**代价**：`lib/recall/*` 多一层 barrel；`__testables` 仍在组合根（测试面不变）。

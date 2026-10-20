@@ -15,7 +15,7 @@ import { spawn } from 'node:child_process'
 
 const LIB = new URL('../lib/', import.meta.url)
 const { AutodreamEngine } = await import(new URL('autodream.js', LIB).href)
-const { createToolRunner } = await import(new URL('autodream-tools.js', LIB).href)
+const { createToolRunner } = await import(new URL('autodream/tools.js', LIB).href)
 
 let pass = 0
 let fail = 0

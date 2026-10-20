@@ -6,7 +6,7 @@ import { mkdtemp, mkdir, writeFile, readFile, readdir, stat } from 'node:fs/prom
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { AutodreamEngine } from '../lib/autodream.js'
-import { createToolRunner, autodreamToolSchemas } from '../lib/autodream-tools.js'
+import { createToolRunner, autodreamToolSchemas } from '../lib/autodream/tools.js'
 
 let pass = 0
 let fail = 0

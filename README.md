@@ -492,6 +492,14 @@ memory/ directory (markdown files, 4 types)
 
 No worker, no SQLite, no HTTP port, no long-running process.
 
+Module boundaries (since 1.2.0):
+
+- `lib/index.js` — the **composition root** plus the three gateways. The typert manifest pins `sourceLocation` to this file, so the gateway classes stay here (moving them would be a contract drift)
+- `lib/recall/` — the injection chain: selection (`select`) / rendering and budget (`compose`) / text (`text`) / session state (`state`)
+- `lib/assembly/` — the four mounts: autodream / retrieval tools / observation / write gate
+- `lib/memory/` — pure memory-layer functions and file operations; `lib/autodream/` — the autodream engine
+- Dependency direction: `memory` never imports `autodream`, `recall` depends only on `memory`, `assembly` never imports the composition root (`test/structure-test.mjs` turns red if that changes)
+
 ## Contributing
 
 ```bash

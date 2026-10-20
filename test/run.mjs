@@ -34,6 +34,8 @@ const SUITES = [
   'autodream-config-test.mjs',
   'update-test.mjs',
   'retrieval-test.mjs',
+  // 1.2.0：注入链拆成纯函数后的直接单测（不需要 new MemoryGateway）。
+  'recall-unit-test.mjs',
   'chunks-test.mjs',
   'bm25-test.mjs',
   'search-test.mjs',
@@ -53,6 +55,9 @@ const SUITES = [
   'checkpoint-test.mjs',
   'typert-test.mjs',
   'inject-test.mjs',
+  // 1.2.0：注入链从组合根搬出前先建的 golden —— 11 个场景逐字节比对，
+  // 证明「纯搬移」不是一句自述（fixtures 由 scripts/gen-recall-golden.mjs 生成）。
+  'recall-golden-test.mjs',
   'host-facts-test.mjs',
   'archive-test.mjs',
   'access-test.mjs',
@@ -63,6 +68,8 @@ const SUITES = [
   'client-render-test.mjs',
   // 契约 §5（环境变量）的默认值 / 越界夹取 —— 以前这半边一条断言都没有。
   'env-contract-test.mjs',
+  // 1.2.0：结构守卫 —— 组合根体积 / 依赖方向 / typert 契约位置。
+  'structure-test.mjs',
   // ⚠️ 下面两个必须排在最后：它们读的是**前面套件跑完落的断言台账**（见 `_passlog.mjs`），
   // 排在前面就会读到残缺的账。它们盯的是「契约里说了不验的承诺」与「两份文档说法不一致」。
   'contract-binding-test.mjs',
