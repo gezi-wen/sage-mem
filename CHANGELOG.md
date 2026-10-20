@@ -7,20 +7,33 @@
 
 ---
 
-## Unreleased
+## 1.6.0
 
-**主题：记忆管理页直接打开记忆文件夹。**
+**主题：记忆管理页直接打开记忆文件夹（社区贡献）。**
 
 ### 行为变更
 
 - 「记忆管理 → 文件列表」头部新增「打开记忆文件夹」：host 侧用系统文件管理器打开当前记忆目录
   （Windows `explorer.exe` / macOS `open` / 其它 `xdg-open`），进程 detached、不等待窗口。
-  路径固定为插件的记忆目录，不接受界面传入。
+  路径固定为插件的记忆目录，不接受界面传入 —— 「打开任意路径」不是一个能力。
+- 窄窗口（≤420px）下头部动作区允许换行，多一个按钮不会把标题挤掉。
 
-### 新增测试
+### 不变
+
+- 其余界面与 remote 面不变；原有入口一个没动，按钮是加法。
+
+### 新增测试（2926 → 2944）
 
 - `test/open-folder-test.mjs`（15 条）：平台映射、spawn 接线（detached / ignore stdio / 不经过 shell /
-  unref）、失败路径。
+  unref）、失败路径；注入 `platform` / `spawn`，Linux CI 上不会真的去开窗口。
+- `client-render-test` 新增第 17 组（3 条）：按钮只在文件列表出现、目录已知时可用、切到星图页不出现。
+- 界面快照因窄窗 CSS 多一条规则而重生成（三屏哈希更新，见 `test/fixtures/client-snapshots.json`）。
+
+### 实测
+
+- `npm test`：**2944 passed, 0 failed**。
+- 贡献：[@DDDMUC](https://github.com/DDDMUC)（暮迟）实现 host 侧与初版测试（PR #4）；
+  维护侧补了渲染断言、窄窗换行与这次发布。
 
 ---
 

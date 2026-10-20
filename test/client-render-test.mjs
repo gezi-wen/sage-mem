@@ -2207,6 +2207,20 @@ async function main() {
     ok(all(tree, byClass('smem-filter-summary')).length === 0, '点 × 只撤掉这一项 → 没有筛选了，汇总行消失')
   }
 
+  // ── 17. 打开记忆文件夹（社区 PR #4，1.6.0）──────────────────────────────
+  group('17. 打开记忆文件夹')
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const { comp: C } = await loadClient(rt, { memory: mem })
+    let tree = await rt.settle(C, {})
+    ok(btnHas(tree, '打开记忆文件夹').length === 1, '文件列表头部有一个「打开记忆文件夹」')
+    ok(btnHas(tree, '打开记忆文件夹')[0].props.disabled !== true, '目录已知且不忙时按钮可用')
+    click(btn(tree, '记忆星图')[0])
+    tree = await rt.settle(C, {})
+    ok(btnHas(tree, '打开记忆文件夹').length === 0, '切到星图页时不出现（只在文件列表）')
+  }
+
   console.log(`\n结果：${pass} passed, ${fail} failed`)
   process.exit(fail ? 1 : 0)
 }
