@@ -137,6 +137,16 @@
 					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
 				},
 				{
+					id: "sage-mem#memory/openMemoryDir",
+					service: "memory",
+					namespace: "memory",
+					method: "openMemoryDir",
+					invocation: { kind: "direct" },
+					parameters: [],
+					result: { mode: "strict", typeSymbol: "sage-mem/types#OpenFolderResult", schema: objCodec, create: () => objCodec },
+					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
+				},
+				{
 					id: "sage-mem#memory/checkUpdate",
 					service: "memory",
 					namespace: "memory",

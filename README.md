@@ -80,6 +80,10 @@ Most memory schemes take the "SQLite + a long-running worker" route: once memori
 
 The UI also carries four more capabilities (all of them optional): the memory management page, type and tag filtering, the memory star map, and audit & archiving.
 
+The memory management page's file list also has an **Open memory folder** button: it opens the
+memory directory in the system file manager (Explorer / Finder / the Linux file manager) through a
+detached host-side process and returns without waiting for the window.
+
 ## Quick Start
 
 Requires **DSH `0.1.2-rc.1` or higher** (see [Compatibility](#compatibility)) and **Node.js `>= 18`**.

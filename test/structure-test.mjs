@@ -100,17 +100,17 @@ group('3. 组合根接线：barrel + 直调 mountWriteGate')
 }
 
 // ── 4. typert 契约位置没动 ──────────────────────────────────────
-group('4. typert 契约：31 条 invocation 仍指 lib/index.js')
+group('4. typert 契约：32 条 invocation 仍指 lib/index.js')
 {
   const { TYPERT } = await import(new URL('../lib/typert.host.js', import.meta.url).href)
-  ok(TYPERT.invocations.length === 31, `31 条 invocation（实际 ${TYPERT.invocations.length}）`)
+  ok(TYPERT.invocations.length === 32, `32 条 invocation（实际 ${TYPERT.invocations.length}）`)
   const bad = TYPERT.invocations.filter((i) => !(i.sourceLocation?.file === 'lib/index.js' && i.sourceLocation?.line === 1 && i.sourceLocation?.column === 1))
   ok(bad.length === 0, '每条 sourceLocation 仍是 lib/index.js:1:1（搬 Gateway 类就必须同步改这里）', bad.slice(0, 3).map((i) => i.id).join(','))
   const src = read('index.js')
   for (const cls of ['MemoryGateway', 'StarmapGateway', 'AutodreamGateway']) {
     ok(new RegExp(`export class ${cls} extends TypertRemoteService`).test(src), `${cls} 仍定义在 lib/index.js（契约位置）`)
   }
-  ok((src.match(/^markRemote\(/gm) || []).length === 31, '31 条 markRemote 仍在组合根里')
+  ok((src.match(/^markRemote\(/gm) || []).length === 32, '32 条 markRemote 仍在组合根里')
 }
 
 console.log(`\n结果：${pass} passed, ${fail} failed`)

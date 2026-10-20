@@ -32,6 +32,7 @@ const SUITES = [
   'q-fixes-098.mjs',
   'archive-index-test.mjs',
   'autodream-config-test.mjs',
+  'open-folder-test.mjs',
   'update-test.mjs',
   'retrieval-test.mjs',
   // 1.2.0：注入链拆成纯函数后的直接单测（不需要 new MemoryGateway）。
