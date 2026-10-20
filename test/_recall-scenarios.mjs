@@ -6,7 +6,7 @@
  * 把当前版本的注入文本逐字节钉住；搬完之后任何一个字节变了都红。
  *
  * 两个让文本**可逐字节比较**的处理：
- *   1. 记忆目录路径会被写进注入头部 → 统一替换成 `<MEMORY_DIR>`（沙箱路径每次都不同）；
+ *   1. 记忆目录路径会被写进注入头部与状态卡 → 统一替换成 `<PATH>`（沙箱路径每次都不同）；
  *   2. 夹具里不写 `updated`，于是不会出现「保存于 N 天前」这种随日期漂移的戳。
  *
  * 场景命名对应方案文档 §4.1；`test/recall-golden-test.mjs` 与
@@ -78,12 +78,20 @@ async function step(handler, sessionId, question, messageCount = 1) {
   return hit ? hit.text : null
 }
 
-/** 归一：沙箱路径每次不同，替换成固定占位符；两种斜杠都换。 */
+/**
+ * 归一：沙箱路径每次不同，替换成固定占位符；两种斜杠都换。
+ *
+ * ⚠️ 这里**只用 `<PATH>` 一个占位符**（不在头部用 `<MEMORY_DIR>` 区分）：状态卡会把目录
+ * 截断到固定长度，而同一个总长的截断在 Windows / Linux 上落点不同 ——
+ * Windows 截出来只有半截路径（靠下面的形状归一），Linux 的 `/tmp/...` 可能短到整段放得下
+ * （被上面的整串替换抓到）。两个占位符会把同一段路径归一成两个长度不同的东西，
+ * 于是夹具在 Linux CI 上差 6 个字符（1.2.0 的 CI 就是这么红的）。
+ */
 function normalize(text) {
   if (text === null) return '<none>'
   const variants = new Set([memDir, memDir.replace(/\\/g, '/'), memDir.replace(/\//g, '\\')])
   let out = text
-  for (const v of variants) out = out.split(v).join('<MEMORY_DIR>')
+  for (const v of variants) out = out.split(v).join('<PATH>')
   /**
    * 状态卡会把记忆目录**截断**到固定字符数（`直接打开记忆目录 C:\…\sage-mem-reca…`），
    * 所以上面那次整串替换抓不到它。这里按形状再归一一次：绝对路径一律变 `<PATH>`
