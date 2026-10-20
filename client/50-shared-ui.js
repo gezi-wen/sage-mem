@@ -307,6 +307,8 @@
 										]
 									: [
 											h("button", { type: "button", className: "smem-btn", key: "edit", onClick: function () { props.onEdit(item.file); } }, "编辑"),
+											// 语义分组：左边只放「编辑」（安全、可逆），右边放「锁定 / 归档 / 删除」（对这条记忆的退役/保护决定）。
+											h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 											/**
 											 * 锁定排在「编辑」与「归档」之间（用户 2026-10-11 指定）：
 											 * 它是「别归档这条」的开关，紧挨着归档才说得通。
@@ -357,6 +359,9 @@
 		function ArchivedCard(props) {
 			const item = props.item;
 			const meta = TYPE_META[item.type] || TYPE_META.reference;
+			// 描述与归档理由都可能很长：默认各 clamp（描述 3 行 / 理由 2 行），点一下展开全文。
+			const sDescOpen = react.useState(false);
+			const descOpen = sDescOpen[0], setDescOpen = sDescOpen[1];
 			return h("div", { className: "smem-card smem-card--archived", key: item.file }, [
 				h("div", { className: "smem-card-head", key: "head" }, [
 					h("span", { className: "smem-badge", key: "badge", title: "类型 " + String(item.type) }, meta[0] + " " + meta[1]),
@@ -372,9 +377,18 @@
 				// 描述留在活动卡片里的同一个位置（标签下面），归档留痕块再往下 ——
 				// 否则「归档理由」像卡片结尾，后面孤零零一行描述没人认得它是什么。
 				item.description
-					? h("div", { className: "smem-narrative", key: "desc" }, String(item.description))
+					? h("div", {
+							className: "smem-narrative", key: "desc",
+							"data-clamp": descOpen ? "0" : "1",
+							title: descOpen ? "点击收起" : "点击展开全文",
+							onClick: function () { setDescOpen(!descOpen); },
+						}, String(item.description))
 					: null,
-				h("div", { className: "smem-ar-reason", key: "why" }, "归档理由：" + (item.archivedReason || "（没写）")),
+				h("div", {
+					className: "smem-ar-reason smem-clamp-2" + (descOpen ? " smem-clamp-2--open" : ""),
+					key: "why", title: "归档理由：" + (item.archivedReason || "（没写）"),
+					onClick: function () { setDescOpen(!descOpen); },
+				}, "归档理由：" + (item.archivedReason || "（没写）")),
 				props.editing
 					? h("div", { className: "smem-ar-edit", key: "edit" }, [
 							h("div", { className: "smem-ar-hint", key: "note" },
@@ -411,7 +425,8 @@
 										disabled: props.busy,
 										onClick: function () { props.onEdit(item.file); },
 									}, "编辑"),
-									h("button", {
+h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
+																		h("button", {
 										type: "button", className: "smem-btn smem-btn-primary", key: "restore",
 										disabled: props.busy,
 										onClick: function () { props.onRestore(item.file); },

@@ -1982,7 +1982,8 @@ async function main() {
     // 13e 三个 tab 共用一条头部带：切到星图 / 自动做梦，头部带都在
     click(btn(tree, '记忆星图')[0])
     tree = await rt.settle(C, {})
-    ok(treeText(tree).indexOf('记忆管理') >= 0 && treeText(tree).indexOf('目录可读') >= 0, '星图页也有同一条头部带')
+    ok(treeText(tree).indexOf('记忆管理') >= 0 && String((all(tree, byClass('smem-dot'))[0] || { props: {} }).props.title || '').indexOf('目录可读') >= 0,
+      '星图页也有同一条头部带（目录状态收进了状态点的 title）')
     ok(all(tree, (n) => n.type === 'button' && textOf(n).indexOf('体检 4 个问题') >= 0).length === 1, '星图页头部带里同样有体检徽标')
     // 13f 星图卡片里那行重复标题已经去掉
     ok(all(tree, byClass('smap-title')).length === 0 && treeText(tree).indexOf('sage-mem memory · 每颗星是一条记忆') < 0,
@@ -2076,6 +2077,101 @@ async function main() {
     click(btnHas(all(tree, byClass('smem-tool-panel'))[0], '收起')[0])
     tree = await rt.settle(C, {})
     ok(all(tree, byClass('smem-tool-panel')).length === 0, '面板里的「收起」把面板关掉')
+  }
+
+  // ── 15. 1.5.0 界面优化：层级 / 密度 / 空态 / 长文 / 动作分组 / 窄窗 ──
+  group('15. 1.5.0 界面优化')
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const { comp: C } = await loadClient(rt, { memory: mem })
+    let tree = await rt.settle(C, {})
+
+    // 15a 头部带：8 → ≤6 个直接子节点；不再有「当前 tab 名」「目录可读」文字
+    const head = all(tree, byClass('smem-head'))[0]
+    const headKids = (head.children || []).filter((x) => x !== null && x !== undefined && x !== false)
+    ok(headKids.length <= 6, `头部带直接子节点 ≤6（实际 ${headKids.length}）`)
+    ok(all(tree, byClass('smem-head-job')).length === 0, '删掉了重复的「当前 tab 名」')
+    ok(treeText(head).indexOf('目录可读') < 0, '「目录可读」文字收进了状态点 title')
+    ok(String((all(tree, byClass('smem-dot'))[0] || { props: {} }).props.title || '').indexOf('目录可读') >= 0,
+      '状态点的 title 带目录状态')
+
+    // 15b tab 语义与分组分隔
+    ok((all(tree, byClass('smem-tabs'))[0] || { props: {} }).props.role === 'tablist', 'tab 栏有 role=tablist')
+    ok(all(tree, (n) => n.type === 'button' && n.props.role === 'tab').length === 5, '五个 tab 都带 role=tab')
+    ok(all(tree, byClass('smem-tabs-sep')).length === 1, 'tab 栏恰好一个分组分隔（看 ｜ 设置·自动化）')
+
+    // 15c 动作分组：编辑 ｜ 其余；最后一个是危险动作
+    const card = all(tree, byClass('smem-card')).find((c) => textOf(c).indexOf('user_alpha.md') >= 0)
+    ok(all(card, byClass('smem-actions-sep')).length === 1, '卡片动作区恰好一个语义分隔')
+    const cardButtons = all(card, (n) => n.type === 'button' && byClass('smem-btn')(n))
+    const labels = cardButtons.map(textOf)
+    ok(labels[0] === '编辑' && labels[1].indexOf('锁定') >= 0 && labels[2] === '归档' && labels[3] === '删除',
+      `按钮顺序不变（实际：${labels.join(' | ')}）`)
+    ok(String(cardButtons[cardButtons.length - 1].props.className).indexOf('danger') >= 0, '危险动作仍是组内最后一个且带 danger 色')
+
+    // 15d 归档卡长文：描述可展开、理由带全文 title
+    const archCard = all(tree, byClass('smem-card--archived')).find((c) => textOf(c).indexOf('feedback_old.md') >= 0)
+    const desc = all(archCard, byClass('smem-narrative'))[0]
+    ok(!!desc && desc.props['data-clamp'] === '1', '归档卡描述默认 clamp（与活动卡同一套规则）')
+    click(desc)
+    tree = await rt.settle(C, {})
+    const archCard2 = all(tree, byClass('smem-card--archived')).find((c) => textOf(c).indexOf('feedback_old.md') >= 0)
+    ok(!!all(archCard2, byClass('smem-narrative'))[0] && all(archCard2, byClass('smem-narrative'))[0].props['data-clamp'] === '0',
+      '点一下展开归档卡描述')
+    const reason = all(
+      all(tree, byClass('smem-card--archived')).find((c) => textOf(c).indexOf('feedback_old.md') >= 0),
+      byClass('smem-clamp-2'),
+    )[0]
+    ok(!!reason && String(reason.props.className).indexOf('smem-clamp-2') >= 0 && textOf(reason).indexOf('归档理由：') === 0,
+      '归档理由 clamp 2 行，完整理由在 title 与文本里（不截断内容，只收视觉高度）')
+
+    // 15e 空态都带动作（空库 / 归档空 / 活动空 / 筛选无结果）
+    const chipOf = (t, text) => all(t, (n) => n.type === 'button' && byClass('smem-chip')(n) && textOf(n) === text)[0]
+    const rtE = makeReact()
+    const memE = makeMemoryRemote([], [])
+    const { comp: E } = await loadClient(rtE, { memory: memE })
+    const tE = await rtE.settle(E, {})
+    ok(btnHas(tE, '添加记忆').length >= 1, '空库空态带「添加记忆」动作')
+
+    const rtA = makeReact()
+    const memA = makeMemoryRemote(ACTIVE, [])
+    const { comp: A } = await loadClient(rtA, { memory: memA })
+    let tA = await rtA.settle(A, {})
+    click(chipOf(tA, '已归档0'))
+    tA = await rtA.settle(A, {})
+    ok(btnHas(tA, '回文件列表').length === 1, '归档区为空时带「回文件列表」动作')
+
+    const rtB = makeReact()
+    const memB = makeMemoryRemote([], ARCHIVED)
+    const { comp: B } = await loadClient(rtB, { memory: memB })
+    let tB = await rtB.settle(B, {})
+    click(chipOf(tB, '活动中0'))
+    tB = await rtB.settle(B, {})
+    ok(btnHas(tB, '切到已归档').length === 1, '活动为空但档案有内容时带「切到已归档」动作')
+
+    const rtC = makeReact()
+    const memC = makeMemoryRemote(ACTIVE, ARCHIVED)
+    const { comp: Cc } = await loadClient(rtC, { memory: memC })
+    let tC = await rtC.settle(Cc, {})
+    const search = all(tC, byClass('smem-search'))[0]
+    typeInto(search, '绝不可能命中的查询串')
+    tC = await rtC.settle(Cc, {})
+    const emptyNode = all(tC, byClass('smem-empty'))[0]
+    ok(!!emptyNode && btnHas(emptyNode, '清除筛选').length === 1, '筛选无结果时**空态里**带「清除筛选」动作')
+
+    // 15f 窄窗口与长文规则进了样式
+    const css = capturedCss.join('\n')
+    ok(css.indexOf('@media (max-width:420px)') >= 0, '有 ≤420px 的窄窗媒体查询')
+    ok(css.indexOf('.smem-clamp-2') >= 0 && css.indexOf('.smem-actions-sep') >= 0, 'clamp 与动作分隔规则都在')
+    ok(/\.smem-starmap\{[^}]*height:clamp\(320px,55vh,620px\)/.test(css), '星图高度用 clamp（矮窗口不再撑出弹窗）')
+    ok(/\.smem-ad-grid2\{[^}]*minmax\(260px,1fr\)/.test(css), '两列网格在 ~560px 就能成立')
+
+    // 15g 抽屉可访问性
+    tree = await rt.settle(C, {})
+    const drawerBtn = btnHas(tree, '工具')[0]
+    ok(String(drawerBtn.props['aria-haspopup'] || '') === 'menu', '抽屉按钮带 aria-haspopup=menu')
+    void tree
   }
 
   console.log(`\n结果：${pass} passed, ${fail} failed`)

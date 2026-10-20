@@ -643,18 +643,29 @@
 			// banner 只在**专门看归档**时出现，切到全部时不重复说一遍。
 			let filesView;
 			if (loading && totalCount === 0) {
-				filesView = h("div", { className: "smem-muted", key: "loading" }, "加载中…");
+				filesView = h("div", { className: "smem-skeleton", key: "loading", "data-loading": "1" }, [0, 1, 2].map(function (i) {
+					return h("div", { className: "smem-skeleton-row", key: i });
+				}));
 			} else if (totalCount === 0) {
-				filesView = h("div", { className: "smem-empty", key: "empty" },
-					"还没有记忆文件。对话中值得记住的事会写到这里，也可以点「添加记忆」手动写入。");
+				filesView = h("div", { className: "smem-empty", key: "empty" }, [
+					h("div", { key: "t" }, "还没有记忆文件。对话中值得记住的事会写到这里，也可以手动写入。"),
+					h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "add", onClick: openAdd }, "+ 添加记忆"),
+				]);
 			} else if (statusFilter === "archived" && archiveItems.length === 0) {
-				filesView = h("div", { className: "smem-empty", key: "empty" },
-					"档案馆是空的 —— 在活动记忆那张卡上点「归档」，它就会收到这里。");
+				filesView = h("div", { className: "smem-empty", key: "empty" }, [
+					h("div", { key: "t" }, "档案馆是空的 —— 在活动记忆那张卡上点「归档」，它就会收到这里。"),
+					h("button", { type: "button", className: "smem-btn", key: "back", onClick: function () { setStatusFilter("active"); } }, "回文件列表"),
+				]);
 			} else if (statusFilter === "active" && items.length === 0) {
-				filesView = h("div", { className: "smem-empty", key: "empty" },
-					"活动记忆是空的 —— 状态筛到「已归档」还能捞出 " + archiveItems.length + " 条。");
+				filesView = h("div", { className: "smem-empty", key: "empty" }, [
+					h("div", { key: "t" }, "活动记忆是空的 —— 状态筛到「已归档」还能捞出 " + archiveItems.length + " 条。"),
+					h("button", { type: "button", className: "smem-btn", key: "go", onClick: function () { setStatusFilter("archived"); } }, "切到已归档"),
+				]);
 			} else if (filtered.length === 0) {
-				filesView = h("div", { className: "smem-empty", key: "empty" }, "没有符合搜索或筛选条件的文件。");
+				filesView = h("div", { className: "smem-empty", key: "empty" }, [
+					h("div", { key: "t" }, "没有符合搜索或筛选条件的文件。"),
+					h("button", { type: "button", className: "smem-btn", key: "clear", onClick: function () { setStatusFilter("all"); setTypeFilter([]); setTagFilter([]); setQuery(""); } }, "清除筛选"),
+				]);
 			} else {
 				const list = h("div", { className: "smem-list", key: "list" }, filtered.map(function (it) {
 					if (it.archived === true) {
@@ -714,25 +725,26 @@
 			}
 
 			return h("div", { className: "smem-root" }, [
-				h("div", { className: "smem-tabs", key: "tabs" }, [
-					h("button", { type: "button", className: "smem-tab" + (tab === "files" ? " smem-tab--on" : ""), key: "f", onClick: function () { setTab("files"); } }, "文件列表"),
-					h("button", { type: "button", className: "smem-tab" + (tab === "star" ? " smem-tab--on" : ""), key: "s", onClick: function () { setTab("star"); } }, "记忆星图"),
-					h("button", { type: "button", className: "smem-tab" + (tab === "autodream" ? " smem-tab--on" : ""), key: "d", onClick: function () { setTab("autodream"); } }, "自动做梦"),
+				h("div", { className: "smem-tabs", key: "tabs", role: "tablist" }, [
+					h("button", { type: "button", className: "smem-tab" + (tab === "files" ? " smem-tab--on" : ""), key: "f", role: "tab", "aria-selected": tab === "files" ? "true" : "false", onClick: function () { setTab("files"); } }, "文件列表"),
+					h("button", { type: "button", className: "smem-tab" + (tab === "star" ? " smem-tab--on" : ""), key: "s", role: "tab", "aria-selected": tab === "star" ? "true" : "false", onClick: function () { setTab("star"); } }, "记忆星图"),
+					h("button", { type: "button", className: "smem-tab" + (tab === "autodream" ? " smem-tab--on" : ""), key: "d", role: "tab", "aria-selected": tab === "autodream" ? "true" : "false", onClick: function () { setTab("autodream"); } }, "自动做梦"),
+					// 视觉分组：左边「看」（文件列表 / 星图），右边「设置 · 自动化」。
+					h("span", { className: "smem-tabs-sep", key: "sep", "aria-hidden": "true" }),
 					// 「自动归档」排在自动做梦之后：归档是**确定性规则**（按闲置天数算，不调模型），
 					// 和「让模型整理记忆」是两件事。塞在自动做梦的设置里用户找不到
 					// （2026-10-11 用户原话：「扔这里连我都找不到」）。
-					h("button", { type: "button", className: "smem-tab" + (tab === "archive" ? " smem-tab--on" : ""), key: "ar", onClick: function () { setTab("archive"); } }, "自动归档"),
+					h("button", { type: "button", className: "smem-tab" + (tab === "archive" ? " smem-tab--on" : ""), key: "ar", role: "tab", "aria-selected": tab === "archive" ? "true" : "false", onClick: function () { setTab("archive"); } }, "自动归档"),
 					// 体检再排在「自动归档」之后、独立成一屏：它只报告不修改，和「文件列表」里的
 					// 增删改是两件事，塞在工具抽屉里会让人以为它是个动作按钮。
-					h("button", { type: "button", className: "smem-tab" + (tab === "audit" ? " smem-tab--on" : ""), key: "a", onClick: openAuditTab }, "体检"),
+					h("button", { type: "button", className: "smem-tab" + (tab === "audit" ? " smem-tab--on" : ""), key: "a", role: "tab", "aria-selected": tab === "audit" ? "true" : "false", onClick: openAuditTab }, "体检"),
 				]),
 				// 四个 tab 共用的一条头部带：我在哪 · 目录状态 · 活动/归档计数 · 体检徽标 · 待重启徽标 · 主操作。
 				// 层级形状固定：导航＝下划线（.smem-tabs）、筛选＝chip、动作＝按钮，三种不混用。
 				h("div", { className: "smem-head", key: "head" }, [
 					h("span", { className: "smem-title", key: "t" }, "记忆管理"),
-					h("span", { className: "smem-head-job", key: "job" }, TAB_LABEL[tab] || ""),
-					h("span", { className: "smem-dot" + (dirOk ? "" : " smem-dot--bad"), key: "dot", title: dirOk ? "memory 目录可读" : "memory 目录不可读" }),
-					h("span", { className: "smem-muted", key: "st" }, dirOk ? "目录可读" : "目录不可读"),
+					// 目录状态收进状态点的 title（不可读时下面另有一条 smem-err，错误本来就该显眼）。
+					h("span", { className: "smem-dot" + (dirOk ? "" : " smem-dot--bad"), key: "dot", title: (dirOk ? "memory 目录可读" : "memory 目录不可读") + " · " + String(TAB_LABEL[tab] || "") }),
 					h("span", { className: "smem-badge", key: "cnt" }, headerCount),
 					// 体检徽标：**抽屉关着也一直看得见**，点它就切到「体检」那一屏。
 					h("button", {
@@ -783,6 +795,7 @@
 							type: "button", key: "btn",
 							className: "smem-btn" + (drawer ? " smem-btn-primary" : ""),
 							"aria-expanded": drawer ? "true" : "false",
+							"aria-haspopup": "menu",
 							title: "归档候选 / 保留名编辑",
 							onClick: function () { setDrawer(!drawer); },
 						}, "工具 ▾"),
@@ -902,8 +915,8 @@
 								: null,
 						])
 					: null,
-				error ? h("div", { className: "smem-err", key: "err" }, "⚠ " + error) : null,
-				notice && !error ? h("div", { className: "smem-ok", key: "ok" }, "✓ " + notice) : null,
+				error ? h("div", { className: "smem-err", key: "err", role: "alert" }, "⚠ " + error) : null,
+				notice && !error ? h("div", { className: "smem-ok", key: "ok", role: "status" }, "✓ " + notice) : null,
 				formOpen
 					? h("div", { className: "smem-form", key: "form" }, [
 							h("div", { className: "smem-form-title", key: "ft" }, editingFile ? "编辑 " + editingFile : "添加记忆"),

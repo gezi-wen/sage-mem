@@ -66,7 +66,7 @@
 			// ⚠️ 可发现性不靠抽屉本身，靠头部带常显的「体检 N 个问题」徽标 —— 那是整个
 			// 抽屉方案能成立的前提（否则三个能力就退回「藏起来」了）。
 			".smem-drawer{position:relative;flex:none;}",
-			".smem-drawer-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:6;min-width:236px;background:var(--dsw-alias-bg-base);border:1px solid var(--dsw-alias-border-l2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.10);padding:6px;display:flex;flex-direction:column;gap:2px;}",
+			".smem-drawer-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:6;min-width:236px;max-width:min(320px,calc(100vw - 24px));background:var(--dsw-alias-bg-base);border:1px solid var(--dsw-alias-border-l2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.10);padding:6px;display:flex;flex-direction:column;gap:2px;}",
 			".smem-drawer-item{display:flex;align-items:center;gap:8px;border:0;background:transparent;font-family:inherit;font-size:12.5px;color:var(--dsw-alias-label-primary);text-align:left;padding:6px 8px;border-radius:8px;cursor:pointer;}",
 			".smem-drawer-item:hover{background:var(--dsw-alias-bg-layer-2);}",
 			'.smem-drawer-item[data-on="1"]{background:var(--dsw-alias-bg-layer-2);font-weight:600;}',
@@ -117,7 +117,7 @@
 			'.smem-subtab--on:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:2px 2px 0 0;background:var(--dsw-alias-label-primary);}',
 			".smem-subtab-n{opacity:.6;margin-left:5px;font-variant-numeric:tabular-nums;}",
 			// 五个注入参数排两列：一行放两个，扫读反而更清楚（吸收方案 A 的做法）。
-			".smem-ad-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:4px 18px;}",
+			".smem-ad-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:4px 18px;}",
 			".smem-ad-field{display:flex;align-items:center;gap:8px;min-width:0;}",
 			".smem-ad-field .smem-autodream-key{min-width:96px;}",
 			".smem-actions{display:flex;gap:6px;}",
@@ -141,7 +141,7 @@
 			'.smem-tab--on:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:2px 2px 0 0;background:var(--dsw-alias-label-primary);}',
 			// 高度预算压到 62vh（原 70vh）：设置弹窗本身高度有限，
 			// 70vh 在较矮的设置弹窗视口下会把星图底部的图例和计数挤出面板之外。
-			".smem-starmap{display:flex;flex-direction:column;height:min(62vh,660px);min-height:400px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;overflow:hidden;}",
+			".smem-starmap{display:flex;flex-direction:column;height:clamp(320px,55vh,620px);min-height:280px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;overflow:hidden;}",
 			// ── 「自动做梦」面板 ──
 			// 融入型：全部走宿主变量，控件复用已有的 chip / input / btn 语言，不另造一套。
 			".smem-autodream{display:flex;flex-direction:column;gap:12px;}",
@@ -188,6 +188,16 @@
 			".smem-update{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--dsw-alias-brand-primary,#4d76e6);border-radius:8px;padding:6px 10px;font-size:12px;background:var(--dsw-alias-bg-layer-1);}",
 			".smem-update-link{color:var(--dsw-alias-brand-primary,#4d76e6);text-decoration:underline;}",
 			".smem-update-x{margin-left:auto;border:0;background:transparent;color:inherit;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;}",
+			// ── 1.5.0：动作分组 / 长文 clamp / 空态骨架 / 窄窗口 ──
+			".smem-actions-sep{width:1px;height:16px;background:var(--dsw-alias-border-l2);margin:0 2px;align-self:center;}",
+			".smem-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;}",
+			".smem-clamp-2--open{-webkit-line-clamp:unset;display:block;}",
+			".smem-skeleton{display:flex;flex-direction:column;gap:10px;padding:6px 0;}",
+			".smem-skeleton-row{height:44px;border-radius:8px;background:var(--dsw-alias-bg-layer-2);opacity:.55;}",
+			".smem-empty{display:flex;flex-direction:column;align-items:flex-start;gap:8px;}",
+			".smem-tabs-sep{width:1px;align-self:stretch;margin:6px 2px;background:var(--dsw-alias-border-l2);}",
+			// 窄窗口（≤420px）：头部带与筛选条各让一行，卡片动作允许换行、分隔符隐藏。
+			"@media (max-width:420px){.smem-root{gap:10px;}.smem-head{gap:6px;}.smem-card-title{min-width:0;word-break:break-word;}.smem-actions{flex-wrap:wrap;}.smem-actions-sep{display:none;}.smem-num{width:56px;}.smem-search{min-width:100px;}}",
 			// ── 底部一行仓库链接（引流，不抢视线）──
 			".smem-star{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--dsw-alias-label-tertiary,#8b93a1);padding:2px 2px 0;}",
 			".smem-star-link{color:var(--dsw-alias-brand-primary,#4d76e6);text-decoration:underline;}",
