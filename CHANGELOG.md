@@ -7,6 +7,53 @@
 
 ---
 
+## 1.3.0
+
+**主题：单一事实来源。** 把「同一件事的第二份实现」收敛成一份，并给「只许有一份」加守卫。
+不改功能；可见变化只有保留名校验收紧（见下）。
+
+### 行为变更
+
+- **保留名（`reserved.json` / 设置页填的名字）校验收紧**：统一走与文件系统同宽的规则，
+  `? * " < > |` 与控制字符也会被拒。这些名字在 Windows 上本来就建不出来；
+  此前是「Linux 认、Windows 崩」，现在两端一致拒绝。合法名字的行为一个字没变。
+
+### 不变
+
+- 注入输出逐字节一致（`recall-golden` 11/11）。
+- typert 契约零 diff：与 `v1.2.1` 的 31 条 invocation 逐字段（id / 参数 / typeSymbol /
+  sourceLocation）比较，可序列化字段**全等**；`lib/typert.host.js` 只换了三处常量的来源。
+- 面板、remote 方法、环境变量语义、状态文件格式均未动。
+- 审计输出未变：`parseFrontmatterLite` 改成正典解析的薄包装后，14 组边界 + 30 份语料逐份对拍一致。
+
+### 内部结构
+
+| 新增 / 修改 | 内容 |
+|---|---|
+| `lib/shared/md-name.js` | 合法 .md 名的**唯一**判据（单段 / 无分隔符 / 无冒号 / 大小写不敏感）+ 索引与流水规范名 |
+| `lib/shared/stamp.js` | `stampDate` / `stampHuman` / `stampCompact`（三份时间戳实现合成一份） |
+| `lib/shared/limits.js` | 512 KB 与 4 MB 两个上限（config 与 typert 共用） |
+| `memory/config.js` | 成为 `LIMIT_SPECS` 唯一定义；五个上限从它派生 |
+| `audit.js` / `frontmatter.js` | `parseFrontmatterLite` 改为薄包装；新增 `hasFrontmatter` |
+| `prompt.js` / `index-file.js` / `tools.js` | 各自的日期、索引名、非条目名副本改为引用共享定义 |
+
+### 新增测试（+65 条，2802 → 2867）
+
+- `test/shared-parity-test.mjs`（44 条）：33 个文件名输入在 isPlainMdName / rawName /
+  fileNameSchema / safeName 四处的接受集合；5 个时刻的三种时间戳与 1.2.x 实现逐字相同；
+  14 组 frontmatter 边界 + 30 份评测语料两份解析器逐字段一致。
+- `test/duplication-test.mjs`（21 条）：7 条「只许一处」的字面量规则（先剥注释）、
+  共享模块零依赖、`lib/` 根目录清单，外加 3 条反向对照（多写一份副本会红、只有白名单不报、
+  注释里提到不算）。**守卫自己证明自己不是空转。**
+- `test/structure-test.mjs`：单文件上限从 1100 收到 **900** 行（实际最大 861）。
+
+### 实测
+
+- `npm test`：**2867 passed, 0 failed**。
+- `node scripts/structure-report.mjs`：`lib/index.js` 740 行 / 构造函数 26 行；
+  最大单文件 `typert.host.js` 861 行（方案目标 800 未达，理由见 `docs/decisions.md` D22）。
+- 与 `v1.2.1` 的 typert manifest 对拍：31/31 条可序列化字段全等。
+
 ## 1.2.1
 
 **主题：修掉 1.2.0 的 CI 红。** 产品代码一行没动 —— 红的是新加的 golden 夹具在 Linux 上差 6 个字符。

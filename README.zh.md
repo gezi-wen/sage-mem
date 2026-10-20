@@ -502,6 +502,7 @@ memory/ 目录（markdown 文件，4 类）
 - `lib/recall/` —— 注入链：选材（`select`）/ 渲染与预算（`compose`）/ 文本（`text`）/ 会话状态（`state`）
 - `lib/assembly/` —— 四块挂载：autodream / 检索工具 / 观测 / 写入门
 - `lib/memory/` —— 记忆层的纯函数与文件操作；`lib/autodream/` —— 自动做梦引擎
+- `lib/shared/` —— 跨层零依赖的小判据：文件名规则 / 本地时间戳 / 两个体积上限（**只许一份**，`test/duplication-test.mjs` 会红）
 - 依赖方向：`memory` 不认识 `autodream`，`recall` 只依赖 `memory`，`assembly` 不反向依赖组合根（`test/structure-test.mjs` 会红）
 
 ## 参与开发

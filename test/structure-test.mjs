@@ -49,7 +49,7 @@ group('1. 组合根体积（1.2.0 验收线）')
   const ctorLines = start >= 0 && end > start ? src.slice(start, end).split('\n').length : Infinity
   ok(ctorLines <= 60, `MemoryGateway 构造函数 ≤ 60 行（实际 ${ctorLines}；1.1.0 是 540）`, `start=${start} end=${end}`)
   const maxFile = all.filter((f) => f.rel !== 'client.js').reduce((a, b) => (a.lines >= b.lines ? a : b))
-  ok(maxFile.lines <= 1100, `lib/ 下单文件 ≤ 1100 行（最大 ${maxFile.rel} ${maxFile.lines} 行；client.js 是构建产物不计）`)
+  ok(maxFile.lines <= 900, `lib/ 下单文件 ≤ 900 行（最大 ${maxFile.rel} ${maxFile.lines} 行；client.js 是构建产物不计）`)
   ok(!/function createSessionInjectState\s*\(/.test(src), '注入状态不再定义在组合根里（已搬到 recall/state.js）')
 }
 

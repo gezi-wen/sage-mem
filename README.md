@@ -498,6 +498,7 @@ Module boundaries (since 1.2.0):
 - `lib/recall/` — the injection chain: selection (`select`) / rendering and budget (`compose`) / text (`text`) / session state (`state`)
 - `lib/assembly/` — the four mounts: autodream / retrieval tools / observation / write gate
 - `lib/memory/` — pure memory-layer functions and file operations; `lib/autodream/` — the autodream engine
+- `lib/shared/` — zero-dependency cross-layer rules: file-name rule / local timestamps / the two size limits (**exactly one copy each**; `test/duplication-test.mjs` turns red otherwise)
 - Dependency direction: `memory` never imports `autodream`, `recall` depends only on `memory`, `assembly` never imports the composition root (`test/structure-test.mjs` turns red if that changes)
 
 ## Contributing

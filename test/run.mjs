@@ -63,6 +63,9 @@ const SUITES = [
   'access-test.mjs',
   'access-v2-test.mjs',
   'panel-api-test.mjs',
+  // 1.3.0：单一事实来源的对拍与「只许一处」守卫（放 build-fresh 之前：都是静态/纯函数）。
+  'shared-parity-test.mjs',
+  'duplication-test.mjs',
   'build-fresh.mjs',
   'client-exec-test.mjs',
   'client-render-test.mjs',

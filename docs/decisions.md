@@ -509,3 +509,30 @@ B 台账」—— **A 里不存在的名字在 B 台账里全被判成死键删�
 现读一次环境变量的成本可以忽略，换来的是「运行时也能打开调试」这个更诚实的行为。
 
 **代价**：`lib/recall/*` 多一层 barrel；`__testables` 仍在组合根（测试面不变）。
+
+## D22 · 同一判据只许一份：收敛到 `lib/shared/`，并给「只许一处」加守卫
+
+**背景**：1.2.1 里「合法 .md 文件名」有 5 份实现（`naming.safeName`、设置页 `rawName`、
+`setSettings` 里手写一遍、`readExtraReserved` 的 filter、typert 的 `fileNameSchema` 正则），
+本地时间戳 3 份，frontmatter 解析 2 份，非记忆条目集合 2 份（**内容还不同**），
+注入上限的 lo/hi 2 份（注释自认「照抄」）。漂移已经发生过：一份漏了 `i`、一份少了 `:`。
+
+**决定**：
+
+- 新建 `lib/shared/`（**零依赖**，谁都能引、不制造循环）：
+  `md-name.js`（三条平台无关底线 + 索引/流水规范名）、`stamp.js`（`stampDate` / `stampHuman` /
+  `stampCompact`）、`limits.js`（512 KB 与 4 MB）。
+- `memory/config.js` 成为 `LIMIT_SPECS` 的**唯一定义**，五个上限从它派生；
+  `settings.js` 与组合根不再各留一份。`audit.parseFrontmatterLite` 改成
+  `parseFrontmatter` 的薄包装（保留导出面，行为由 30 份语料 + 14 组边界对拍）。
+- 新增 `test/duplication-test.mjs`：按**字面量**扫 `lib/**`（先剥注释），
+  「应该只有一处」的串出现在白名单之外就红；反向对照写在套件内。
+  新增 `test/shared-parity-test.mjs`：把同一批输入喂给每个入口，比较接受集合与输出。
+
+**可见的收紧（是行为变化，不是纯重构）**：保留名校验（`setSettings` / `readExtraReserved` /
+`rawName`）现在统一走 `isPlainMdName`，因此 `? * " < > |` 与控制字符也会被拒 ——
+这些名字在 Windows 上本来就建不出来，此前是「Linux 能过、Windows 崩」，现在两端一致拒绝。
+
+**没做到的**：`lib/` 最大文件仍是 `typert.host.js` 861 行（方案里写了 ≤800）。拆它等于动
+31 条 invocation 的声明位置，收益/风险比不划算，留到真正需要加 remote 时再谈。
+客户端侧的重复（类型词表 / codec 基元 / unwrap）留给 1.4.0（那一版本来就动客户端作用域）。
