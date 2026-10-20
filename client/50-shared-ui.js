@@ -364,7 +364,7 @@
 
 		/**
 		 * 归档区的一条。与活动卡片共用骨架（类型章 / 标题 / 标签 / 描述），刻意的差异：
-		 * 虚线边框 + 整体压灰（退役感）、多一行归档留痕、动作是「编辑 / 恢复」。
+		 * 虚线边框 + 整体压灰（退役感）、多一行归档留痕、动作是「编辑 / 恢复 / 彻底删除」。
 		 *
 		 * ⚠️ 灰的只有**内容**（`.smem-card--archived` 那几条只点标题/类型章/标签/正文的字色）。
 		 * 按钮一律保持原样 —— 按钮一灰，用户就以为不能按。
@@ -372,7 +372,10 @@
 		 * ⚠️ 编辑走**原样文本**：readArchived 拿到的全文直接进 textarea，保存时原样交回
 		 * writeArchived。绝不走活跃记忆那套 buildFrontmatter 重建 —— 重建会吞字段，
 		 * 归档文件里还有 archived_at / archived_reason 这种留痕，更动不得。
-		 * 也不提供删除：归档 = 不删，host 侧也没有那条 remote。
+		 *
+		 * 「彻底删除」是 v1.1.0 加的**唯一**一个不可逆入口，所以它走两段式：
+		 * 点一下只展开一句「真的删、不能恢复」的确认条，再点「确认彻底删除」才动手。
+		 * 归档的承诺（只移不删）没有被它破坏 —— 归档动作仍然一个字节都不删。
 		 */
 		function ArchivedCard(props) {
 			const item = props.item;
@@ -412,19 +415,39 @@
 								h("button", { type: "button", className: "smem-btn", key: "cancel", disabled: props.busy, onClick: props.onCancel }, "取消"),
 							]),
 						])
-					: h("div", { className: "smem-card-foot", key: "foot" },
-							h("div", { className: "smem-actions", key: "acts" }, [
-								h("button", {
-									type: "button", className: "smem-btn", key: "edit",
-									disabled: props.busy,
-									onClick: function () { props.onEdit(item.file); },
-								}, "编辑"),
-								h("button", {
-									type: "button", className: "smem-btn smem-btn-primary", key: "restore",
-									disabled: props.busy,
-									onClick: function () { props.onRestore(item.file); },
-								}, props.restoring ? "恢复中…" : "恢复"),
-							])),
+					: props.deleting
+						? h("div", { className: "smem-ar-confirm", key: "del" }, [
+								h("div", { key: "what" },
+									"彻底删除「" + item.file + "」：它会从 archive/ 里被真的删掉，不能恢复。" +
+									"要保留它就先点「恢复」，把它放回活动记忆。"),
+								h("div", { className: "smem-ar-hint", key: "hint" },
+									"这一步之后没有任何界面能把内容找回来 —— 只剩你自己在磁盘上留过备份。"),
+								h("div", { className: "smem-row", key: "btns" }, [
+									h("button", { type: "button", className: "smem-btn smem-btn-danger", key: "yes", disabled: props.busy, onClick: function () { props.onConfirmDelete(item.file); } }, "确认彻底删除"),
+									h("button", { type: "button", className: "smem-btn", key: "no", disabled: props.busy, onClick: props.onCancelDelete }, "取消"),
+								]),
+							])
+						: h("div", { className: "smem-card-foot", key: "foot" },
+								h("div", { className: "smem-actions", key: "acts" }, [
+									h("button", {
+										type: "button", className: "smem-btn", key: "edit",
+										disabled: props.busy,
+										onClick: function () { props.onEdit(item.file); },
+									}, "编辑"),
+									h("button", {
+										type: "button", className: "smem-btn smem-btn-primary", key: "restore",
+										disabled: props.busy,
+										onClick: function () { props.onRestore(item.file); },
+									}, props.restoring ? "恢复中…" : "恢复"),
+									// 放在最后、且用 danger-ghost：它是这张卡上唯一不可逆的动作，
+									// 不该跟「恢复」长得一样。
+									h("button", {
+										type: "button", className: "smem-btn smem-btn-danger-ghost", key: "purge",
+										disabled: props.busy,
+										title: "从 archive/ 里彻底删掉，不可恢复（要留就先恢复）",
+										onClick: function () { props.onAskDelete(item.file); },
+									}, "彻底删除"),
+								])),
 			]);
 		}
 

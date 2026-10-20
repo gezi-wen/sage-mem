@@ -108,6 +108,21 @@
 					result: { mode: "strict", typeSymbol: "sage-mem/types#ArchivedWriteResult", schema: archivedWriteSchema, create: () => archivedWriteSchema },
 					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
 				},
+				{
+					// 彻底删除一条归档件（不可恢复）。第二个参数是归档代次：宿主拿它核对
+					// 「要删的是不是用户确认过的那一版」，传错（比如列表过期）会被拒绝。
+					id: "sage-mem#memory/deleteArchived",
+					service: "memory",
+					namespace: "memory",
+					method: "deleteArchived",
+					invocation: { kind: "direct" },
+					parameters: [
+						{ name: "name", wire: "name", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#ArchivedFileName", schema: strSchema, create: () => strSchema } },
+						{ name: "archivedAt", wire: "archivedAt", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#ArchiveStamp", schema: archiveStampSchema, create: () => archiveStampSchema } },
+					],
+					result: { mode: "strict", typeSymbol: "sage-mem/types#ArchiveResult", schema: archiveSchema, create: () => archiveSchema },
+					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
+				},
 				// ── 面板 API（D1）：体检 / 归档候选 / 设置 / 保留名原样读写 ──
 				// 结果形状都在演进（审计清单、候选表、设置项），顶层用 objCodec 接住、
 				// 内部宽松 —— 与 autodream 那几个 codec 同一套理由：host 加字段不该让旧界面整体报错。

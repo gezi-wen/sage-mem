@@ -151,7 +151,7 @@ Every image below is **rendered from the UI code in this repository** (the same 
 
 ![File list: one Markdown file per memory, greyed rows are archived](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/files-list.png)
 
-*File list — the header always shows 「体检 N 个问题」(audit: N issues) and 「待重启生效」(restart to apply), so you know whether you should deal with it without opening anything; greyed rows are archived and can be restored at any time.*
+*File list — the header always shows 「体检 N 个问题」(audit: N issues) and 「待重启生效」(restart to apply), so you know whether you should deal with it without opening anything; greyed rows are archived and can be restored at any time, or deleted for good with 「彻底删除」(irreversible, asks once more).*
 
 ![Tools drawer: archive candidates / reserved-name editing, zero footprint when closed](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/tools-drawer.png)
 
@@ -171,7 +171,7 @@ Every image below is **rendered from the UI code in this repository** (the same 
 
 ![Archive candidates: each states "why archiving is suggested", executed only after confirmation](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/archive-candidates.png)
 
-*Archive candidates — each states "why archiving is suggested" (idle days vs the threshold for that type); files are touched only after you confirm one by one or select all. Archiving moves a file into `archive/`, it **does not delete**.*
+*Archive candidates — each states "why archiving is suggested" (idle days vs the threshold for that type); files are touched only after you confirm one by one or select all. Archiving moves a file into `archive/`, it **does not delete**; to actually delete an archived entry, click 「彻底删除」(delete permanently) in the archive view and confirm once more.*
 
 ![Memory star map: dark stars are archived memories](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/starmap-archive.png)
 

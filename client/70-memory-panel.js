@@ -67,6 +67,10 @@
 			const archiveReason = sArchiveReason[0], setArchiveReason = sArchiveReason[1];
 			const sRestoring = react.useState(null);
 			const restoring = sRestoring[0], setRestoring = sRestoring[1];
+			// 「彻底删除」的二次确认：正在问哪一条（null = 没在问）。
+			// 与 editing 互斥 —— 同一张卡上不能既在改又在删。
+			const sArchDelete = react.useState(null);
+			const archDelete = sArchDelete[0], setArchDelete = sArchDelete[1];
 			// 归档文件的「原样文本」编辑器：正在编辑谁、编辑框里是什么、读/存进行中
 			const sArchEdit = react.useState(null);
 			const archEdit = sArchEdit[0], setArchEdit = sArchEdit[1];
@@ -336,6 +340,7 @@
 				}
 				setBusy(true); setError(null); setNotice("");
 				setRestoring(file);
+				setArchDelete(null);
 				remote.restore(file)
 					.then(function (r) {
 						if (r && r.ok === false) { setError(r.error || "恢复被拒绝"); return; }
@@ -345,6 +350,31 @@
 					})
 					.catch(function (e) { setError(String((e && e.message) || e)); })
 					.then(function () { setBusy(false); setRestoring(null); });
+			}
+
+			/**
+			 * **彻底删除**一条归档件（不可恢复）。
+			 *
+			 * 第二个参数是归档代次（列表上看到的 `archivedAt`）：宿主拿它核对「要删的是不是
+			 * 我确认过的那一版」。不传它会变成「按名字删」—— 名字底下的内容刚才可能已经换人了。
+			 */
+			function deleteArchivedFile(file) {
+				if (typeof remote.deleteArchived !== "function") {
+					setError("宿主侧还没有 deleteArchived 接口（插件版本较旧）");
+					return;
+				}
+				const item = archiveItems.filter(function (x) { return x.file === file; })[0];
+				const stamp = (item && item.archivedAt) || "";
+				setBusy(true); setError(null); setNotice("");
+				remote.deleteArchived(file, stamp)
+					.then(function (r) {
+						if (r && r.ok === false) { setError(r.error || "删除被拒绝"); return; }
+						setArchDelete(null);
+						setNotice("已彻底删除 " + file + " —— 归档区里也没有它了，找不回来");
+						load();
+					})
+					.catch(function (e) { setError(String((e && e.message) || e)); })
+					.then(function () { setBusy(false); });
 			}
 
 			/**
@@ -361,6 +391,7 @@
 					return;
 				}
 				setError(null); setNotice("");
+				setArchDelete(null);
 				setArchEdit(file);
 				setArchText("");
 				setArchLoad(true);
@@ -631,6 +662,7 @@
 							item: it,
 							busy: busy,
 							restoring: restoring === it.file,
+							deleting: archDelete === it.file,
 							editing: archEdit === it.file,
 							loading: archLoad && archEdit === it.file,
 							saving: archSaving && archEdit === it.file,
@@ -640,6 +672,10 @@
 							onSave: saveArchEdit,
 							onCancel: cancelArchEdit,
 							onRestore: restoreFile,
+							// 两个「危险动作的确认」互斥：问到一半又去改文本，界面就会同时摆两个确认条。
+							onAskDelete: function (file) { setArchDelete(file); setArchEdit(null); },
+							onCancelDelete: function () { setArchDelete(null); },
+							onConfirmDelete: deleteArchivedFile,
 						});
 					}
 					return h(Card, {
@@ -670,7 +706,7 @@
 					? [
 							h("div", { className: "smem-ar-banner", key: "banner" },
 								"档案馆里的记忆不参与检索与星图，原文仍在记忆目录的 archive/ 下 —— 恢复后它就回到活动列表；" +
-								"「编辑」是原样文本编辑，改完存回同一份文件。"),
+								"「编辑」是原样文本编辑，改完存回同一份文件；「彻底删除」会真的从 archive/ 里删掉它（不可恢复，删除前还要再确认一次）。"),
 							list,
 						]
 					: list;

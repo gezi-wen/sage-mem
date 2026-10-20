@@ -45,6 +45,9 @@
 		// 归档文件的读 / 写（B1b）：形状与活跃记忆那套的 readSchema / writeSchema 对称。
 		const archivedReadSchema = parseSchema({ "name": isStr, "content": isStr });
 		const archivedWriteSchema = parseSchema({ "ok": isBool, "file": isStr });
+		// 「彻底删除」的入参：归档代次（`archivedAt`）。它不是装饰 —— 宿主拿它核对
+		// 「要删的是不是用户确认过的那一版」。老归档件没有留痕时传空串，所以只校类型。
+		const archiveStampSchema = strSchema;
 
 		// ── autodream 的 codec ──
 		// 刻意写得宽：这几个方法返回的是配置 / 状态对象，字段会随版本增删。

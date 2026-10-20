@@ -236,6 +236,8 @@ function makeMemoryRemote(active, archived, raw) {
     active: active.map((x) => ({ ...x })), archived: archived.map((x) => ({ ...x })),
     calls: [], raw: { ...(raw || {}) },
     audit: null, cand: null, settings: null, update: null,
+    // 「彻底删除」的拒绝分支开关（模拟宿主发现代次对不上）
+    refuseDelete: false,
   }
   return {
     st,
@@ -330,6 +332,18 @@ function makeMemoryRemote(active, archived, raw) {
       delete rest.archivedAt
       delete rest.archivedReason
       st.active.unshift(rest)
+      return Promise.resolve({ ok: true, file: name })
+    },
+    // v1.1.0：彻底删除（不可恢复）。第二个参数是归档代次 —— 真宿主会拿它核对
+    // 「要删的是不是用户确认过的那一版」，这里只记录、并对拒绝分支留一个开关。
+    deleteArchived(name, archivedAt) {
+      st.calls.push(['deleteArchived', name, archivedAt])
+      if (st.refuseDelete) {
+        return Promise.resolve({ ok: false, error: 'sage-mem: ' + name + ' 在确认之后被换成了另一版，本次一个字节都没删 —— 请刷新列表再看一眼。' })
+      }
+      const i = st.archived.findIndex((x) => x.file === name)
+      if (i < 0) return Promise.resolve({ ok: false, error: 'sage-mem: not archived: ' + name })
+      st.archived.splice(i, 1)
       return Promise.resolve({ ok: true, file: name })
     },
     readFile() { return Promise.resolve({ content: '# x' }) },
@@ -764,7 +778,7 @@ async function emitPreview() {
     mem.st.settings = LIMITS_FIXTURE
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
     const tree = await rt.settle(C, {})
-    S('files-list', 'docs/images/files-list.png', '文件列表 —— 头部带常显「体检 N 个问题」与「待重启生效」，不用点开就知道该不该处理；灰底条目是已归档，随时可以恢复。', '① 文件列表 · 常态（工具抽屉关着，头部带常显「体检 4 个问题」）', serHtml(tree))
+    S('files-list', 'docs/images/files-list.png', '文件列表 —— 头部带常显「体检 N 个问题」与「待重启生效」，不用点开就知道该不该处理；灰底条目是已归档，随时可以恢复，也可以彻底删除（要再确认一次）。', '① 文件列表 · 常态（工具抽屉关着，头部带常显「体检 4 个问题」）', serHtml(tree))
   }
   // ② 文件列表 · 抽屉打开（两项各带状态）
   {
@@ -1067,9 +1081,12 @@ async function main() {
     ok(!!card && String(card.props.className).indexOf('smem-card--archived') >= 0, '归档卡带灰系 class')
     const editBtn = btn(card, '编辑')[0]
     const restBtn = btn(card, '恢复')[0]
+    const purgeBtn = btn(card, '彻底删除')[0]
     ok(!!editBtn && !!restBtn, '归档卡同时有「编辑」与「恢复」')
     ok(editBtn && editBtn.props.disabled !== true && restBtn && restBtn.props.disabled !== true, '两个按钮都不是禁用态')
-    ok(btn(card, '删除').length === 0, '归档卡没有「删除」（归档 = 不删）')
+    ok(!!purgeBtn, '归档卡多一个「彻底删除」入口（v1.1.0）')
+    ok(purgeBtn && purgeBtn.props.disabled !== true, '「彻底删除」不是禁用态（先点开确认条，不会当场删）')
+    ok(btn(card, '删除').length === 0, '没有裸的「删除」：归档上的不可逆动作必须自称「彻底删除」')
 
     const css = capturedCss.join('\n')
     const rule = (css.match(/\.smem-card--archived\{([^}]*)\}/) || [])[1] || ''
@@ -1077,6 +1094,67 @@ async function main() {
     ok(!/\.smem-card--archived[^{]*\.smem-btn/.test(css), '灰系规则一条都不点按钮类')
     ok(/\.smem-card--archived .smem-card-title/.test(css), '灰系只点内容（标题/类型章/标签/正文）')
     void tree
+  }
+
+  // ── 2b. 彻底删除：两段式确认 + 带上归档代次 ──────────────────────────────
+  // 为什么单独成组：这是归档卡上**唯一不可逆**的动作。点一下不能删，
+  // 而且请求里必须带 `archivedAt` —— 宿主拿它核对「删的是不是用户确认过的这一版」。
+  group('2b. 彻底删除：先问再删，且带上归档代次')
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const { comp: C } = await loadClient(rt, { memory: mem })
+    let tree = await rt.settle(C, {})
+    const chipIn = (t, text) => all(all(t, byClass('smem-filters'))[0], (n) => n.type === 'button' && String(n.props.className).indexOf('smem-chip') >= 0 && textOf(n) === text)[0]
+    click(chipIn(tree, '已归档2'))
+    tree = await rt.settle(C, {})
+    const cardOf = (t) => all(t, byClass('smem-card--archived')).find((c) => textOf(c).indexOf('feedback_old.md') >= 0)
+
+    click(btn(cardOf(tree), '彻底删除')[0])
+    tree = await rt.settle(C, {})
+    const confirm = all(tree, byClass('smem-ar-confirm'))[0]
+    ok(!!confirm, '点「彻底删除」只展开确认条，不直接删')
+    ok(!!confirm && textOf(confirm).indexOf('不能恢复') >= 0 && textOf(confirm).indexOf('archive/') >= 0,
+      '确认条写清「从 archive/ 里真的删掉、不能恢复」')
+    ok(!!confirm && textOf(confirm).indexOf('恢复') >= 0, '确认条同时给出退路（要留就先恢复）')
+    ok(mem.st.calls.filter((c) => c[0] === 'deleteArchived').length === 0, '展开确认条时没有发 deleteArchived 请求')
+    ok(!!confirm && btn(confirm, '确认彻底删除').length === 1 && btn(confirm, '取消').length === 1,
+      '确认条里是「确认彻底删除 / 取消」两个按钮')
+
+    const callsBefore = mem.st.calls.length
+    click(btn(confirm, '取消')[0])
+    tree = await rt.settle(C, {})
+    ok(all(tree, byClass('smem-ar-confirm')).length === 0, '取消后确认条收起')
+    ok(mem.st.archived.length === 2, '取消后归档区一条都没少')
+    ok(mem.st.calls.length === callsBefore, '取消不产生任何写请求')
+
+    click(btn(cardOf(tree), '彻底删除')[0])
+    tree = await rt.settle(C, {})
+    click(btn(all(tree, byClass('smem-ar-confirm'))[0], '确认彻底删除')[0])
+    tree = await rt.settle(C, {})
+    const call = mem.st.calls.find((c) => c[0] === 'deleteArchived')
+    ok(!!call && call[1] === 'feedback_old.md', `确认后调了 deleteArchived（${JSON.stringify(call)}）`)
+    ok(!!call && call[2] === '2026-10-01 09:30', '请求带上列表里那条的归档代次 archivedAt')
+    ok(mem.st.archived.length === 1 && !mem.st.archived.some((x) => x.file === 'feedback_old.md'), '归档区里那条真的没了')
+    ok(treeText(tree).indexOf('已彻底删除 feedback_old.md') >= 0, '删除后有明确反馈')
+    ok(all(tree, byClass('smem-card--archived')).length === 1, '卡片从列表里消失')
+
+    // 拒绝分支：宿主发现代次对不上 → 界面必须原样转述，且卡片还在
+    const rt2 = makeReact()
+    const mem2 = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    mem2.st.refuseDelete = true
+    const { comp: C2 } = await loadClient(rt2, { memory: mem2 })
+    let t2 = await rt2.settle(C2, {})
+    click(chipIn(t2, '已归档2'))
+    t2 = await rt2.settle(C2, {})
+    const card2 = all(t2, byClass('smem-card--archived')).find((c) => textOf(c).indexOf('feedback_old.md') >= 0)
+    click(btn(card2, '彻底删除')[0])
+    t2 = await rt2.settle(C2, {})
+    click(btn(all(t2, byClass('smem-ar-confirm'))[0], '确认彻底删除')[0])
+    t2 = await rt2.settle(C2, {})
+    ok(treeText(t2).indexOf('请在刷新') >= 0 || treeText(t2).indexOf('请刷新列表') >= 0, '宿主拒绝时把理由原样显示出来')
+    ok(mem2.st.archived.length === 2, '被拒绝时归档区一条都没少')
+    ok(all(t2, byClass('smem-card--archived')).length === 2, '被拒绝时卡片仍在列表里')
   }
 
   // ── 3. R4：归档编辑 = 原样文本进、原样文本出 ─────────────────────────────

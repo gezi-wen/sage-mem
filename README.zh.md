@@ -153,7 +153,7 @@ SAGE_MEM_DIR=/path/to/your/memory
 
 ![文件列表：每条记忆一个 Markdown 文件，灰底的是已归档](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/files-list.png)
 
-*文件列表 —— 头部常显「体检 N 个问题」与「待重启生效」，不用点开就知道该不该处理；灰底条目是已归档，随时可以恢复。*
+*文件列表 —— 头部常显「体检 N 个问题」与「待重启生效」，不用点开就知道该不该处理；灰底条目是已归档，随时可以恢复，也可以点「彻底删除」真的删掉（不可恢复，要再确认一次）。*
 
 ![工具抽屉：归档候选 / 保留名编辑，关着时零占位](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/tools-drawer.png)
 
@@ -173,7 +173,7 @@ SAGE_MEM_DIR=/path/to/your/memory
 
 ![归档候选：每条写清「为什么建议归档」，确认后才执行](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/archive-candidates.png)
 
-*归档候选 —— 每条写清「为什么建议归档」（闲置天数 vs 该类型阈值），逐条或全选后确认才动文件。归档是把文件移进 `archive/`，**不删除**。*
+*归档候选 —— 每条写清「为什么建议归档」（闲置天数 vs 该类型阈值），逐条或全选后确认才动文件。归档是把文件移进 `archive/`，**不删除**；真要删掉一条归档件，得在档案馆里单独点「彻底删除」并再确认一次。*
 
 ![记忆星图：暗星是已归档的记忆](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/starmap-archive.png)
 

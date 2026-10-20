@@ -363,16 +363,16 @@ group('10. 归档文件的读 / 写：改正文但留痕不许丢')
   try { await gw.readArchived('../evil.md') } catch (e) { readInvalid = e }
   ok(readInvalid !== null && /invalid file name/.test(readInvalid.message), 'readArchived 带路径成分 → 抛错', String(readInvalid?.message))
 
-  // ④ 「归档 = 不删」：这两条 remote 之外不许有删除/出档的入口。
-  // D1 起 memory 面从 9 条长到 16 条（audit / archiveCandidates / checkUpdate / getSettings /
-  // setSettings / readRaw / writeRaw），契约面由 client-exec 的 29 条对表守着；这里仍然逐名列全，
-  // 防的是「顺手加了个 deleteArchived」这种没人看出来的新入口。
+  // ④ 归档面恰好这 18 个方法（v1.1.0 起多一个 `deleteArchived`）。
+  // 这一组原先的用意是**防有人顺手加一个删除入口**把「归档 = 不删」偷偷破坏掉；
+  // v1.1.0 是**有意**加的：归档动作仍然只移不删，删除要人在档案馆里单独点、再确认一次。
+  // 所以这里从 17 改成 18，并仍然逐名列全 —— 再加第二个删除入口就还是会在这里现形。
   const methods = Object.getOwnPropertyNames(mod.MemoryGateway.prototype).filter((n) => n !== 'constructor' && !n.startsWith('@')).sort()
   ok(JSON.stringify(methods) === JSON.stringify([
-    'archive', 'archiveCandidates', 'audit', 'checkUpdate', 'deleteFile', 'getSettings', 'listArchived', 'listFiles',
+    'archive', 'archiveCandidates', 'audit', 'checkUpdate', 'deleteArchived', 'deleteFile', 'getSettings', 'listArchived', 'listFiles',
     'readArchived', 'readFile', 'readRaw', 'restore', 'setLocked', 'setSettings', 'writeArchived', 'writeFile', 'writeRaw',
   ]),
-    'memory 面恰好 17 个方法，没有 deleteArchived 之类的新入口', methods.join(','))
+    'memory 面恰好 18 个方法：唯一不可逆入口是 deleteArchived（归档动作本身仍只移不删）', methods.join(','))
 
   // ⑤ 真实输出过一遍 manifest schema
   const { TYPERT } = await import(new URL('typert.host.js', LIB).href)
@@ -384,6 +384,86 @@ group('10. 归档文件的读 / 写：改正文但留痕不许丢')
   shape('readArchived 的真实输出符合 #ArchivedFileContent', 'sage-mem#memory/readArchived', after2)
   shape('writeArchived 成功分支符合 #ArchivedWriteResult', 'sage-mem#memory/writeArchived', w2)
   shape('writeArchived 失败分支符合 #ArchivedWriteResult', 'sage-mem#memory/writeArchived', await gw.writeArchived('nope.md', 'x'))
+}
+
+// ── 10b. 彻底删除归档件（v1.1.0）：代次判据 + 三道闸门 ──────────
+// 这是归档面上**唯一不可逆**的入口，所以断言分两层：
+//   ① 拒绝矩阵 —— 代次不对、目标不在归档区、归档区是联接、名字不合法，一律不动手；
+//   ② 真删 —— 删的是归档区那份，根目录的同名活记忆一个字节不许动（那是「删除」不该碰的东西）。
+group('10b. 彻底删除归档件：代次判据 + 闸门 + 不误伤活记忆')
+{
+  const NAME = 'project_beta.md'
+  const listed = (await gw.listArchived()).files.find((f) => f.file === NAME)
+  ok(!!listed && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(listed.archivedAt),
+    '(前提) beta 在归档区、且带着可核对的归档代次', JSON.stringify(listed))
+  const stamp = listed?.archivedAt ?? ''
+
+  // ① 代次对不上 → 拒绝，一个字节都不删
+  const wrong = await gw.deleteArchived(NAME, '1999-01-01 00:00')
+  ok(wrong.ok === false && /另一版/.test(wrong.error),
+    '代次对不上 → {ok:false} 并说明「被换成了另一版」', JSON.stringify(wrong))
+  ok(existsSync(archivedPath(NAME)), '被拒绝时那份归档件仍在')
+
+  // ② 目标不在归档区 / 名字不合法 / 保留名
+  await rejects('彻底删除一条活动记忆 → 拒绝', () => gw.deleteArchived('project_alpha.md', ''), 'not archived')
+  await rejects('彻底删除归档区没有的名字 → 拒绝', () => gw.deleteArchived('nope.md', ''), 'not archived')
+  await rejects('彻底删除保留名 → 拒绝', () => gw.deleteArchived('memory.md', ''), 'reserved')
+  await rejects('彻底删除带路径成分 → 拒绝', () => gw.deleteArchived('../evil.md', ''), 'invalid file name')
+  await rejects('彻底删除非 .md → 拒绝', () => gw.deleteArchived('notes.txt', ''), 'invalid file name')
+
+  // ③ 真删：只删归档区那份
+  const activeBefore = readFileSync(activePath(NAME), 'utf8')
+  const okDel = await gw.deleteArchived(NAME, stamp)
+  ok(okDel.ok === true && okDel.file === NAME, 'deleteArchived 成功返回 { ok: true, file }', JSON.stringify(okDel))
+  ok(!existsSync(archivedPath(NAME)), 'archive/ 里那份真的没了')
+  ok(!(await gw.listArchived()).files.some((f) => f.file === NAME), 'listArchived 不再列它')
+  ok(readFileSync(activePath(NAME), 'utf8') === activeBefore,
+    '根目录那份**同名活记忆**一个字节没动（删除只碰归档区）')
+
+  // ④ 再删一次 → 明确拒绝（不是静默成功）
+  await rejects('对同一份重复彻底删除 → 拒绝', () => gw.deleteArchived(NAME, stamp), 'not archived')
+
+  // ⑤ 归档区是目录联接 → 拒绝（删的是外部文件的话，比「没删掉」严重得多）
+  const fsp = await import('node:fs/promises')
+  const linkedRoot = join(sandbox, 'linked')
+  const mem2 = join(linkedRoot, 'memory')
+  const outside = join(linkedRoot, 'outside')
+  mkdirSync(mem2, { recursive: true })
+  mkdirSync(outside, { recursive: true })
+  writeFileSync(join(outside, 'secret.md'), '---\narchived_at: 2026-01-01 00:00\n---\n\n外部内容\n', 'utf8')
+  let junctionable = true
+  try {
+    await fsp.symlink(outside, join(mem2, 'archive'), 'junction')
+  } catch (e) {
+    junctionable = false
+    ok(true, `（跳过目录联接断言：本机建不出 junction，${e?.code}）`)
+  }
+  const archiveMod = await import(new URL('memory/archive.js', LIB).href)
+  if (junctionable) {
+    const r = await archiveMod.deleteArchivedMemory(mem2, 'secret.md', '2026-01-01 00:00')
+    ok(r.ok === false && r.code === 'symlink' && /目录联接/.test(r.error),
+      '归档区被换成联接 → 拒绝（不删外部文件）', JSON.stringify(r))
+    ok(existsSync(join(outside, 'secret.md')), '外部那份文件仍在')
+  }
+
+  // ⑥ 归档区不存在 → not archived（拒绝，不是抛错）
+  const mem3 = join(sandbox, 'empty-mem')
+  mkdirSync(mem3, { recursive: true })
+  const r3 = await archiveMod.deleteArchivedMemory(mem3, 'x.md', '')
+  ok(r3.ok === false && /not archived/.test(r3.error), '归档区不存在 → not archived（不抛）', JSON.stringify(r3))
+
+  // ⑦ 真实输出过一遍 manifest schema + 入参形状
+  const { TYPERT } = await import(new URL('typert.host.js', LIB).href)
+  const schemaOf = (id) => TYPERT.invocations.find((i) => i.id === id)?.result?.schema
+  const shape = (label, id, value) => {
+    const r = schemaOf(id).safeParse(value)
+    ok(r.success, label, r.success ? '' : JSON.stringify((r.error?.issues ?? []).slice(0, 3)))
+  }
+  shape('deleteArchived 成功分支符合 #ArchiveResult', 'sage-mem#memory/deleteArchived', okDel)
+  shape('deleteArchived 失败分支符合 #ArchiveResult', 'sage-mem#memory/deleteArchived', await gw.deleteArchived('nope.md', ''))
+  const stampParam = TYPERT.invocations.find((i) => i.id === 'sage-mem#memory/deleteArchived').parameters[1].codec.schema
+  ok(stampParam.safeParse('2026-10-01 09:30').success && stampParam.safeParse('').success && !stampParam.safeParse(123).success,
+    'ArchiveStamp 收字符串（含空串：老归档件没有留痕时用它），拒绝其它类型')
 }
 
 // ── 11. 体检的三种假阳性 ──────────────────────────────────────
