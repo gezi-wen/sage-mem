@@ -7,6 +7,39 @@
 
 ---
 
+## 1.5.2
+
+**主题：Section 减负（筛选条抽成独立组件）+ 界面快照守卫。** 界面一个像素都没变。
+
+### 行为变更
+
+- 无。
+
+### 内部结构
+
+- 新增 `client/74-filter-bar.js`：筛选条成为只吃 props、只渲染的组件；筛选语义（组内 OR / 组间 AND）
+  仍在 Section 里算好再传进去。`70-memory-panel.js` 从 998 行降到 **933 行**，构建分片 14 → 15。
+- 新增 `test/_client-snapshot.mjs`：把 3 屏（文件列表 / 自动做梦·设置 / 体检）的真渲染树
+  sha256 存进 `test/fixtures/client-snapshots.json`。纯结构搬移必须哈希不变；有意改界面时用
+  `node test/_client-snapshot.mjs --update` 重生成，并在 CHANGELOG 说明。
+  **它不挂进 `npm test`**（要再起一遍渲染套件，且正常状态是「等一次有意改界面才变」）。
+
+### 不变
+
+- `client-render-test` 296 条全绿（DOM 结构与文案完全一致）；其余全部断言不变。
+- remote / 描述符 / 构建方式 / 环境变量 / 状态文件均未动。
+
+### 实测
+
+- `npm test`：**2926 passed, 0 failed**（总数不变 —— 快照守卫是手动套件）。
+- `node test/_client-snapshot.mjs`：3/3 屏哈希与基线一致；反向对照（不同内容哈希不同）通过。
+- `lib/client.js`：15 个分片。
+
+### 还在队列里的
+
+- Section 剩下的 933 行（文件列表 / 表单 / 归档动作）还没拆成独立视图，每屏 IIFE 也还没做 ——
+  下一步按「FilesView 拆出 + 快照哈希守零变化」继续。
+
 ## 1.5.1
 
 **主题：筛选条密度（原 1.6.0 清单里的一件，按小版本先落）。** 行为只有「筛选条怎么摆」这一块。
