@@ -188,6 +188,11 @@
 			".smem-update{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--dsw-alias-brand-primary,#4d76e6);border-radius:8px;padding:6px 10px;font-size:12px;background:var(--dsw-alias-bg-layer-1);}",
 			".smem-update-link{color:var(--dsw-alias-brand-primary,#4d76e6);text-decoration:underline;}",
 			".smem-update-x{margin-left:auto;border:0;background:transparent;color:inherit;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;}",
+			// ── 1.5.1：筛选汇总行（有筛选才出现）──
+			".smem-filter-summary{width:100%;display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--dsw-alias-label-secondary);}",
+			".smem-sum-item{display:inline-flex;align-items:center;gap:2px;border:1px solid var(--dsw-alias-border-l1);border-radius:999px;padding:1px 8px;}",
+			".smem-sum-x{border:0;background:transparent;color:inherit;cursor:pointer;font-size:12px;line-height:1;padding:0 0 0 2px;}",
+			".smem-sum-clear{border:0;background:transparent;color:var(--dsw-alias-brand-primary,#4d76e6);font-size:12px;font-family:inherit;cursor:pointer;padding:2px 4px;}",
 			// ── 1.5.0：动作分组 / 长文 clamp / 空态骨架 / 窄窗口 ──
 			".smem-actions-sep{width:1px;height:16px;background:var(--dsw-alias-border-l2);margin:0 2px;align-self:center;}",
 			".smem-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;}",

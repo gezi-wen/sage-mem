@@ -11,6 +11,8 @@
 			const sNotice = react.useState("");
 			const notice = sNotice[0], setNotice = sNotice[1];
 			const sQuery = react.useState("");
+			const sTagOpen = react.useState(false);
+			const tagOpen = sTagOpen[0], setTagOpen = sTagOpen[1];
 			const query = sQuery[0], setQuery = sQuery[1];
 			const sExpanded = react.useState({});
 			const expanded = sExpanded[0], setExpanded = sExpanded[1];
@@ -628,6 +630,17 @@
 				return hay.indexOf(q) >= 0;
 			});
 			const hasFilter = !!(statusFilter !== "all" || typeFilter.length || tagFilter.length || q);
+			// 标签最多平铺 6 个：再多就把筛选条撑成三行，而真正常用的标签通常就那几个。
+			const TAG_VISIBLE_MAX = 6;
+			const tagShown = tagOpen ? tagList : tagList.slice(0, TAG_VISIBLE_MAX);
+			const tagHiddenCount = tagList.length - tagShown.length;
+			// 汇总行里每一项都是「现在正在筛什么 + 单独撤掉它」；只出现有筛选时。
+			function sumItem(label, onRemove) {
+				return h("span", { className: "smem-sum-item", key: "sum-" + label }, [
+					label,
+					h("button", { type: "button", className: "smem-sum-x", key: "x", title: "撤掉这项筛选", onClick: onRemove }, "×"),
+				]);
+			}
 			// 两个计数永远一起露脸：用户不必先筛状态才知道档案馆里有没有东西。
 			const headerCount = (hasFilter ? "筛出 " + String(filtered.length) + " / " + String(statusItems.length) + " · " : "") +
 				"活动中 " + String(items.length) + " · 已归档 " + String(archiveItems.length);
@@ -865,6 +878,24 @@
 				// 三排筛选：状态 / 类型 / 标签。组内 OR、组间 AND，再与搜索框 AND。
 				tab === "files" && totalCount
 					? h("div", { className: "smem-filters", key: "filters" }, [
+							hasFilter
+								? h("div", { className: "smem-filter-summary", key: "sum" }, [
+										statusFilter !== "all"
+											? sumItem("状态：" + (statusFilter === "active" ? "活动中" : "已归档"), function () { setStatusFilter("all"); })
+											: null,
+										typeFilter.map(function (t) {
+											return sumItem("类型：" + (TYPE_LABEL[t] || t), function () { toggleIn(setTypeFilter, t); });
+										}),
+										tagFilter.map(function (g) {
+											return sumItem("标签：#" + g, function () { toggleIn(setTagFilter, g); });
+										}),
+										query.trim() ? sumItem("搜索：" + query.trim(), function () { setQuery(""); }) : null,
+										h("button", {
+											type: "button", className: "smem-sum-clear", key: "all",
+											onClick: function () { setStatusFilter("all"); setTypeFilter([]); setTagFilter([]); setQuery(""); },
+										}, "清除全部"),
+									])
+								: null,
 							h("span", { className: "smem-filters-label", key: "lst" }, "状态"),
 							h("button", {
 								type: "button", key: "st-all", className: "smem-chip",
@@ -900,13 +931,20 @@
 							}),
 							tagList.length ? h("span", { className: "smem-sep", key: "sep" }) : null,
 							tagList.length ? h("span", { className: "smem-filters-label", key: "lgt" }, "标签") : null,
-							tagList.map(function (g) {
+							tagShown.map(function (g) {
 								return h("button", {
 									type: "button", key: "tag-" + g, className: "smem-chip",
 									"data-on": tagFilter.indexOf(g) >= 0 ? "1" : "0",
 									onClick: function () { toggleIn(setTagFilter, g); },
 								}, ["#" + g, h("span", { className: "smem-chip-n", key: "n" }, String(tagCounts[g]))]);
 							}),
+							tagList.length > TAG_VISIBLE_MAX
+								? h("button", {
+										type: "button", key: "moretag", className: "smem-btn",
+										title: tagOpen ? "收起标签" : "还有一些标签没显示",
+										onClick: function () { setTagOpen(!tagOpen); },
+									}, tagOpen ? "收起标签" : ("更多标签 (" + String(tagHiddenCount) + ")") )
+								: null,
 							hasFilter
 								? h("button", {
 										type: "button", key: "clear", className: "smem-btn",

@@ -2174,6 +2174,39 @@ async function main() {
     void tree
   }
 
+  // ── 16. 1.5.1 筛选密度：标签封顶 + 活动筛选汇总 ─────────────────────────
+  group('16. 1.5.1 筛选密度')
+  {
+    const tags = ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8']
+    const many = tags.map((t, i) => ({ file: `project_many${i}.md`, type: 'project', description: 'x', size: 10, tags: [t] }))
+    const rt = makeReact()
+    const mem = makeMemoryRemote(many, [])
+    const { comp: C } = await loadClient(rt, { memory: mem })
+    let tree = await rt.settle(C, {})
+    const tagChips = () => all(tree, (n) => n.type === 'button' && byClass('smem-chip')(n) && textOf(n).indexOf('#') === 0)
+    ok(tagChips().length === 6, `8 个标签只平铺 6 个（实际 ${tagChips().length}）`)
+    const more = btnHas(tree, '更多标签')[0]
+    ok(!!more && textOf(more).indexOf('2') >= 0, '多出来时给「更多标签 (2)」按钮')
+    click(more)
+    tree = await rt.settle(C, {})
+    ok(tagChips().length === 8, '点开后 8 个标签都在')
+    ok(btnHas(tree, '收起标签').length === 1, '点开后按钮变成「收起标签」')
+    click(btnHas(tree, '收起标签')[0])
+    tree = await rt.settle(C, {})
+    ok(tagChips().length === 6, '收起后回到 6 个')
+
+    // 活动筛选汇总：选中某一项 → 汇总行给出「类型：项目 ×」；点 × 只撤掉这一项
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-chip')(n) && textOf(n).indexOf('项目') === 0)[0])
+    tree = await rt.settle(C, {})
+    const summary = all(tree, byClass('smem-filter-summary'))[0]
+    ok(!!summary && treeText(summary).indexOf('类型：项目') >= 0, '有筛选时出现汇总行，写清「类型：项目」')
+    ok(treeText(summary).indexOf('清除全部') >= 0, '汇总行带「清除全部」')
+    const xBtn = all(summary, byClass('smem-sum-x'))[0]
+    click(xBtn)
+    tree = await rt.settle(C, {})
+    ok(all(tree, byClass('smem-filter-summary')).length === 0, '点 × 只撤掉这一项 → 没有筛选了，汇总行消失')
+  }
+
   console.log(`\n结果：${pass} passed, ${fail} failed`)
   process.exit(fail ? 1 : 0)
 }

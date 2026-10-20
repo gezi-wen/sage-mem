@@ -538,6 +538,9 @@ No. Serialized writes guarantee only **in-process** ordering; there is no file l
 **Can I do without autodream?**
 Yes, it is off by default. It and archiving are two different things: archiving is a deterministic rule (by idle days), calls no model and costs nothing.
 
+**The plugin market says "the registry's latest is older than the installed version, updating would downgrade"?**
+That is a **stale `/latest` cache on the download-region mirror**, not a mis-published package: the mirror's full metadata (the document pnpm reads) already has the new version, while the `/<pkg>/latest` shortcut still serves an old one. Retry after a minute or two; if it persists, temporarily switch the market's download region to "Global" (the origin registry, registry.npmjs.org), update, then switch back. To check what is actually published: `npm view sage-mem dist-tags`.
+
 ## Uninstall
 
 ```bash
