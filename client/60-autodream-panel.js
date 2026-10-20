@@ -312,7 +312,7 @@
 					subtab("settings", "设置"),
 					subtab("records", "记录", String(snaps.length + runs.length + reports.length)),
 				]),
-				segOf === "run" ? h("div", { className: "smem-seg", key: "seg-run" }, [
+				segOf === "run" ? h("div", { key: "seg-run" }, [
 				h("div", { className: "smem-autodream-sec", key: "top" }, [
 					h("div", { className: "smem-autodream-row", key: "r" }, [
 						h("button", {
@@ -436,7 +436,7 @@
 						: null,
 				]),
 				]) : null,
-				segOf === "settings" ? h("div", { className: "smem-seg", key: "seg-set" }, [
+				segOf === "settings" ? h("div", { key: "seg-set" }, [
 				// 自动归档那一段（三档策略 + 三个阈值）**已挪到「自动归档」页签**（v0.9.9）：
 				// 归档是确定性规则、不调模型，和这一页的「让模型整理」不是一件事；
 				// 同一件事只在一处设定，这里不再重复摆一份。
@@ -537,7 +537,7 @@
 				]) : null,
 				// ── 回滚点（新）──────────────────────────────────────────────
 				// 只改这一个文件、只用既有 h() 写法；数据全走 remote.autodream。
-				segOf === "records" ? h("div", { className: "smem-seg", key: "seg-rec" }, [
+				segOf === "records" ? h("div", { key: "seg-rec" }, [
 				h("div", { className: "smem-autodream-sec", key: "snap" }, [
 					h("div", { className: "smem-autodream-row", key: "h" }, [
 						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, "回滚点"),

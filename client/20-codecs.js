@@ -1,20 +1,5 @@
 		// ── 手写 strict codec（浏览器无 zod，typert 只要求 parse 方法）──
-		function parseSchema(shape) {
-			return {
-				parse(value) {
-					if (value === null || typeof value !== "object") throw new Error("sage-mem: invalid payload");
-					for (const [key, check] of Object.entries(shape)) {
-						if (!(key in value)) throw new Error("sage-mem: missing field " + key);
-						check(value[key]);
-					}
-					return value;
-				},
-			};
-		}
-		const isStr = (v) => { if (typeof v !== "string") throw new Error("expected string"); };
-		const isBool = (v) => { if (typeof v !== "boolean") throw new Error("expected boolean"); };
-		const isNum = (v) => { if (typeof v !== "number") throw new Error("expected number"); };
-		const strSchema = { parse(v) { isStr(v); return v; } };
+		// 基元（parseSchema / isStr / isBool / isNum / strSchema）在 05-shared.js。
 		const fileSchema = parseSchema({ "file": isStr, "type": isStr, "description": isStr, "size": isNum });
 		const listSchema = { parse(v) { if (!Array.isArray(v)) throw new Error("expected array"); v.forEach((f) => fileSchema.parse(f)); return v; } };
 		const readSchema = parseSchema({ "name": isStr, "content": isStr });

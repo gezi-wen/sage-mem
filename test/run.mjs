@@ -68,6 +68,8 @@ const SUITES = [
   'duplication-test.mjs',
   'build-fresh.mjs',
   'client-exec-test.mjs',
+  // 1.4.0：客户端共享基元的「只许一处」与拼接顺序守卫。
+  'client-scope-test.mjs',
   'client-render-test.mjs',
   // 契约 §5（环境变量）的默认值 / 越界夹取 —— 以前这半边一条断言都没有。
   'env-contract-test.mjs',

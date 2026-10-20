@@ -1,15 +1,3 @@
-		const TYPE_META = {
-			user: ["👤", "用户"],
-			feedback: ["📌", "反馈"],
-			project: ["📁", "项目"],
-			reference: ["🔗", "参考"],
-		};
-		const TYPE_ORDER = ["user", "feedback", "project", "reference"];
-		// 筛选条上的显示名：emoji 在筛选条里太吵，只用文字；special 是星图的兜底类，
-		// 文件列表里出现它说明 frontmatter 写了 type: special。
-		const TYPE_LABEL = { user: "用户", feedback: "反馈", project: "项目", reference: "参考", special: "特殊" };
-		const TYPE_SORT = ["user", "feedback", "project", "reference", "special"];
-
 		/**
 		 * 把输入框里的一串标签切成数组。
 		 *
@@ -256,17 +244,6 @@
 			const tagLine = Array.isArray(tags) && tags.length ? "\n" + renderTags(tags) : "";
 			return "---\nname: \"" + yamlQuote(slug) + "\"\ndescription: \"" + yamlQuote(desc) + "\"" +
 				tagLine + "\nmetadata:\n  node_type: memory\n  type: " + type + "\n---\n\n";
-		}
-
-		function fmtSize(n) {
-			if (n < 1024) return n + " B";
-			if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
-			return (n / 1024 / 1024).toFixed(1) + " MB";
-		}
-
-		/** 拆 typert remote 的 {ok, value} 信封。 */
-		function unwrap(result) {
-			return result && result.ok ? result.value : result;
 		}
 
 		function Chip(props) {
@@ -557,7 +534,7 @@
 					standalone ? null : toolClose(props),
 				]),
 				r.problems
-					? h("div", { className: "smem-audit-secs", key: "secs" }, [
+					? h("div", { key: "secs" }, [
 							section("索引悬空（索引里有、文件没了）", r.dangling, (x) => x.file),
 							section("漏索引（文件在、索引里没有）", r.unlisted, (x) => x.file),
 							section("type 与前缀对不上", r.typeMismatch, (x) => x.file + " · type=" + x.type + "，文件名前缀=" + x.prefix),

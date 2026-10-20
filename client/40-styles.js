@@ -62,10 +62,6 @@
 			// ── 工具行 + 工具面板（体检 / 归档候选 / 保留名原样编辑）──
 			// 三个新入口收在一行**轻量**文字按钮里：不跟主工具栏抢重量级，也不各占一块版面。
 			// 面板一次只开一个（Section 里一个 tool 状态），否则文件列表会被顶到屏幕外。
-			".smem-tools{display:flex;align-items:center;gap:4px;flex-wrap:wrap;}",
-			".smem-tool-btn{border:0;background:transparent;color:var(--dsw-alias-label-secondary);font-size:12px;font-family:inherit;cursor:pointer;padding:2px 8px;border-radius:6px;}",
-			".smem-tool-btn:hover{color:var(--dsw-alias-label-primary);}",
-			'.smem-tool-btn[data-on="1"]{color:var(--dsw-alias-brand-primary,#4d76e6);background:var(--dsw-alias-bg-layer-2);}',
 			// 工具抽屉：关着时**零占位**（工具栏里只有一个「工具 ▾」），点开才占版面。
 			// ⚠️ 可发现性不靠抽屉本身，靠头部带常显的「体检 N 个问题」徽标 —— 那是整个
 			// 抽屉方案能成立的前提（否则三个能力就退回「藏起来」了）。

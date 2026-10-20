@@ -26,6 +26,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url))
  */
 export const CLIENT_PARTS = [
   'client/00-header.js', // 文件头注释 + __ModuleLoader__.load 包装开头
+  'client/05-shared.js', // 1.4.0：跨屏共享的小基元与类型词表（只此一份）
   'client/10-starmap-head.js', // StarmapRuntime IIFE 头：常量 / 纯函数 / Markdown 渲染 / overlay store
   'client/11-starmap-styles.js', // 星图那份 CSS（同名第一份，IIFE 作用域内）
   'client/12-starmap-render.js', // 渲染层：WebGL 星野 + canvas2d 兜底

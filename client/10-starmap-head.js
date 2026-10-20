@@ -2,9 +2,7 @@ const StarmapRuntime = (function (require, _react) {
 	let react = _react;
 	const h = react.createElement;
 // ── 手写 strict codec（浏览器无 zod，typert 只要求 parse 方法）──
-		const isStr = (v) => { if (typeof v !== "string") throw new Error("expected string"); };
-		const isNum = (v) => { if (typeof v !== "number") throw new Error("expected number"); };
-		const strSchema = { parse(v) { isStr(v); return v; } };
+		// isStr / isNum / strSchema 来自 05-shared.js（这个 IIFE 在 factory 作用域内，看得到）。
 		const starSchema = {
 			parse(v) {
 				if (v === null || typeof v !== "object") throw new Error("invalid star");
@@ -57,11 +55,6 @@ const StarmapRuntime = (function (require, _react) {
 			],
 		};
 
-		/** 拆 typert remote 的 {ok, value} 信封。 */
-		function unwrap(result) {
-			return result && result.ok ? result.value : result;
-		}
-
 		/** 错误详情尽量展开，避免 "[object Object]" 式黑洞。 */
 		function detail(e) {
 			if (!e) return "未知错误";
@@ -90,15 +83,10 @@ const StarmapRuntime = (function (require, _react) {
 		// 深空画布上够辨认，又不抢眼。
 		//
 		// 两档取值：`color` = 深色档（夜空画布），`light` = 浅色档（纸本设色）。
-		// 浅色档不用「深色档降亮度」那种做法 —— 高饱和冷色压在暖纸上会发脏；
-		// 换成明度接近的矿物颜料色（赭石/石青/紫墨/石绿/墨），色相错开才分得清类型。
-		const KIND_META = {
-			user: { label: "用户", color: "#e0c07a", light: "#a4652c" },
-			feedback: { label: "反馈", color: "#7ec8da", light: "#3a6f8f" },
-			project: { label: "项目", color: "#ac9edc", light: "#6a5b8f" },
-			reference: { label: "参考", color: "#92ceaa", light: "#4a7c63" },
-			special: { label: "特殊", color: "#bcc3d0", light: "#5b5750" },
-		};
+		// 类型标签与配色来自 05-shared.js 的唯一定义；这里只是把它们组装成星图用的 meta。
+		const KIND_META = {};
+		for (const k of TYPE_SORT) KIND_META[k] = { label: TYPE_LABEL[k], color: TYPE_COLOR_DARK[k], light: TYPE_COLOR_LIGHT[k] };
+
 		/**
 		 * 宿主主题挂钩 —— 与 ui-theme 同一处：body[data-ds-dark-theme] 存在即深色档。
 		 */
@@ -154,16 +142,6 @@ const StarmapRuntime = (function (require, _react) {
 			t = Math.imul(t ^ (t >>> 15), t | 1);
 			t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
 			return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-		}
-
-		function hexA(hex, a) {
-			const n = parseInt(hex.slice(1), 16);
-			return "rgba(" + ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a.toFixed(3) + ")";
-		}
-
-		function fmtBytes(n) {
-			if (n >= 1024) return (n / 1024).toFixed(1) + " KB";
-			return n + " B";
 		}
 
 		function fmtDate(ms) {
@@ -367,21 +345,5 @@ const StarmapRuntime = (function (require, _react) {
 			return blocks;
 		}
 
-		// ── overlay 开合的模块级 store（footer 按钮与 overlay 共享）──
-		const uiStore = { open: false, subs: new Set() };
 		/** client context 由 apply 存入；Slot 组件经 props 或此兜底获取。 */
 		let appCtx = null;
-		function setOpen(v) {
-			uiStore.open = !!v;
-			uiStore.subs.forEach((fn) => fn(uiStore.open));
-		}
-		function useOpen() {
-			const s = react.useState(uiStore.open);
-			react.useEffect(() => {
-				const fn = (v) => s[1](v);
-				uiStore.subs.add(fn);
-				return () => { uiStore.subs.delete(fn); };
-			}, []);
-			return s[0];
-		}
-

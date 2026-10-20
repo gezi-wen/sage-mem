@@ -7,6 +7,47 @@
 
 ---
 
+## 1.4.0
+
+**主题：客户端共享基元收敛 + 死代码清理。** 界面一个像素都没有变（266 条渲染断言全绿）。
+
+### 行为变更
+
+- 无。两处 DOM 里少了无样式类名（`smem-seg` / `smem-audit-secs`，全仓库 CSS 都没有它们），
+  以及字节格式化并入 `fmtSize`（星图文件都 < 512 KB，显示完全一致）。
+
+### 不变
+
+- 界面：`client-render-test` 266 条断言（含文案、按钮顺序、空态、星图几何）全绿，一条文案没改。
+- 契约：`client/30-descriptors.js` 零 diff，`client-exec-test` 的 31 条描述符对表不变。
+- 构建产物仍由 `npm run build:client` 从分片拼接；`build-fresh` 照常盯着漂移。
+
+### 内部结构
+
+| 变化 | 内容 |
+|---|---|
+| 新增 `client/05-shared.js` | 基础类型检查 / `parseSchema` / `strSchema` / `unwrap` / `fmtSize` / `hexA` / 类型词表（排序·标签·emoji）与两套星图配色 |
+| `10` / `20` / `50` | 删掉各自的 `isStr/isNum/strSchema/unwrap/fmtSize/fmtBytes` 与 3 份类型词表副本，改用共享那份 |
+| 死代码（7 项） | `StarmapOverlay` / `StarmapEdgeTab` / `uiStore` / `setOpen` / `useOpen` / 未用的 `renderSlot` 局部变量 / 4 条无主 CSS 规则 + 2 个无样式类名 |
+| 构建顺序 | `CLIENT_PARTS` 在 00 与 10 之间插入 `05-shared.js`（14 个分片） |
+
+### 新增测试（+29 条，2867 → 2896）
+
+- `test/client-scope-test.mjs`（29 条）：14 个共享名字**只许在 05 声明一次**、05 的拼接顺序在
+  引用它的分片之前（否则 TDZ）、构建产物里该段只出现一次；7 项死代码确实消失；
+  3 条反向对照（合成源码里声明两份必须报、只有 05 一份必须过、注释里提到不算）。
+- `test/run.mjs` 登记该套件（放在 `client-exec` 之后）。
+
+### 没做的（诚实清单，理由见 D23）
+
+- `70-memory-panel`（946 行的 Section）拆分、每屏一个 IIFE、3 屏快照哈希 —— 与 1.5.0 的
+  UI 改动是**同一片区域**，拆两次等于把同一个风险付两遍。1.5.0 一起做，并用快照哈希钉「界面不变」。
+
+### 实测
+
+- `npm test`：**2896 passed, 0 failed**。
+- `lib/client.js`：14 个分片，242.6 KB（1.3.0 是 13 个分片）。
+
 ## 1.3.0
 
 **主题：单一事实来源。** 把「同一件事的第二份实现」收敛成一份，并给「只许有一份」加守卫。

@@ -109,7 +109,7 @@
 				});
 			}
 
-			return h("div", { className: "smem-seg" }, [
+			return h("div", { }, [
 				// ── ① 它做什么（这一屏存在的理由写在最前面）──
 				h("div", { className: "smem-autodream-sec", key: "what" }, [
 					h("div", { className: "smem-autodream-row", key: "h" }, [

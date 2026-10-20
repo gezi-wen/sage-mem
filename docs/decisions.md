@@ -536,3 +536,25 @@ B 台账」—— **A 里不存在的名字在 B 台账里全被判成死键删�
 **没做到的**：`lib/` 最大文件仍是 `typert.host.js` 861 行（方案里写了 ≤800）。拆它等于动
 31 条 invocation 的声明位置，收益/风险比不划算，留到真正需要加 remote 时再谈。
 客户端侧的重复（类型词表 / codec 基元 / unwrap）留给 1.4.0（那一版本来就动客户端作用域）。
+
+## D23 · 客户端共享基元收敛到 `05-shared.js`；Section 拆分留给 1.5.0
+
+**背景**：客户端 14 个分片共享**同一个 factory 作用域**（不用打包器的代价）。1.3.0 之后
+仍然有三处重复：`isStr/isNum/strSchema` 在 10 与 20 各一份，`unwrap` 与字节格式化在 10 与 50 各一份，
+类型词表 3 份（50 的 `TYPE_*` + 10 的 `KIND_META` + 星图配色）。
+
+**决定**：
+
+- 新增 `client/05-shared.js`（拼接顺序在建 10 之前）：基础类型检查 / `parseSchema` / `strSchema` /
+  `unwrap` / `fmtSize` / `hexA` / `TYPE_ORDER`·`TYPE_SORT`·`TYPE_LABEL`·`TYPE_META`·两套星图配色。
+  10（IIFE 内部）与 20 / 50 删掉各自的副本，直接用外层这一份 —— **不需要 import**，因为本来就共享作用域。
+- 删死代码：`StarmapOverlay` / `StarmapEdgeTab`（B 方案后只剩子槽渲染）、`uiStore/setOpen/useOpen`
+  （随两个入口一起死；`60` 里的 `setOpen` 是局部 useState，不冲突）、`renderSlot` 局部变量、
+  4 条无主 CSS 规则、2 个无样式类名（`smem-seg` / `smem-audit-secs`）。
+- 新增 `test/client-scope-test.mjs`：14 个共享名字只许在 05 声明一次、05 必须排在最前
+  （TDZ）、死代码确实没了；反向对照用合成源码验判据。
+
+**没做的（留给 1.5.0）**：`70-memory-panel` 946 行的 Section 拆分、每屏一个 IIFE 的显式公开面、
+3 屏快照哈希。理由是**它们与 1.5.0 的 UI 改动是同一片区域** —— 先拆一次、再按新布局拆第二次，
+等于把同一个风险付两遍；1.5.0 会同时改布局与拆分，并用快照哈希证明「只动了要动的那部分」。
+本版用 266 条 `client-render` 断言证明界面行为未变（文案级相等，不是「看起来对」）。

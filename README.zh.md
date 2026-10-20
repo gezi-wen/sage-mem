@@ -503,6 +503,7 @@ memory/ 目录（markdown 文件，4 类）
 - `lib/assembly/` —— 四块挂载：autodream / 检索工具 / 观测 / 写入门
 - `lib/memory/` —— 记忆层的纯函数与文件操作；`lib/autodream/` —— 自动做梦引擎
 - `lib/shared/` —— 跨层零依赖的小判据：文件名规则 / 本地时间戳 / 两个体积上限（**只许一份**，`test/duplication-test.mjs` 会红）
+- 界面侧：`client/*.js` 按屏分片（`05-shared.js` 放跨屏小基元与类型词表），`npm run build:client` 拼成 `lib/client.js`
 - 依赖方向：`memory` 不认识 `autodream`，`recall` 只依赖 `memory`，`assembly` 不反向依赖组合根（`test/structure-test.mjs` 会红）
 
 ## 参与开发

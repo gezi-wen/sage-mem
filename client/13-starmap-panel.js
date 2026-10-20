@@ -386,7 +386,7 @@
 					if (s.mtimeMs > newest) newest = s.mtimeMs;
 				}
 				legendKids.push(h("span", { key: "count", className: "smap-count" },
-					viewStars.length + " 条 · " + fmtBytes(totalBytes) + (newest ? " · 最近更新 " + fmtDate(newest) : "") +
+					viewStars.length + " 条 · " + fmtSize(totalBytes) + (newest ? " · 最近更新 " + fmtDate(newest) : "") +
 					(showArchive && archivedN ? " · 档案馆 " + archivedN + " 颗暗星" : "") +
 					" · 单击看" + (showArchive && archivedN ? "详情" : "全文")));
 
@@ -395,7 +395,7 @@
 					const kids = [
 						h("div", { key: "t", className: "smap-tip-title" }, hover.star.title),
 						h("div", { key: "k", className: "smap-tip-kind" },
-							meta.label + " · " + hover.star.file + " · " + fmtBytes(hover.star.bytes)),
+							meta.label + " · " + hover.star.file + " · " + fmtSize(hover.star.bytes)),
 					];
 					if (hover.star.archived === true) {
 						// 悬浮也要说清它是档案馆里的：暗星外表已经不同，别让人猜。
@@ -419,7 +419,7 @@
 							h("button", { className: "smap-btn", onClick: () => setSelected(null), title: "关闭" }, "×")),
 						h("div", { key: "meta", className: "smap-panel-meta" },
 							h("span", { className: "smap-meta-dot", style: { background: kindColor(meta) } }),
-							meta.label + " · " + selected.star.file + " · " + fmtBytes(selected.star.bytes) +
+							meta.label + " · " + selected.star.file + " · " + fmtSize(selected.star.bytes) +
 							// 归档星的 mtime 是「当年写下」的时间，跟「什么时候收起来的」不是一回事 ——
 							// 这里只留「已归档」，具体时间在下面的归档块里给。
 							(selected.star.archived === true
@@ -522,42 +522,11 @@
 				body);
 		}
 
-		// ── 全屏 overlay ─────────────────────────────────────────────
-		function StarmapOverlay() {
-			const open = useOpen();
-			react.useEffect(() => {
-				if (!open) return undefined;
-				const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
-				document.addEventListener("keydown", onKey);
-				return () => document.removeEventListener("keydown", onKey);
-			}, [open]);
-			if (!open) return null;
-			return h("div", {
-				className: "smap-veil",
-				onMouseDown: (e) => { if (e.target === e.currentTarget) setOpen(false); },
-			},
-			h("div", { className: "smap-modal" },
-				h(StarMap, { ctx: appCtx, onClose: () => setOpen(false) })));
-		}
-
-		// ── 窗口右缘浮标（唯一入口，不绑实例/会话/Run 卡片）────────────
-		function StarmapEdgeTab() {
-			const open = useOpen();
-			if (open) return null;
-			return h("button", {
-				type: "button",
-				className: "smap-fab",
-				onClick: () => setOpen(true),
-				title: "记忆星图 — 把 sage-mem 的记忆画成一片星空",
-				"aria-label": "记忆星图",
-			}, "✦");
-		}
-
 		const inject = ["slots", "remote"];
 
 		/**
 		 * Client 插件：$mount strict remote contribution（第三方 remote 不在
-		 * 宿主的固定 remote 清单里，必须自己挂），再注册 footer 按钮与 overlay。
+		 * 宿主的固定 remote 清单里，必须自己挂），再注册星图子槽（B 方案起不再有右缘浮标与全屏 overlay）。
 		 */
 		async function apply(ctx) {
 			appCtx = ctx;

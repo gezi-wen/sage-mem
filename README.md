@@ -499,6 +499,7 @@ Module boundaries (since 1.2.0):
 - `lib/assembly/` — the four mounts: autodream / retrieval tools / observation / write gate
 - `lib/memory/` — pure memory-layer functions and file operations; `lib/autodream/` — the autodream engine
 - `lib/shared/` — zero-dependency cross-layer rules: file-name rule / local timestamps / the two size limits (**exactly one copy each**; `test/duplication-test.mjs` turns red otherwise)
+- UI side: `client/*.js` is split per screen (`05-shared.js` holds the cross-screen primitives and type tables); `npm run build:client` concatenates them into `lib/client.js`
 - Dependency direction: `memory` never imports `autodream`, `recall` depends only on `memory`, `assembly` never imports the composition root (`test/structure-test.mjs` turns red if that changes)
 
 ## Contributing

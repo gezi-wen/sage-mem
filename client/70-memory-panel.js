@@ -120,7 +120,8 @@
 			const rawBusy = sRawBusy[0], setRawBusy = sRawBusy[1];
 			const sRawLoading = react.useState(false);
 			const rawLoading = sRawLoading[0], setRawLoading = sRawLoading[1];
-			const renderSlot = props.renderSlot;
+			// renderSlot：shell 会经 props 传进来（见 80-apply 的 children 声明），
+			// 但本插件改用并列 tab 渲染星图，不再调用它 —— 声明保留给 shell，这里不取。
 
 			function load() {
 				setLoading(true);
