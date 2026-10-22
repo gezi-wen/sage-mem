@@ -2221,6 +2221,30 @@ async function main() {
     ok(btnHas(tree, '打开记忆文件夹').length === 0, '切到星图页时不出现（只在文件列表）')
   }
 
+  // ── 18. 空记忆库「建立索引骨架」（1.6.1）────────────────────────────────
+  group('18. 建立索引骨架')
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote([], [])
+    const { comp: C } = await loadClient(rt, { memory: mem })
+    let tree = await rt.settle(C, {})
+    ok(btnHas(tree, '建立索引骨架').length === 1, '空库空态带「建立索引骨架」按钮')
+    click(btnHas(tree, '建立索引骨架')[0])
+    tree = await rt.settle(C, {})
+    ok(String(mem.st.raw['MEMORY.md'] || '').indexOf('# 记忆索引') === 0, '点击后写入 MEMORY.md 骨架')
+    ok(treeText(tree).indexOf('已建立 MEMORY.md 索引骨架') >= 0, '写入后给出成功提示')
+
+    // 已有索引时**绝不覆盖**：先读到文件就停下
+    const rt2 = makeReact()
+    const mem2 = makeMemoryRemote([], [], { 'MEMORY.md': '手工写的索引' })
+    const loaded = await loadClient(rt2, { memory: mem2 })
+    let t2 = await rt2.settle(loaded.comp, {})
+    click(btnHas(t2, '建立索引骨架')[0])
+    t2 = await rt2.settle(loaded.comp, {})
+    ok(mem2.st.raw['MEMORY.md'] === '手工写的索引', '已有 MEMORY.md 一字不动')
+    ok(treeText(t2).indexOf('已经存在') >= 0, '提示索引已存在、没有改动')
+  }
+
   console.log(`\n结果：${pass} passed, ${fail} failed`)
   process.exit(fail ? 1 : 0)
 }

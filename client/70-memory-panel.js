@@ -198,6 +198,53 @@
 				setFormFm(null); setFormBaseType(""); setFormTags("");
 			}
 
+			// 空记忆库时「建立索引骨架」写进去的引导文件。它只是给人看的起点：
+			// 索引本来就是手写维护的，这里不猜用户有什么记忆、也不生成假条目。
+			const INDEX_SKELETON = [
+				"# 记忆索引",
+				"",
+				"> 这是 sage-mem 的记忆索引骨架：每条记忆一行，链接到同目录下的一个 Markdown 文件。",
+				"> 索引由人（或 agent）手写维护，不是自动生成的；改写前建议先备份。",
+				"",
+				"## 活动记忆",
+				"",
+				"<!-- 一条记忆一行：「- [标题](文件名.md) — 一句话描述」 -->",
+				"",
+				"## 四类记忆",
+				"",
+				"- `user_*`：关于用户的事实与偏好",
+				"- `feedback_*`：用户给的工作方式指导",
+				"- `project_*`：进行中的工作与状态",
+				"- `reference_*`：外部信息在哪找",
+				"",
+			].join("\n");
+
+			function createIndexSkeleton() {
+				setError(null);
+				setNotice("");
+				if (!remote || typeof remote.readRaw !== "function" || typeof remote.writeRaw !== "function") {
+					setError("宿主侧还没有 readRaw / writeRaw 接口（插件版本较旧）");
+					return;
+				}
+				setBusy(true);
+				// 先读再写：**已有索引绝不覆盖**。readRaw 对不存在的文件会 reject，正好当探针。
+				remote.readRaw("MEMORY.md").then(function () {
+					setBusy(false);
+					setNotice("MEMORY.md 已经存在，没有改动它。");
+				}, function () {
+					return remote.writeRaw("MEMORY.md", INDEX_SKELETON).then(function (res) {
+						const out = unwrap(res);
+						setBusy(false);
+						if (out && out.ok === false) { setError(out.error || "建立索引骨架失败"); return; }
+						setNotice("已建立 MEMORY.md 索引骨架。");
+						load();
+					});
+				}).catch(function (e) {
+					setBusy(false);
+					setError(String((e && e.message) || e));
+				});
+			}
+
 			function openMemoryFolder() {
 				setError(null);
 				if (!remote || typeof remote.openMemoryDir !== "function") {
@@ -669,7 +716,7 @@
 			// 「文件列表」这一屏：状态筛选决定看哪一批，灰色卡片与留痕块自带「退役」语义。
 			// banner 只在**专门看归档**时出现，切到全部时不重复说一遍。
 			const filesView = h(FilesView, {
-				loading: loading, totalCount: totalCount, openAdd: openAdd,
+				loading: loading, totalCount: totalCount, openAdd: openAdd, createIndexSkeleton: createIndexSkeleton,
 				statusFilter: statusFilter, setStatusFilter: setStatusFilter,
 				items: items, archiveItems: archiveItems, filtered: filtered,
 				setTypeFilter: setTypeFilter, setTagFilter: setTagFilter, setQuery: setQuery,

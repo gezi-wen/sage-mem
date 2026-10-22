@@ -84,6 +84,11 @@ The memory management page's file list also has an **Open memory folder** button
 memory directory in the system file manager (Explorer / Finder / the Linux file manager) through a
 detached host-side process and returns without waiting for the window.
 
+While the memory directory is empty, the empty state carries a **Create index skeleton** button: one
+click writes a starter `MEMORY.md` (index format plus the four memory categories). When `MEMORY.md`
+already exists it only says so and changes nothing; it uses the existing reserved-file read/write
+calls rather than a new remote.
+
 ## Quick Start
 
 Requires **DSH `0.1.2-rc.1` or higher** (see [Compatibility](#compatibility)) and **Node.js `>= 18`**.
