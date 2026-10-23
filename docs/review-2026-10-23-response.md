@@ -20,7 +20,7 @@
 | RET-01 | **数字全部一致，口径需纠正** | 5/5 指标与仓库 baseline 吻合；「71」是题数不是检查项；无答案题注入的是 baseline 记忆 | 排 1.6.4 补诊断与指标 |
 | TEST-01 | **环境阻塞，不是仓库缺陷** | 裸解压未装依赖 → `zod` 找不到；本机与按 README 安装后均 2949/0 | 不改代码；CI/发布清单兜住 |
 | COMP-01 | **部分成立**（口径缺口） | 无硬矛盾，但「声明范围」被读成「逐版本端到端验过」；本机实跑的 DSH `0.2.1-rc.1` 不在表里 | 已改说法 + 对拍门禁 |
-| REL-01 | **未发现缺陷** | 包内 64 条目，`lib/` 58 个文件齐全，零 test/docs/tgz；装包 `import` 正常 | 加 `pack-test` 防回归 |
+| REL-01 | **未发现缺陷** | 包内 64 条目，`lib/` 58 个文件齐全，零 test/docs/tgz；装包 `import` 正常 | 加 `release-test` 防回归 |
 | OBS-01 | 成立（改进建议） | 检索诊断缺 token / 权重 / gate 数值与自动案例报告 | 排 1.6.4 |
 
 **两处核验中额外发现**（不在原报告）：
@@ -132,8 +132,9 @@ EXIT 0、`compared`、判定「无退化」、11 项全部持平。对照结果�
 
 ### REL-01（未发现缺陷，加门禁）
 
-`npm pack --dry-run --json`：64 条目 / 337,878 B —— `lib/` 58 个文件 + `cordis.patch.yml` +
+`npm pack --dry-run --json`（审查对象 1.6.1 的实测）：64 条目 / 337,878 B —— `lib/` 58 个文件 + `cordis.patch.yml` +
 `NOTICE` + `LICENSE` + 双语 README + `package.json`；零 `test/`、`docs/`、`scripts/`、`*.tgz`。
+（1.6.2 因 README 变长，同一份清单是 338,569 B；条目数不变。）
 装 tarball 后 `import('sage-mem')` 与 `import('sage-mem/typert')` 均正常；`zod` 自动装上。
 `import('sage-mem/client')` 报 `window is not defined` 是浏览器半包的预期行为，不是缺文件。
 
@@ -181,7 +182,10 @@ npm test \
 ```
 
 - 抽验 DOC-01：把 `package.json.version` 改成任意别的数字，`npm test` 必须变红并点名 README/CHANGELOG。
-- 抽验 REL-01：在 `lib/` 下加一个空 `.js`，`release-test` 必须报「漏打包」；在 `files` 里加 `docs/`，必须报白名单外。
+- 抽验 REL-01：把 `package.json` 的 `files` 临时改成只列 `lib/index.js`，`release-test` 必须报
+  「`lib/` 下每个 `.js` 都打进了包（漏 N 个）」；在 `files` 里加 `docs/`，必须报白名单外。
+  ⚠️ 「在 `lib/` 下新加一个空 `.js` 看它报漏」**不成立** —— `files: ["lib/"]` 会把 lib 下所有文件自动打进包，
+  那条断言只在白名单被改窄时才有意义（2026-10-23 独立复核实测）。
 - 重跑 SEC-01 的确定性实验：`gate = inspectMemoryEntry(f)` 之后、`readFile(f)` 之前换文件，看读到的
   字节数是否与 `gate.size` 不一致。**能复现不等于可利用** —— 评估威胁模型时把「谁能写记忆目录」算进去。
 

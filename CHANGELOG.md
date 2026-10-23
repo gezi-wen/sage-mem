@@ -30,6 +30,7 @@
 ### 实测
 
 - `npm test`：**2971 passed, 0 failed**。
+- `pnpm test`：同样 **2971 passed, 0 failed**（`release-test` 兼容 pnpm 的 `pack --json` 对象形态；两种入口都实测过）。
 - `npm pack --dry-run`：64 个条目（`lib/` 58 + 根文件 6），无 test / docs / scripts / tgz。
 - 离线评测：与 `test/eval/baseline.json` 对比 `compared`、判定无退化、退出码 0（11 项持平）。
 

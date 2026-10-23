@@ -101,7 +101,7 @@ dsh --profile web --patch $yml --port 0 --no-open
 （元数据不等于事实）；2026-10-23 外部审查又抓到 README 停在 `1.0.0` 而包已是 `1.6.1`。
 
 前三处已由 `test/release-test.mjs` 第 5 组在 `npm test` 里自动核对（含反向对照）；
-后两处由本清单与 `scripts/verify-release.mjs` 核对。**别靠眼睛对。**
+后两处由本清单与 `release-standards` 技能里的 `scripts/verify-release.mjs`（在 `$DSH_HOME` 下，不在本仓库）核对。**别靠眼睛对。**
 
 ⚠️ **另有两处「手写副本」已被对拍**：README 顶部那两条静态徽章（`DSH ≥ x` / `node ≥ y`）必须等于
 `package.json` 的 `engines`（`doc-consistency-test.mjs` 第 5 组看着）；双语兼容表必须等于

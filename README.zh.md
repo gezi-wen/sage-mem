@@ -482,7 +482,7 @@ sage-mem 是纯 DSH 插件，用 `package.json` 的 **`engines.dsh`** 声明宿�
 | 0.2.0-rc.2 | compatible |
 | 0.2.1-rc.1 | compatible |
 
-**`compatible` 怎么读**：它表示本插件的 codec / manifest 契约在该宿主代上核对过（代码层比对 + 单元/契约测试），**不表示**在那个确切宿主构建上跑过端到端探针。这张表是声明，证据列在下面。真实宿主探针目前只跑过 `headless`（2026-10-15）与 `web`（2026-10-16）；`desktop` profile **还没跑过**（见 [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b）。CI 只在 Ubuntu + Node 24 上、对着 `0.2.0-rc.1` 一代 peer 跑；`engines.node` 仍声明 `>=18`，但 Node 18 不在 CI 矩阵里。
+**`compatible` 怎么读**：它表示本插件的 codec / manifest 契约在该宿主代上核对过（代码层比对 + 单元/契约测试），**不表示**在那个确切宿主构建上跑过端到端探针。这张表是声明，核对方式总结在下面。真实宿主探针目前只跑过 `headless`（2026-10-15）与 `web`（2026-10-16）；`desktop` profile **还没跑过**（见 [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b）。CI 只在 Ubuntu + Node 24 上、对着 `0.2.0-rc.1` 一代 peer 跑；`engines.node` 仍声明 `>=18`，但 Node 18 不在 CI 矩阵里。
 
 两点值得说明：
 

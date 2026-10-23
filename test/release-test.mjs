@@ -44,15 +44,27 @@ function walkJs(dir) {
 /** `npm pack --dry-run --json`：npm 自己的权威清单。 */
 function dryRun() {
   const args = ['pack', '--dry-run', '--json']
-  const npmExec = process.env.npm_execpath
-  const r = npmExec
+  const npmExec = String(process.env.npm_execpath ?? '')
+  /**
+   * ⚠️ 不能只看 `npm_execpath` 非空就 `node <它>`：`pnpm test` 下它是 `pnpm.mjs`，
+   * 而 pnpm 的 `pack --json` 输出是**对象** `{name, version, files}`、不是 npm 的数组。
+   * 所以只在确认是 npm 的 CLI 时直接执行；否则回退到 `npm`（PATH 上一定有）。
+   * 解析端也兼容对象形态，双保险。
+   */
+  const isNpmCli = /npm-cli\.js$/i.test(npmExec)
+  const r = isNpmCli
     ? spawnSync(process.execPath, [npmExec, ...args], { cwd: ROOT, encoding: 'utf8' })
     : spawnSync('npm', args, { cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32' })
   const stdout = String(r.stdout ?? '')
-  const start = stdout.indexOf('[')
+  const objAt = stdout.indexOf('{')
+  const arrAt = stdout.indexOf('[')
+  const start = objAt >= 0 && (arrAt < 0 || objAt < arrAt) ? objAt : arrAt
   let parsed = null
   if (start >= 0) {
-    try { parsed = JSON.parse(stdout.slice(start))[0] } catch { parsed = null }
+    try {
+      const raw = JSON.parse(stdout.slice(start))
+      parsed = Array.isArray(raw) ? raw[0] : raw
+    } catch { parsed = null }
   }
   return { status: r.status, signal: r.signal, stderr: String(r.stderr ?? ''), parsed }
 }
@@ -75,7 +87,7 @@ group('0. npm pack --dry-run 跑得通')
     process.exit(1)
   }
 
-  const entries = parsed.files ?? []
+  const entries = (parsed.files ?? []).map((f) => (typeof f === 'string' ? { path: f } : f))
   const paths = entries.map((f) => String(f.path).replace(/\\/g, '/'))
   const set = new Set(paths)
 
