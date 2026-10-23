@@ -270,6 +270,12 @@ function makeMemoryRemote(active, archived, raw) {
         error: '', releasesUrl: 'https://github.com/gezi-wen/sage-mem/releases',
       })
     },
+    // 1.7.0：注入调试账。默认「开关关着」= 空账，所以既有断言（抽屉两项、界面快照）
+    // 一个都不受影响；要看调试视图的用例自己往 st.recallDebug 里喂数据。
+    recallDebug() {
+      st.calls.push(['recallDebug'])
+      return Promise.resolve(st.recallDebug || { enabled: false, records: [] })
+    },
     // 上锁 / 解锁：改的是 fixture 里的 locked，所以面板重取列表后状态保持得住
     setLocked(name, locked) {
       st.calls.push(['setLocked', name, locked])
@@ -2077,6 +2083,23 @@ async function main() {
     click(btnHas(all(tree, byClass('smem-tool-panel'))[0], '收起')[0])
     tree = await rt.settle(C, {})
     ok(all(tree, byClass('smem-tool-panel')).length === 0, '面板里的「收起」把面板关掉')
+
+    // 14f 【真机 bug 回归】2026-10-24 实测：开抽屉的那一次点击会**继续冒泡到 document**，
+    // 被「点外部关闭」当成外部点击 → 弹层 ADD 后 2 毫秒就被 REMOVE，用户看到的是
+    // 「点了完全没反应」。当时测试没抓到，是因为点击只调 onClick、不走真实事件冒泡。
+    // 这里按真实顺序复现：先点开（onClick + effect 挂监听），再把**同一次点击**
+    // 以抽屉内部的 target 派发给 document —— 弹层必须还在。
+    tree = await openDrawer(rt, C, tree)
+    ok(!!drawerItem(tree, '归档候选'), '回归前置：抽屉已展开')
+    ok(all(tree, (n) => n.props && n.props['data-smem-drawer'] === '1').length === 1,
+      '抽屉容器带 data-smem-drawer 标记（点外部关闭的排除判据）')
+    fakeDoc.fire('click', { target: { closest: (sel) => (sel === '[data-smem-drawer]' ? {} : null) } })
+    tree = await rt.settle(C, {})
+    ok(!!drawerItem(tree, '归档候选'), '同一次点击冒泡到 document 时不关闭（target 在抽屉内）')
+    // 对照：真正的外部点击仍然要关 —— 否则修法就变成「点哪儿都不关」了
+    fakeDoc.fire('click', { target: { closest: () => null } })
+    tree = await rt.settle(C, {})
+    ok(drawerItem(tree, '归档候选') === undefined, '对照：真正的外部点击仍然关闭抽屉')
   }
 
   // ── 15. 1.5.0 界面优化：层级 / 密度 / 空态 / 长文 / 动作分组 / 窄窗 ──
@@ -2243,6 +2266,82 @@ async function main() {
     t2 = await rt2.settle(loaded.comp, {})
     ok(mem2.st.raw['MEMORY.md'] === '手工写的索引', '已有 MEMORY.md 一字不动')
     ok(treeText(t2).indexOf('已经存在') >= 0, '提示索引已存在、没有改动')
+  }
+
+  // ── 19. 1.7.0 注入调试视图：开关决定入口；账看得懂；旧宿主不炸 ──────────
+  group('19. 1.7.0 注入调试：关着不出现 / 开着能看 / 旧宿主不炸')
+  {
+    // 一条「真注入」账 + 一条「同题去重」账，覆盖面板要解释的两种形态
+    const REC = {
+      at: FIXED_NOW, sessionId: 'abcd1234-0000-0000-0000-000000000000',
+      query: '阿尔法项目为什么没被召回',
+      outcome: 'injected', deduped: false, baseline: 1,
+      scanned: 106, hits: 2,
+      scores: [{ file: 'project_alpha.md', score: 12.3456 }, { file: 'reference_beta.md', score: 3.2 }],
+      body: [{ file: 'project_alpha.md', score: 26.87 }],
+      picked: ['user_base.md', 'project_alpha.md'],
+      injected: ['user_base.md', 'project_alpha.md'],
+      chars: 4820, sessionChars: 4820, cardChars: 0, skippedByBudget: 1, card: 'none',
+    }
+    const DUP = Object.assign({}, REC, {
+      at: FIXED_NOW + 1000, outcome: 'empty', deduped: true, injected: [], chars: 0, cardChars: 0,
+    })
+
+    // 19a 开关关着：抽屉仍只有两项，「注入调试」不出现
+    const rtOff = makeReact()
+    const memOff = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const off = await loadClient(rtOff, { memory: memOff })
+    let tOff = await rtOff.settle(off.comp, {})
+    tOff = await openDrawer(rtOff, off.comp, tOff)
+    const offItems = all(tOff, (n) => n.type === 'button' && byClass('smem-drawer-item')(n)).map(textOf)
+    ok(offItems.every((x) => x.indexOf('注入调试') < 0), `开关关着：抽屉里没有注入调试（${offItems.join(' | ')}）`)
+    ok(memOff.st.calls.some((c) => c[0] === 'recallDebug'), '挂载时问过一次宿主开关状态（只读、不扫目录）')
+
+    // 19b 开关开着：抽屉第三项出现；点开能看到完整账
+    const rtOn = makeReact()
+    const memOn = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    memOn.st.recallDebug = { enabled: true, records: [REC, DUP] }
+    const on = await loadClient(rtOn, { memory: memOn })
+    let tOn = await rtOn.settle(on.comp, {})
+    tOn = await openDrawer(rtOn, on.comp, tOn)
+    const itemsOn = all(tOn, (n) => n.type === 'button' && byClass('smem-drawer-item')(n)).map(textOf)
+    ok(itemsOn.some((x) => x.indexOf('注入调试') === 0), `开关开着：抽屉出现注入调试（${itemsOn.join(' | ')}）`)
+    click(drawerItem(tOn, '注入调试'))
+    tOn = await rtOn.settle(on.comp, {})
+    const panel = all(tOn, byClass('smem-tool-panel'))[0]
+    ok(!!panel, '点条目后面板出现')
+    const txt = treeText(panel || {})
+    ok(txt.indexOf('阿尔法项目为什么没被召回') >= 0, '能看到当时的问题原文')
+    ok(txt.indexOf('project_alpha.md') >= 0 && txt.indexOf('12.34') >= 0, '能看到命中文件与得分')
+    ok(txt.indexOf('4820') >= 0, '能看到注入正文字节')
+    ok(txt.indexOf('预算挡掉 1 条') >= 0, '能看到被预算挡掉几条')
+    ok(txt.indexOf('同题已注入过') >= 0, '历史里的去重步骤被翻译成人话（不是一行空白）')
+    const callsBefore = memOn.st.calls.filter((c) => c[0] === 'recallDebug').length
+    click(btnHas(panel, '刷新')[0])
+    tOn = await rtOn.settle(on.comp, {})
+    ok(memOn.st.calls.filter((c) => c[0] === 'recallDebug').length === callsBefore + 1, '「刷新」会再拉一次账')
+
+    // 19c 开着但还没有记录：空态要有话说，不是空白
+    const rtEmpty = makeReact()
+    const memEmpty = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    memEmpty.st.recallDebug = { enabled: true, records: [] }
+    const em = await loadClient(rtEmpty, { memory: memEmpty })
+    let tEm = await rtEmpty.settle(em.comp, {})
+    tEm = await openDrawer(rtEmpty, em.comp, tEm)
+    click(drawerItem(tEm, '注入调试'))
+    tEm = await rtEmpty.settle(em.comp, {})
+    ok(treeText(all(tEm, byClass('smem-tool-panel'))[0] || {}).indexOf('还没有一次注入') >= 0, '没有记录时有空态说明')
+
+    // 19d 旧宿主没有 recallDebug：入口不出现、不报错（版本错配的唯一正确姿势）
+    const rtOld = makeReact()
+    const memOld = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    delete memOld.recallDebug
+    const old = await loadClient(rtOld, { memory: memOld })
+    let tOld = await rtOld.settle(old.comp, {})
+    tOld = await openDrawer(rtOld, old.comp, tOld)
+    const oldItems = all(tOld, (n) => n.type === 'button' && byClass('smem-drawer-item')(n)).map(textOf)
+    ok(oldItems.length === 2, `旧宿主：抽屉仍是两项（${oldItems.join(' | ')}）`)
+    ok(treeText(tOld).indexOf('宿主侧还没有') < 0, '旧宿主：不冒「接口不存在」的红字')
   }
 
   console.log(`\n结果：${pass} passed, ${fail} failed`)

@@ -363,17 +363,19 @@ group('10. 归档文件的读 / 写：改正文但留痕不许丢')
   try { await gw.readArchived('../evil.md') } catch (e) { readInvalid = e }
   ok(readInvalid !== null && /invalid file name/.test(readInvalid.message), 'readArchived 带路径成分 → 抛错', String(readInvalid?.message))
 
-  // ④ 归档面恰好这 19 个方法（v1.1.0 起多一个 `deleteArchived`；1.5.4 起多一个 `openMemoryDir`）。
+  // ④ 归档面恰好这 20 个方法（v1.1.0 起多一个 `deleteArchived`；1.5.4 起多一个 `openMemoryDir`；
+  // 1.7.0 起多一个只读 `recallDebug`）。
   // 这一组原先的用意是**防有人顺手加一个删除入口**把「归档 = 不删」偷偷破坏掉；
   // v1.1.0 是**有意**加的：归档动作仍然只移不删，删除要人在档案馆里单独点、再确认一次。
   // 所以这里从 17 改成 18，并仍然逐名列全 —— 再加第二个删除入口就还是会在这里现形。
   // 1.5.4 起为了「打开记忆文件夹」再加一个 `openMemoryDir`（非删除入口，不影响上一条）。
+  // 1.7.0 起加 `recallDebug`：只读账，不改归档语义 —— 但它进了 memory 面，所以必须在这里列全。
   const methods = Object.getOwnPropertyNames(mod.MemoryGateway.prototype).filter((n) => n !== 'constructor' && !n.startsWith('@')).sort()
   ok(JSON.stringify(methods) === JSON.stringify([
     'archive', 'archiveCandidates', 'audit', 'checkUpdate', 'deleteArchived', 'deleteFile', 'getSettings', 'listArchived', 'listFiles', 'openMemoryDir',
-    'readArchived', 'readFile', 'readRaw', 'restore', 'setLocked', 'setSettings', 'writeArchived', 'writeFile', 'writeRaw',
+    'readArchived', 'readFile', 'readRaw', 'recallDebug', 'restore', 'setLocked', 'setSettings', 'writeArchived', 'writeFile', 'writeRaw',
   ]),
-    'memory 面恰好 19 个方法：唯一不可逆入口是 deleteArchived（归档动作本身仍只移不删）', methods.join(','))
+    'memory 面恰好 20 个方法：唯一不可逆入口是 deleteArchived（归档动作本身仍只移不删）', methods.join(','))
 
   // ⑤ 真实输出过一遍 manifest schema
   const { TYPERT } = await import(new URL('typert.host.js', LIB).href)

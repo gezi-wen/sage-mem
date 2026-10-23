@@ -71,6 +71,24 @@
 			".smem-drawer-item:hover{background:var(--dsw-alias-bg-layer-2);}",
 			'.smem-drawer-item[data-on="1"]{background:var(--dsw-alias-bg-layer-2);font-weight:600;}',
 			".smem-drawer-item .smem-status{margin-left:auto;}",
+			// ── 注入调试面板（1.7.0）──
+			// 只读账目：时间/会话/结论一行，问题一行，两组得分表，字节与预算一行。
+			// 颜色**只用宿主变量**（主题两档都要能读）；没有一处在硬编码背景上反色。
+			".smem-dbg-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}",
+			".smem-dbg-time{font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-secondary);font-size:12px;}",
+			".smem-dbg-sess{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dsw-alias-label-secondary);}",
+			".smem-dbg-out{font-size:12px;font-weight:600;}",
+			".smem-dbg-ok{color:var(--dsw-alias-brand-primary,#4d76e6);}",
+			".smem-dbg-warn{color:var(--dsw-alias-state-warn-primary,#d97706);}",
+			".smem-dbg-dim{color:var(--dsw-alias-label-secondary);}",
+			".smem-dbg-query{font-size:12.5px;color:var(--dsw-alias-label-primary);white-space:pre-wrap;overflow-wrap:anywhere;}",
+			".smem-dbg-row{display:flex;gap:8px;align-items:flex-start;font-size:12px;}",
+			".smem-dbg-scores{display:flex;flex-wrap:wrap;gap:4px 10px;}",
+			".smem-dbg-score{display:inline-flex;gap:4px;align-items:baseline;}",
+			".smem-dbg-file{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;overflow-wrap:anywhere;}",
+			".smem-dbg-num{font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-secondary);font-size:11.5px;}",
+			".smem-dbg-hist{display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--dsw-alias-border-l2);padding-top:6px;}",
+			".smem-dbg-hist-row{display:flex;gap:8px;align-items:baseline;font-size:11.5px;}",
 			".smem-status--bad{color:var(--dsw-alias-state-error-primary,#dc2626);font-weight:600;}",
 			// 头部带：三个 tab 共用的一条「我在哪 + 现在什么状态 + 主操作」。
 			".smem-head-job{font-size:12.5px;font-weight:600;}",

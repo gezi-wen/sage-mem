@@ -14,7 +14,7 @@
 
 > File-based cross-session memory for DeepSeek Harness — every memory is a plain markdown file you can open, edit and delete. No database, no worker, no port.
 
-**当前发布版本：`1.6.5`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
+**当前发布版本：`1.7.0`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
 [契约冻结](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)。
 
 如果它对你有用，给个 Star 是最直接的反馈。
@@ -389,7 +389,7 @@ sage-mem 给记忆目录的写入加了**版本守卫**：写入前记下当前�
 | `SAGE_MEM_MAX_BASELINE` | `8`（1–50） | `baseline` 名额 |
 | `SAGE_MEM_STALE_DAYS` | `1`（0–365） | 标题标「保存于 N 天前」的门槛；0 = 每条都标 |
 | `SAGE_MEM_TASK_ID` | 空 | 任务检查点的作用域；空则回落会话 id |
-| `SAGE_MEM_DEBUG` | 关 | 调试日志 |
+| `SAGE_MEM_DEBUG` | 关 | 调试日志；打开后面板「工具 ▾ → 注入调试」显示最近 8 次注入的账（只读、不落盘） |
 
 取值语义：**越界夹到边界，非法值（含纯空格）回落默认。**
 

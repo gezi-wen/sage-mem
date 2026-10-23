@@ -41,6 +41,8 @@ const SUITES = [
   'retrieval-report-test.mjs',
   // 1.2.0：注入链拆成纯函数后的直接单测（不需要 new MemoryGateway）。
   'recall-unit-test.mjs',
+  // 1.7.0：注入调试账（开关语义 / 环形缓冲 / 不落盘 / typert 对拍）。
+  'recall-debug-test.mjs',
   'chunks-test.mjs',
   'bm25-test.mjs',
   'search-test.mjs',

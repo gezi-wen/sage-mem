@@ -49,7 +49,11 @@ group('1. 组合根体积（1.2.0 验收线）')
   const ctorLines = start >= 0 && end > start ? src.slice(start, end).split('\n').length : Infinity
   ok(ctorLines <= 60, `MemoryGateway 构造函数 ≤ 60 行（实际 ${ctorLines}；1.1.0 是 540）`, `start=${start} end=${end}`)
   const maxFile = all.filter((f) => f.rel !== 'client.js').reduce((a, b) => (a.lines >= b.lines ? a : b))
-  ok(maxFile.lines <= 900, `lib/ 下单文件 ≤ 900 行（最大 ${maxFile.rel} ${maxFile.lines} 行；client.js 是构建产物不计）`)
+  // 1.7.0 把这条从 900 抬到 950：`memory/recallDebug` 的 strict schema 是**传输契约**，
+  // 必须与它镜像的 payload 放在同一个 manifest 文件里；861 → 909 是一次性增长
+  // （一条只读 remote 的字段声明），不是逻辑膨胀。别的阈值（组合根 ≤800 / 构造 ≤60）
+  // 一个都没动 —— 这条护栏防的是「往 lib 里塞逻辑」，不是防 schema 行数。
+  ok(maxFile.lines <= 950, `lib/ 下单文件 ≤ 950 行（最大 ${maxFile.rel} ${maxFile.lines} 行；client.js 是构建产物不计）`)
   ok(!/function createSessionInjectState\s*\(/.test(src), '注入状态不再定义在组合根里（已搬到 recall/state.js）')
 }
 
@@ -100,17 +104,22 @@ group('3. 组合根接线：barrel + 直调 mountWriteGate')
 }
 
 // ── 4. typert 契约位置没动 ──────────────────────────────────────
-group('4. typert 契约：32 条 invocation 仍指 lib/index.js')
+group('4. typert 契约：33 条 invocation 仍指 lib/index.js')
 {
   const { TYPERT } = await import(new URL('../lib/typert.host.js', import.meta.url).href)
-  ok(TYPERT.invocations.length === 32, `32 条 invocation（实际 ${TYPERT.invocations.length}）`)
+  // 33 = 1.6.5 的 32 + 1.7.0 的 memory/recallDebug。数字变了要**同时**改
+  // client-exec-test 里的对表计数 —— 两处一起红才是「漏了一边」的正确定位信号。
+  ok(TYPERT.invocations.length === 33, `33 条 invocation（实际 ${TYPERT.invocations.length}）`)
   const bad = TYPERT.invocations.filter((i) => !(i.sourceLocation?.file === 'lib/index.js' && i.sourceLocation?.line === 1 && i.sourceLocation?.column === 1))
   ok(bad.length === 0, '每条 sourceLocation 仍是 lib/index.js:1:1（搬 Gateway 类就必须同步改这里）', bad.slice(0, 3).map((i) => i.id).join(','))
   const src = read('index.js')
   for (const cls of ['MemoryGateway', 'StarmapGateway', 'AutodreamGateway']) {
     ok(new RegExp(`export class ${cls} extends TypertRemoteService`).test(src), `${cls} 仍定义在 lib/index.js（契约位置）`)
   }
-  ok((src.match(/^markRemote\(/gm) || []).length === 32, '32 条 markRemote 仍在组合根里')
+  ok((src.match(/^markRemote\(/gm) || []).length === 33, '33 条 markRemote 仍在组合根里')
+  // 1.7.0：调试账必须是**只读**（无入参）—— 面板只许看，不许改账。
+  const dbg = TYPERT.invocations.find((i) => i.id === 'sage-mem#memory/recallDebug')
+  ok(!!dbg && dbg.parameters.length === 0, 'memory/recallDebug 存在且无入参（只读）')
 }
 
 console.log(`\n结果：${pass} passed, ${fail} failed`)

@@ -467,6 +467,99 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 			: null);
 
 		/**
+		 * 「注入调试」面板（1.7.0）。
+		 *
+		 * 只读：没有「清空 / 重跑」按钮 —— 账是注入链在 `SAGE_MEM_DEBUG=1` 时自动记的，
+		 * 人能做的是看，以及点「刷新」再取一次。入口只在开关打开时出现（宿主告诉我们）。
+		 *
+		 * 每一条记录的口径写在 `lib/recall/debug.js` 的 makeDebug 注释里；这里只负责把
+		 * 「为什么这一步没注入」翻译成人话 —— 那是这个面板存在的唯一理由。**尤其是
+		 * `empty + deduped`**：每轮多步里它占大多数，不解释就会被当成「插件坏了」。
+		 */
+		function RecallDebugPanel(props) {
+			const data = props.data || {};
+			const recs = Array.isArray(data.records) ? data.records : [];
+			const latest = recs.length ? recs[0] : null;
+			const pad = (n) => (n < 10 ? "0" + n : String(n));
+			function clock(ms) {
+				if (typeof ms !== "number") return "";
+				const d = new Date(ms);
+				return pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+			}
+			function outcomeText(r) {
+				if (!r) return "";
+				if (r.outcome === "injected") return "本步注入 " + (Array.isArray(r.injected) ? r.injected.length : 0) + " 条正文";
+				if (r.outcome === "card-only") return "正文没进，只发了状态卡";
+				return r.deduped ? "同题已注入过，本步去重" : "本步没有可注入的内容";
+			}
+			function outcomeClass(r) {
+				if (!r) return "";
+				if (r.outcome === "injected") return " smem-dbg-ok";
+				if (r.outcome === "card-only") return " smem-dbg-warn";
+				return " smem-dbg-dim";
+			}
+			function scoreRows(list, emptyText) {
+				const arr = Array.isArray(list) ? list : [];
+				if (!arr.length) return h("span", { className: "smem-muted", key: "none" }, emptyText || "无");
+				return h("div", { className: "smem-dbg-scores", key: "s" }, arr.map(function (x, i) {
+					return h("span", { className: "smem-dbg-score", key: String((x && x.file) || i) + "-" + i }, [
+						h("span", { className: "smem-dbg-file", key: "f" }, String((x && x.file) || "?")),
+						h("span", { className: "smem-dbg-num", key: "n" }, x && typeof x.score === "number" ? String(x.score) : "?"),
+					]);
+				}));
+			}
+			const injected = latest && Array.isArray(latest.injected) ? latest.injected : [];
+			const histogram = recs.slice(1).map(function (r, i) {
+				return h("div", { className: "smem-dbg-hist-row", key: "h" + i }, [
+					h("span", { className: "smem-dbg-time", key: "t" }, clock(r.at)),
+					h("span", { className: "smem-dbg-out" + outcomeClass(r), key: "o" }, outcomeText(r)),
+					h("span", { className: "smem-muted", key: "n" }, String(r.chars || 0) + " 字节"),
+				]);
+			});
+			return h("div", { className: "smem-tool-panel smem-tool-panel--cap", key: "recall-debug" }, [
+				h("div", { className: "smem-tool-head", key: "head" }, [
+					h("span", { className: "smem-tool-title", key: "t" }, "注入调试"),
+					h("span", { className: "smem-muted", key: "s" }, "SAGE_MEM_DEBUG=1 · 最近 " + String(recs.length) + " 次"),
+					h("button", { type: "button", className: "smem-btn", key: "again", disabled: props.busy, onClick: props.onReload }, props.busy ? "读取中…" : "刷新"),
+					toolClose(props),
+				]),
+				!latest
+					? h("div", { className: "smem-empty", key: "empty" }, "开关已开，但还没有一次注入 —— 开一轮对话再回来看。")
+					: h("div", { key: "body" }, [
+							h("div", { className: "smem-dbg-head", key: "meta" }, [
+								h("span", { className: "smem-dbg-time", key: "t" }, clock(latest.at)),
+								h("span", { className: "smem-dbg-sess", key: "sid" }, String(latest.sessionId || "").slice(0, 8)),
+								h("span", { className: "smem-dbg-out" + outcomeClass(latest), key: "o" }, outcomeText(latest)),
+							]),
+							h("div", { className: "smem-dbg-query", key: "q" }, "问题：" + (String(latest.query || "").trim() || "（无）")),
+							h("div", { className: "smem-muted", key: "stat" },
+								"扫了 " + String(latest.scanned || 0) + " 条 · 摘要命中 " + String(latest.hits || 0) +
+								" · 正文命中 " + String(Array.isArray(latest.body) ? latest.body.length : 0) +
+								" · baseline " + String(latest.baseline || 0)),
+							h("div", { className: "smem-dbg-row", key: "sum" }, [h("span", { className: "smem-label", key: "l" }, "摘要得分"), scoreRows(latest.scores)]),
+							h("div", { className: "smem-dbg-row", key: "body" }, [h("span", { className: "smem-label", key: "l" }, "正文命中"), scoreRows(latest.body)]),
+							h("div", { className: "smem-dbg-row", key: "inj" }, [
+								h("span", { className: "smem-label", key: "l" }, "实际注入"),
+								injected.length
+									? h("span", { className: "smem-dbg-scores", key: "v" }, injected.map(function (f) {
+										return h("span", { className: "smem-dbg-file", key: String(f) }, String(f));
+									}))
+									: h("span", { className: "smem-muted", key: "v" }, "无"),
+							]),
+							h("div", { className: "smem-muted", key: "bytes" },
+								"正文字节 " + String(latest.chars || 0) + "（本代累计 " + String(latest.sessionChars || 0) + "）" +
+								" · 状态卡 " + (latest.cardChars ? String(latest.cardChars) + " 字节" : "未发") +
+								" · 预算挡掉 " + String(latest.skippedByBudget || 0) + " 条"),
+							h("div", { className: "smem-ar-hint", key: "hint" },
+								"注入每走一步都会尝试一次；同题同命中集不会重复注入 —— 所以「空」多半是去重生效，不是坏了。"),
+							histogram.length
+								? h("div", { className: "smem-dbg-hist", key: "hist" }, histogram)
+								: null,
+						]),
+			]);
+		}
+
+		/**
 		 * 稳定的 remote 引用。
 		 *
 		 * 起因（issue #3，2026-10-10 外部报告）：面板在**渲染期**取 `ctx.get("remote.x")`，

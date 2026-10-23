@@ -162,11 +162,12 @@ if (clientInv) {
   const clientAuto = clientInv.filter((i) => (i.service || i.namespace) === 'autodream')
   ok(clientAuto.length === 11, `客户端声明了 11 条 autodream 描述符（实际 ${clientAuto.length}）`)
 
-  // 契约总数：memory 19（原 9 + audit / archiveCandidates / checkUpdate / getSettings /
-  // setLocked / setSettings / readRaw / writeRaw + deleteArchived + openMemoryDir）+ starmap 2
-  // + autodream 11 = 32。v1.1.0 加 deleteArchived 之前是 30；下面每一条比对仍然是逐条严格比对。
-  ok(clientInv.length === 32, `客户端声明了 32 条描述符（实际 ${clientInv.length}）`)
-  ok(hostInv.length === 32, `宿主 manifest 也是 32 条 invocation（实际 ${hostInv.length}）`)
+  // 契约总数：memory 20（原 9 + audit / archiveCandidates / checkUpdate / getSettings /
+  // setLocked / setSettings / readRaw / writeRaw + deleteArchived + openMemoryDir
+  // + 1.7.0 的 recallDebug）+ starmap 2 + autodream 11 = 33。
+  // v1.1.0 加 deleteArchived 之前是 30；下面每一条比对仍然是逐条严格比对。
+  ok(clientInv.length === 33, `客户端声明了 33 条描述符（实际 ${clientInv.length}）`)
+  ok(hostInv.length === 33, `宿主 manifest 也是 33 条 invocation（实际 ${hostInv.length}）`)
 
   const missing = [...hostMap.keys()].filter((k) => !clientMap.has(k))
   const extra = [...clientMap.keys()].filter((k) => !hostMap.has(k))

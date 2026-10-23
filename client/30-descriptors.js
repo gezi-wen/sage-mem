@@ -228,6 +228,19 @@
 					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
 				},
 				{
+					// 1.7.0：最近几次注入的账。**宽松 codec**（与 audit / 设置那批同一套理由）：
+					// 面板只按字段取值、缺失就降级显示，host 将来加字段不该让整条调用报错。
+					// 每一条记录的字段口径见 lib/recall/debug.js 的 makeDebug 注释。
+					id: "sage-mem#memory/recallDebug",
+					service: "memory",
+					namespace: "memory",
+					method: "recallDebug",
+					invocation: { kind: "direct" },
+					parameters: [],
+					result: { mode: "strict", typeSymbol: "sage-mem/types#RecallDebug", schema: objCodec, create: () => objCodec },
+					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
+				},
+				{
 					id: "sage-mem#starmap/listStars",
 					service: "starmap",
 					namespace: "starmap",

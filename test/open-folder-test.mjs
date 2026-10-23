@@ -3,7 +3,8 @@
  *
  * 三组：
  *   1. 平台 → 命令映射（win32 / darwin / 其它），路径原样进 args，不拼 shell；
- *   2. spawn 接线：detached + stdio ignore + windowsHide，必须 unref（不等窗口退出）；
+ *   2. spawn 接线：detached + stdio ignore、**不许 windowsHide**（1.7.0：它会藏掉 explorer 的窗口），
+ *      必须 unref（不等窗口退出）；
  *   3. 失败路径：目录为空、spawn 同步抛错 → { ok:false, error }，不抛。
  */
 import { folderOpenCommand, openMemoryFolder } from '../lib/memory/open-folder.js'
@@ -56,7 +57,11 @@ console.log('\n== 2. spawn 接线 ==')
   ok(calls[0].command === 'explorer.exe' && calls[0].args[0] === 'C:\\mem', '命令与参数正确')
   ok(calls[0].options.detached === true, 'detached：不随宿主退出')
   ok(calls[0].options.stdio === 'ignore', '不持有 stdio')
-  ok(calls[0].options.windowsHide === true, 'Windows 不闪窗')
+  // ⚠️ 这里**必须是「不许传 windowsHide」**（1.7.0 修的真 bug，2026-10-24 A/B 实测）：
+  // windowsHide 在 Windows 上映射 CREATE_NO_WINDOW，explorer.exe 会启动成功、退出码也正常，
+  // 但文件夹窗口被藏起来 —— 用户看到的就是「点了没反应」。原来这条断言写的是
+  // `windowsHide === true`（注释「Windows 不闪窗」），等于把这个 bug 钉成了正确行为。
+  ok(calls[0].options.windowsHide !== true, 'win32 不传 windowsHide（传了 explorer 的窗口会被藏起来）')
   ok(calls[0].options.shell === undefined, '不经过 shell（避免路径注入）')
 }
 

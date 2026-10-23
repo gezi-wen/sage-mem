@@ -122,6 +122,15 @@
 			const rawBusy = sRawBusy[0], setRawBusy = sRawBusy[1];
 			const sRawLoading = react.useState(false);
 			const rawLoading = sRawLoading[0], setRawLoading = sRawLoading[1];
+			// ── 注入调试（1.7.0）──
+			// 入口**只在 SAGE_MEM_DEBUG=1 时出现**：挂载时问宿主一次（enabled 由宿主每次现读
+			// 环境变量），关着就什么都不显示、抽屉里也不多一项。
+			const sDbgOn = react.useState(false);
+			const dbgOn = sDbgOn[0], setDbgOn = sDbgOn[1];
+			const sDbg = react.useState(null);
+			const dbg = sDbg[0], setDbg = sDbg[1];
+			const sDbgBusy = react.useState(false);
+			const dbgBusy = sDbgBusy[0], setDbgBusy = sDbgBusy[1];
 			// renderSlot：shell 会经 props 传进来（见 80-apply 的 children 声明），
 			// 但本插件改用并列 tab 渲染星图，不再调用它 —— 声明保留给 shell，这里不取。
 
@@ -157,6 +166,9 @@
 				// 头部带的两个徽标要有数据才立得住：体检（只读扫描）与待重启项。
 				runAudit();
 				loadSettings();
+				// 1.7.0：只读问一次「调试开关开着吗」—— 关着时抽屉里不会多出「注入调试」。
+				// 这是唯一一处为调试视图多付的调用（一次本地只读 remote，不碰磁盘）。
+				loadRecallDebug();
 				/**
 				 * 更新检查：**静默**跑，失败一律不打扰 ——
 				 * 网络不通、被 GitHub 限流、仓库还没建 release，都不该在面板上冒一条红。
@@ -183,7 +195,26 @@
 			react.useEffect(function () {
 				if (!drawer) return undefined;
 				if (typeof document === "undefined" || !document.addEventListener) return undefined;
-				function onOutside() { setDrawer(false); }
+				/**
+				 * ⚠️ **必须放过「抽屉内部」的点击**（2026-10-24 真机实测的 bug）。
+				 *
+				 * 打开抽屉的那一次点击，会在这个 effect 挂上监听之后**继续冒泡到 document**。
+				 * DevTools 里记到的顺序：`DOC:工具 ▾@911408 → 弹层 ADD@911410 → REMOVE@911412`
+				 * —— 弹层活了 2 毫秒就关掉自己，按钮连变色都来不及，用户看到的是
+				 * 「点了完全没反应」。
+				 *
+				 * 为什么测试没抓到：测试点按钮是直接调 `onClick`，不经过真实的事件冒泡，
+				 * 所以「同一次点击既开又关」这条路径在假环境里根本不存在。
+				 *
+				 * 判据用 `closest("[data-smem-drawer]")` 而不是比 DOM 引用：按钮与弹层条目
+				 * 都在带这个属性的 span 里，text / svg 子节点也照样命中；也不依赖事件对象
+				 * 上别的字段（测试喂一个只有 closest 的 target 就能复现）。
+				 */
+				function onOutside(e) {
+					const t = e && e.target;
+					if (t && typeof t.closest === "function" && t.closest("[data-smem-drawer]")) return;
+					setDrawer(false);
+				}
 				function onKey(e) { if (e && (e.key === "Escape" || e.keyCode === 27)) setDrawer(false); }
 				document.addEventListener("click", onOutside);
 				document.addEventListener("keydown", onKey);
@@ -528,6 +559,27 @@
 			}
 
 			/**
+			 * 拉一次注入调试账（1.7.0）。
+			 *
+			 * 返回值同时决定入口出不出现：`enabled === false` 时「工具」抽屉里不渲染
+			 * 「注入调试」这一项 —— 这是路线图「关掉调试开关时界面不出现」的落地方式。
+			 *
+			 * 旧宿主没有 recallDebug → 什么都不做、不报错（与 openMemoryDir / readRaw 同一套降级）。
+			 */
+			function loadRecallDebug() {
+				if (!remote || typeof remote.recallDebug !== "function") return;
+				setDbgBusy(true);
+				remote.recallDebug()
+					.then(function (r) {
+						const d = unwrap(r) || {};
+						setDbgOn(d.enabled === true);
+						setDbg(d);
+					})
+					.catch(function () { setDbgOn(false); })
+					.then(function () { setDbgBusy(false); });
+			}
+
+			/**
 			 * 打开 / 收起一个工具面板。数据只在第一次打开时拉；已经拉过就复用
 			 * （「刷新」「重新体检」是显式动作，别替用户反复扫目录）。
 			 */
@@ -537,6 +589,8 @@
 				setError(null);
 				if (next === "candidates" && !cand) loadCandidates();
 				if (next === "raw" && !settings) loadSettings();
+				// 调试账每次都重新取：它记的是「最近几次」，多一步就多一条 —— 缓存没有意义。
+				if (next === "debug") loadRecallDebug();
 			}
 
 			/**
@@ -800,13 +854,15 @@
 				tab === "files" ? h("div", { className: "smem-toolbar", key: "bar" }, [
 					h("input", { className: "smem-search", key: "q", value: query, placeholder: "搜索文件名 / 描述 / 类型 / 标签…", onChange: function (e) { setQuery(e.target.value); } }),
 					// 工具抽屉：关着时这里只有一个按钮，零占位；面板一次只开一个。
-					h("span", { className: "smem-drawer", key: "drawer" }, [
+					// `data-smem-drawer` 是「点外部关闭」的排除标记：这一整块里的点击
+					// 都算「抽屉内部」，包括开抽屉的那一次点击本身（见上面 effect 的长注释）。
+					h("span", { className: "smem-drawer", key: "drawer", "data-smem-drawer": "1" }, [
 						h("button", {
 							type: "button", key: "btn",
 							className: "smem-btn" + (drawer ? " smem-btn-primary" : ""),
 							"aria-expanded": drawer ? "true" : "false",
 							"aria-haspopup": "menu",
-							title: "归档候选 / 保留名编辑",
+							title: "归档候选 / 保留名编辑" + (dbgOn ? " / 注入调试" : ""),
 							onClick: function () { setDrawer(!drawer); },
 						}, "工具 ▾"),
 						drawer ? h("div", { className: "smem-drawer-pop", key: "pop" }, [
@@ -821,6 +877,12 @@
 								"data-on": tool === "raw" ? "1" : "0",
 								onClick: function () { toggleTool("raw"); setDrawer(false); },
 							}, ["保留名编辑", h("span", { className: "smem-status", key: "s" }, settings && settings.reserved ? (settings.reserved.length + " 个") : "")]),
+							// 1.7.0：只在调试开关打开时出现（关着时抽屉仍是两项，界面零变化）
+							dbgOn ? h("button", {
+								type: "button", className: "smem-drawer-item", key: "d",
+								"data-on": tool === "debug" ? "1" : "0",
+								onClick: function () { toggleTool("debug"); setDrawer(false); },
+							}, ["注入调试", h("span", { className: "smem-status", key: "s" }, dbg && Array.isArray(dbg.records) ? (dbg.records.length + " 次") : "")]) : null,
 						]) : null,
 					]),
 				]) : null,
@@ -870,6 +932,16 @@
 							onText: setRawText,
 							onSave: saveRaw,
 							onClose: function () { setRawName(null); setRawText(""); setRawIsNew(false); },
+						})
+					: null,
+				// 1.7.0：注入调试。只读面板；数据在打开那一刻现取（最近 8 次），
+				// 「刷新」是显式动作 —— 与体检 / 候选同一条交互约定。
+				tab === "files" && tool === "debug"
+					? h(RecallDebugPanel, {
+							data: dbg,
+							busy: dbgBusy,
+							onReload: loadRecallDebug,
+							onClose: function () { setTool(null); },
 						})
 					: null,
 				// 三排筛选：状态 / 类型 / 标签。组内 OR、组间 AND，再与搜索框 AND。
