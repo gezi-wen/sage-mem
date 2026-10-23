@@ -19,13 +19,23 @@
  */
 
 import { createHash } from 'node:crypto'
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
-import { tokenize } from '../lib/memory/bm25.js'
+import { queryTermsOf, scoreDocBreakdown, tokenize } from '../lib/memory/bm25.js'
 import { parseBaseline, parseFrontmatter } from '../lib/memory/frontmatter.js'
-import { DEFAULT_LIMIT, MAX_LIMIT, PER_FILE_CHUNKS, retrieve } from '../lib/memory/search.js'
+import {
+  DEFAULT_LIMIT,
+  MAX_EVIDENCE_DF_RATIO,
+  MAX_LIMIT,
+  MIN_EVIDENCE_RATIO,
+  MIN_EVIDENCE_SUM,
+  MIN_MATCHED_RUN,
+  PER_FILE_CHUNKS,
+  chunksOf,
+  retrieve,
+} from '../lib/memory/search.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
@@ -44,6 +54,8 @@ const USAGE = `sage-mem 检索评测（离线：不联网、不调模型）
   --limit <N>                      每次返回条数，收敛到 [1,${MAX_LIMIT}]（默认 ${DEFAULT_LIMIT}）
   --per-file <N>                   每文件最多贡献几条（默认 ${PER_FILE_CHUNKS}）
   --json <path>                    把完整结果（含逐题明细）写成 JSON
+  --report <path>                  写一份可读的逐案例诊断报告（Markdown）：误注入 / 白名单外 /
+                                   MISS / 词法边界 / 无答案注入，含 evidence 门槛值与逐词元贡献
   --baseline <path>                与一份旧的 --json 产物对比，出现退化时退出码 1
   --allow-baseline-skip            允许「显式给了 --baseline 但比较没完成」时放行（默认不允许）
   --strict                         任何黑/白名单误注入都算失败（默认只如实报告）
@@ -67,6 +79,7 @@ function parseArgs(argv) {
     limit: DEFAULT_LIMIT,
     perFile: PER_FILE_CHUNKS,
     json: '',
+    report: '',
     baseline: '',
     allowBaselineSkip: false,
     strict: false,
@@ -89,6 +102,7 @@ function parseArgs(argv) {
     else if (key === '--limit') opts.limit = Number(take())
     else if (key === '--per-file') opts.perFile = Number(take())
     else if (key === '--json') opts.json = take()
+    else if (key === '--report') opts.report = resolve(process.cwd(), take())
     else if (key === '--baseline') opts.baseline = take()
     else if (key === '--allow-baseline-skip') opts.allowBaselineSkip = true
     else if (key === '--corpus') opts.corpus = resolve(process.cwd(), take())
@@ -272,11 +286,21 @@ function evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs) {
   const ms = performance.now() - started
 
   const hits = result && Array.isArray(result.hits) ? result.hits.map(h => ({
+    id: String(h.id ?? ''),
     file: String(h.file),
+    title: String(h.title ?? ''),
+    headingPath: String(h.headingPath ?? ''),
     lines: Array.isArray(h.lines) ? h.lines : null,
     score: Number(h.score),
     matchedBy: Array.isArray(h.matchedBy) ? h.matchedBy : [],
     excerptBytes: String(h.excerpt ?? '').length,
+    // 正文证据门槛的**现场数值**（摘要层没有门槛，这几个字段是 null）。
+    // 诊断报告要回答「这条凭什么被放进来」，只给总分不够。
+    evidence: Number.isFinite(h.evidence) ? h.evidence : null,
+    evidenceSum: Number.isFinite(h.evidenceSum) ? h.evidenceSum : null,
+    evidenceRarest: Number.isFinite(h.evidenceRarest) ? h.evidenceRarest : null,
+    evidenceRarestDf: Number.isFinite(h.evidenceRarestDf) ? h.evidenceRarestDf : null,
+    evidenceRun: Number.isFinite(h.evidenceRun) ? h.evidenceRun : null,
   })) : []
   const firstAt = new Map()
   hits.forEach((h, i) => {
@@ -311,6 +335,14 @@ function evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs) {
   const blacklistSharedTokenEntries = q.mustNotInject.filter(f => sharedTokenPairs.has(`${q.id}\u0000${f}`))
   const blacklistHitSharedToken = blacklistHit.filter(f => sharedTokenPairs.has(`${q.id}\u0000${f}`))
   const whitelistHit = q.allowFiles.length ? hits.map(h => h.file).filter(f => !q.allowFiles.includes(f)) : []
+
+  // Precision@k 的「相关集」= 标注的 needed ∪ allowFiles。**是下界不是真值**：
+  // 合成语料里可能还有未标注但确实相关的文件，这个数只能往低处偏，不能拿来宣称真实精度。
+  const relevantSet = new Set([...q.needed.map(n => n.file), ...(q.allowFiles ?? [])])
+  const relevantHitCount = hits.filter(h => relevantSet.has(h.file)).length
+  const precisionAtK = relevantSet.size && hits.length ? relevantHitCount / hits.length : null
+  // 注入字节用「候选片段字节」代理（真实注入还要受 60 KB 会话预算裁切，见契约 2.5）。
+  const injectedBytes = hits.reduce((s, h) => s + h.excerptBytes, 0)
 
   // 同一文件在同一次结果里重复出现 = 候选位被同一份证据重复占用。
   const seen = new Set()
@@ -348,6 +380,9 @@ function evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs) {
     blacklistNoSharedTokenCount: q.mustNotInject.length - blacklistSharedTokenEntries.length,
     blacklistNoSharedTokenViolations: blacklistHit.filter(f => !sharedTokenPairs.has(`${q.id}\u0000${f}`)).length,
     whitelistHit,
+    relevantHitCount,
+    precisionAtK,
+    injectedBytes,
     dupExtra,
     dupExtraBytes,
     coverage,
@@ -392,6 +427,12 @@ function summarize(rows) {
     whitelistViolations: 0,
     unresolvedQuestions: 0,
     overInjectQuestions: 0,
+    noAnswerRefused: 0,
+    precisionQuestions: 0,
+    precisionHits: 0,
+    precisionDen: 0,
+    injectedBytes: 0,
+    injectionQuestions: 0,
     incompleteCoverageQuestions: 0,
     skippedFiles: 0,
     candidatesSum: 0,
@@ -412,6 +453,16 @@ function summarize(rows) {
     if (q.unresolved && !q.shouldInject) {
       m.unresolvedQuestions++
       if (row.hits.length) m.overInjectQuestions++
+      else m.noAnswerRefused++
+    }
+    if (row.hits.length) {
+      m.injectionQuestions++
+      m.injectedBytes += row.injectedBytes
+    }
+    if (row.precisionAtK !== null) {
+      m.precisionQuestions++
+      m.precisionHits += row.relevantHitCount
+      m.precisionDen += row.hits.length
     }
     if (q.needed.length) {
       m.neededQuestions++
@@ -468,6 +519,13 @@ function rates(m) {
     whitelistViolationRate: div(m.whitelistViolationQuestions, m.whitelistQuestions),
     dupQuestionRate: div(m.dupQuestions, m.questions),
     overInjectRate: div(m.overInjectQuestions, m.unresolvedQuestions),
+    // 拒绝率 = 无答案题里「一条都不注入」的比例。与 overInjectRate 互为补数，
+    // 单独给出来是因为「越低越好的误注入」和「越高越好的拒绝率」在看板上方向相反。
+    noAnswerRefusalRate: m.unresolvedQuestions ? div(m.noAnswerRefused, m.unresolvedQuestions) : 1,
+    // Precision@k：top-k 里落在「标注相关集（needed ∪ allowFiles）」的比例。
+    // **是下界**：合成语料里可能还有未标注但相关的文件，不能拿它宣称真实精度。
+    precisionAtK: div(m.precisionHits, m.precisionDen),
+    injectedBytesAvg: div(m.injectedBytes, m.questions),
     errorRate: div(m.retrieveErrors, m.questions),
     incompleteRate: div(m.incompleteCoverageQuestions, m.questions),
     candidatesAvg: div(m.candidatesSum, m.questions),
@@ -542,11 +600,141 @@ function printMetrics(title, rows, m, r) {
   line('白名单外误注入', frac(m.whitelistViolationQuestions, m.whitelistQuestions))
   line('重复文件（题数／多余条）', `${m.dupQuestions} / ${m.dupExtra}   [重复字节 ${m.dupExtraBytes}]`)
   line('无答案题仍注入', `${frac(m.overInjectQuestions, m.unresolvedQuestions)}   [只说「继续」这类题]`)
+  line('无答案题拒绝率', frac(m.noAnswerRefused, m.unresolvedQuestions))
+  line('Precision@k（标注相关集·下界）', `${frac(m.precisionHits, m.precisionDen)}   [可评题 ${m.precisionQuestions}]`)
+  line('注入字节（候选片段代理）', `${m.injectedBytes} 总 / ${r.injectedBytesAvg.toFixed(1)} 平均每题`)
   line('平均候选数 candidates', r.candidatesAvg.toFixed(2))
   line('切分不全的题数', `${m.incompleteCoverageQuestions}   [skipped 文件合计 ${m.skippedFiles}]`)
   line('retrieve 抛错题数', String(m.retrieveErrors))
   line(`延迟 p50 / p95`, `${r.latencyP50.toFixed(3)} ms / ${r.latencyP95.toFixed(3)} ms   [最近秩法]`)
   void rows
+}
+
+// ─────────────────────────── 诊断报告 ───────────────────────────
+
+function pctOf(num, den) {
+  return den > 0 ? `${((num / den) * 100).toFixed(1)}%` : NA
+}
+
+/**
+ * 可读的逐案例诊断报告。目标不是再印一遍指标，而是回答：
+ * 「这条命中凭什么被放进来 / 这条 needed 为什么没命中 / 这个误注入走的是哪条路」。
+ */
+function renderDiagnostics({ opts, corpus, rows, m, r, audit, corpusHash, questionHash, baselineReport }) {
+  const { chunks, stats } = chunksOf(corpus)
+  const chunkById = new Map(chunks.map((c) => [c.id, c]))
+  const flagged = rows.filter((row) =>
+    row.blacklistHit.length > 0 ||
+    row.whitelistHit.length > 0 ||
+    row.verdict === 'MISS' ||
+    row.verdict === 'ERROR' ||
+    (row.question.unresolved && row.hits.length > 0) ||
+    row.question.note.includes(LEXFAIL),
+  )
+  const out = []
+  const push = (...xs) => out.push(...xs)
+
+  push('# 检索诊断报告', '')
+  push('> 由 `scripts/eval-retrieval.mjs --report` 生成，**不要手改**。')
+  push(`> 生成时间：${new Date().toISOString()}；mode=${opts.mode}，limit=${opts.limit}，per-file=${opts.perFile}。`, '')
+  push('## 运行信息', '')
+  push(`- 语料：${corpus.length} 份；问题集：${rows.length} 题；语料指纹 \`${corpusHash}\`，题号指纹 \`${questionHash}\`。`)
+  push(`- 误注入（主指标）：${m.blacklistViolationQuestions}/${m.blacklistQuestions} 道有黑名单检查的题；检查项共 ${m.blacklistChecks} 个。`)
+  push(`- 白名单外：${m.whitelistViolationQuestions}/${m.whitelistQuestions} 道有白名单检查的题。`)
+  push(`- 无答案题：仍注入 ${m.overInjectQuestions}/${m.unresolvedQuestions}，拒绝率 ${pctOf(m.noAnswerRefused, m.unresolvedQuestions)}。`)
+  if (baselineReport) {
+    push(`- 基线比较：${baselineReport.status}${baselineReport.regressions?.length ? `（退化：${baselineReport.regressions.join(', ')}）` : ''}`)
+  }
+  push('')
+  push('## 指标（含诊断口径）', '', '| 指标 | 值 |', '|---|---|')
+  push(`| Recall@k（任一命中） | ${m.anyHit}/${m.neededQuestions} = ${pctOf(m.anyHit, m.neededQuestions)} |`)
+  push(`| 全中率（全部 needed） | ${m.allHit}/${m.neededQuestions} = ${pctOf(m.allHit, m.neededQuestions)} |`)
+  push(`| 条目级召回 | ${m.foundItems}/${m.neededItems} = ${pctOf(m.foundItems, m.neededItems)} |`)
+  push(`| 段落命中（严格） | ${m.spanStrict}/${m.spanItems} = ${pctOf(m.spanStrict, m.spanItems)} |`)
+  push(`| MRR | ${r.mrr.toFixed(4)}（Σ1/rank = ${m.mrrSum.toFixed(4)} / ${m.neededQuestions}） |`)
+  push(`| 误注入率（主指标） | ${m.blacklistViolationQuestions}/${m.blacklistQuestions} = ${pctOf(m.blacklistViolationQuestions, m.blacklistQuestions)} |`)
+  push(`| 白名单外误注入 | ${m.whitelistViolationQuestions}/${m.whitelistQuestions} = ${pctOf(m.whitelistViolationQuestions, m.whitelistQuestions)} |`)
+  push(`| 无答案题拒绝率 | ${m.noAnswerRefused}/${m.unresolvedQuestions} = ${pctOf(m.noAnswerRefused, m.unresolvedQuestions)} |`)
+  push(`| Precision@k（标注相关集·下界） | ${m.precisionHits}/${m.precisionDen} = ${pctOf(m.precisionHits, m.precisionDen)}（可评题 ${m.precisionQuestions}） |`)
+  push(`| 注入字节（候选片段代理） | ${m.injectedBytes} 总 / ${r.injectedBytesAvg.toFixed(1)} 平均每题 |`)
+  push(`| 延迟 p50 / p95 | ${r.latencyP50.toFixed(3)} ms / ${r.latencyP95.toFixed(3)} ms |`)
+  push('')
+  push('## 逐案例', '')
+  push(`触发诊断的题：${flagged.length} 道（误注入 / 白名单外 / 无答案注入 / 词法边界 / MISS）。`, '')
+  if (!flagged.length) push('（没有触发诊断条件的题）', '')
+  for (const row of flagged) {
+    const q = row.question
+    push(`### ${q.id} · ${row.verdict} · scope=${row.scope}`, '')
+    push(`- 问题：「${q.query}」`)
+    push(`- 备注：${q.note || '—'}`)
+    push(`- needed：${row.needed.length ? row.needed.map((n) => `${n.file}${n.span ? ` [${n.span[0]}-${n.span[1]}]` : ''} ${n.found ? `✓@${n.rank}` : '✗'}`).join('；') : '—'}`)
+    const flags = []
+    if (row.blacklistHit.length) flags.push(`黑名单命中：${row.blacklistHit.join(', ')}`)
+    if (row.whitelistHit.length) flags.push(`白名单外：${row.whitelistHit.join(', ')}`)
+    if (q.unresolved && row.hits.length) flags.push('无答案题仍注入')
+    if (q.note.includes(LEXFAIL)) flags.push('已知词法边界（query 与原文没有词面重合）')
+    if (!row.coverage.complete) flags.push(`切分不全（skipped ${row.coverage.skipped}）`)
+    if (row.dupExtra > 0) flags.push(`同文件重复 ${row.dupExtra} 条`)
+    if (flags.length) push(`- 标记：${flags.join('；')}`)
+    push('')
+    if (row.hits.length) {
+      push('| # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |', '|---|---|---|---|---|---|')
+      for (const [i, h] of row.hits.entries()) {
+        const ev = h.evidence === null ? '—（摘要层无门槛）' : `${h.evidence} / ${h.evidenceSum} / ${h.evidenceRarestDf} / ${h.evidenceRun}`
+        push(`| ${i + 1} | ${h.file} | ${h.lines ? `${h.lines[0]}-${h.lines[1]}` : '—'} | ${h.score} | ${h.matchedBy.join('+')} | ${ev} |`)
+      }
+      push('')
+    } else {
+      push('（没有命中）', '')
+    }
+    push('**诊断**：', '')
+    if (row.blacklistHit.length) {
+      const summaryLayer = row.hits.filter((h) =>
+        row.blacklistHit.includes(h.file) &&
+        h.matchedBy.some((x) => ['description', 'alias', 'filename', 'summary'].includes(x)),
+      )
+      if (summaryLayer.length) {
+        push('- 误注入中有**摘要层**命中：`summary` 路径（description / alias / filename）**没有 evidence 门槛**，词面重合就入选 —— 这是「共享常用词」误注入的直接原因。')
+      } else {
+        push('- 误注入来自**正文路径**：下面是它通过证据门槛的现场数值。')
+      }
+    }
+    for (const h of row.hits) {
+      if (h.evidence === null) continue
+      const rareOk = h.evidenceRarestDf <= 1 || h.evidenceRarest <= MAX_EVIDENCE_DF_RATIO
+      const checks = [
+        [`ratio ${h.evidence} ${h.evidence >= MIN_EVIDENCE_RATIO ? '≥' : '<'} ${MIN_EVIDENCE_RATIO}`, h.evidence >= MIN_EVIDENCE_RATIO],
+        [`sum ${h.evidenceSum} ${h.evidenceSum >= MIN_EVIDENCE_SUM ? '≥' : '<'} ${MIN_EVIDENCE_SUM}`, h.evidenceSum >= MIN_EVIDENCE_SUM],
+        [`rarestDf ${h.evidenceRarestDf} / ${h.evidenceRarest} ${rareOk ? '满足' : '不满足'}冷门判据`, rareOk],
+        [`run ${h.evidenceRun} ${h.evidenceRun >= MIN_MATCHED_RUN ? '≥' : '<'} ${MIN_MATCHED_RUN}`, h.evidenceRun >= MIN_MATCHED_RUN],
+      ]
+      const failed = checks.filter(([, ok]) => !ok).map(([label]) => label)
+      push(`- \`${h.file}\` 正文门槛：${checks.map(([label, ok]) => `${ok ? '✓' : '✗'} ${label}`).join('；')}${failed.length ? `（**未过** ${failed.length} 项；命中若仍存在，说明它经由摘要层进入）` : '（通过）'}`)
+      const chunk = chunkById.get(h.id)
+      if (chunk) {
+        const bd = scoreDocBreakdown(queryTermsOf(q.query), chunk.tf, chunk.dl, stats)
+        if (bd.length) {
+          const top = bd.slice().sort((a, b) => b.score - a.score).slice(0, 6)
+          push(`  - 词元贡献（前 ${top.length}）：${top.map((x) => `\`${x.term}\` idf=${x.idf.toFixed(2)} tf=${x.tf} → ${x.score.toFixed(2)}`).join('；')}`)
+        }
+      }
+    }
+    if (row.verdict === 'MISS') {
+      push(`- 未命中线索：needed 不在 top-${opts.limit}；本次候选 ${row.coverage.candidates} 条，正文门槛滤掉 ${row.coverage.filteredBelowFloor ?? 0} 条。`)
+    }
+    push('')
+  }
+  push('## 口径说明', '')
+  push('- **Precision@k 是下界**：相关集取「标注 needed ∪ allowFiles」；合成语料里未标注但相关的文件不会计入分子。')
+  push('- **注入字节**用候选片段字节代理；真实注入还受单场会话预算裁切（契约 2.5，软上限）。')
+  push('- **黑名单主指标**按「有黑名单检查的题」计，不按检查项计；71 是题数，检查项是 229（2026-10-23 审查口径纠正）。')
+  push('- **摘要层没有 evidence 门槛**是有意设计（摘要只有一句话，词面重合已经是较强信号）；代价是共享常用词的记忆会被误注入，这正是 1.7.1 难负例扩容要压的。')
+  push('')
+  push('## 复现', '')
+  push('```powershell')
+  push(`node scripts/eval-retrieval.mjs --mode ${opts.mode} --limit ${opts.limit} --per-file ${opts.perFile} --baseline test/eval/baseline.json --report docs/retrieval-diagnostics.md`)
+  push('```')
+  return out.join('\n') + '\n'
 }
 
 // ─────────────────────────── 主流程 ───────────────────────────
@@ -750,11 +938,26 @@ function main(argv) {
         scope: row.scope,
         verdict: row.verdict,
         note: row.question.note,
-        hits: row.hits.map(h => ({ file: h.file, lines: h.lines, score: h.score, matchedBy: h.matchedBy })),
+        hits: row.hits.map(h => ({
+          id: h.id,
+          file: h.file,
+          title: h.title,
+          headingPath: h.headingPath,
+          lines: h.lines,
+          score: h.score,
+          matchedBy: h.matchedBy,
+          evidence: h.evidence,
+          evidenceSum: h.evidenceSum,
+          evidenceRarest: h.evidenceRarest,
+          evidenceRarestDf: h.evidenceRarestDf,
+          evidenceRun: h.evidenceRun,
+        })),
         needed: row.needed,
         blacklistHit: row.blacklistHit,
         whitelistHit: row.whitelistHit,
         dupExtra: row.dupExtra,
+        precisionAtK: row.precisionAtK,
+        injectedBytes: row.injectedBytes,
         ms: Number(row.ms.toFixed(4)),
         coverage: row.coverage,
       })),
@@ -765,6 +968,13 @@ function main(argv) {
     }
     writeFileSync(opts.json, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
     console.log(`\nJSON 已写入 ${opts.json}`)
+  }
+
+  if (opts.report) {
+    const md = renderDiagnostics({ opts, corpus, rows, m, r, audit, corpusHash, questionHash, baselineReport })
+    mkdirSync(dirname(opts.report), { recursive: true })
+    writeFileSync(opts.report, md, 'utf8')
+    console.log(`\n诊断报告已写入 ${opts.report}`)
   }
 
   console.log(`\n退出码：${failed ? 1 : 0}`)

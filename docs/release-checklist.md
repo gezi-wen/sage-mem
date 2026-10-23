@@ -46,14 +46,17 @@ npm test
 ## 3. 离线评测（**不在 CI**，必须人工跑）
 
 ```bash
-node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json
+node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json \
+  --report docs/retrieval-diagnostics.md
 ```
 
 - **退出码必须是 0**。显式 `--baseline` 不可比时脚本退出 1（外部复审 R04 的修复）；
   确需探索用 `--allow-baseline-skip`，它**只放行「没比成」，不豁免真退化**。
 - 主指标一律看「**全部检查项**」，不看「无共享词元子集」那个诊断切片（R08）。
+- `--report` 重新生成 `docs/retrieval-diagnostics.md` 并随发布提交；确认已知误注入案例
+  （a08 / b12 / b14 / b15）仍能被它解释，而不是只剩一堆百分比。
 - 评测脚本**有意不登记**进 `test/run.mjs`（它打的是指标不是汇总行，见 D4）—— 所以它
-  永远只能靠这条清单人工跑。
+  永远只能靠这条清单人工跑；`test/retrieval-report-test.mjs` 只做「报告能生成」的烟雾。
 
 ## 4. 真实宿主探针（只有本次动了宿主侧才需要）
 

@@ -24,6 +24,7 @@ node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json   
 | `--limit N` | 每次返回条数，收敛到 `[1,10]`（默认 5） |
 | `--per-file N` | 每文件最多贡献几条段落（默认 2） |
 | `--json <path>` | 把完整结果（含逐题明细、标注自检、审计信息）写成 JSON |
+| `--report <path>` | 写一份可读的逐案例诊断报告（Markdown）：误注入 / 白名单外 / 无答案注入 / 词法边界 / MISS，含 evidence 门槛值、逐词元贡献与「为什么」 |
 | `--baseline <path>` | 与一份旧的 `--json` 产物对比，退化时退出码 1（**比较没完成也算失败**，见第 6 节） |
 | `--allow-baseline-skip` | 允许「显式给了 `--baseline` 但比较没完成」时放行（默认不允许） |
 | `--strict` | 黑名单/白名单误注入一律算失败（默认只如实报告） |
@@ -145,6 +146,9 @@ node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json   
 | 白名单外误注入 | 返回里出现 `allowFiles` 之外文件的题数 / 有白名单的题数 |
 | 重复文件 | 同一次结果里同一文件出现第 2 次起的条数（不该发生，是结构不变量）与这些重复片段的字节数 |
 | 无答案题仍注入 | `unresolved && !shouldInject` 的题里 `hits.length > 0` 的题数 / 这类题数 |
+| 无答案题拒绝率 | 同一类题里一条都不注入的题数 / 这类题数（与上一行互为补数；看板方向相反，单独给） |
+| **Precision@k（标注相关集·下界）** | top-k 里落在「标注 `needed` ∪ `allowFiles`」的条数 / 可评题的 top-k 总条数。**是下界**：未标注但相关的文件不计入分子 |
+| 注入字节（候选片段代理） | 所有命中片段字节之和 / 题数；真实注入还受单场会话预算裁切（契约 2.5） |
 | 平均候选数 | `coverage.candidates` 之和 / 题数（合并去重后可排的候选总量） |
 | 延迟 p50 / p95 | 逐题 `retrieve()` 墙钟耗时的最近秩分位数（20 个样本时 p95 取第 19 个观测，不插值） |
 
@@ -186,6 +190,25 @@ node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json   
 这四类各自需要**新的语料与题目**（现有的 30 份语料没有「同名不同项目 / 相同实体不同时间 /
 已失效内容」这三种构造）—— 属于**题集扩容，不是调参能解决的**：检索参数再怎么调，
 也不会让「词面完全相同、只有所指不同」的负例变得可分。本轮不改 `questions.jsonl`。
+
+### 诊断报告（`--report`）
+
+```powershell
+node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json --report docs/retrieval-diagnostics.md
+```
+
+报告只列**触发诊断条件的题**（误注入 / 白名单外 / 无答案注入 / 已知词法边界 / MISS），每题给出：
+
+- 命中的文件、行号、分数、命中层（`description` / `alias` / `filename` / `body`）；
+- 正文命中的 **evidence 门槛现场值**（`ratio` / `sum` / `rarestDf` / `run`）与门槛常量对照；
+- 正文命中的**逐词元贡献**（`scoreDocBreakdown`，各项之和严格等于 `scoreDoc`）；
+- 摘要层误注入会明确标出「`summary` 路径没有 evidence 门槛」；
+- MISS 会给出「候选数 / 正文门槛滤掉几条」；
+- 顶部指标表包含 `Precision@k`（下界）、无答案拒绝率、注入字节。
+
+当前仓库里有一份随版本生成的样本：`docs/retrieval-diagnostics.md`。**不要手改**，
+改算法后重新跑上面那条命令生成。`test/retrieval-report-test.mjs` 会检查报告能生成、
+包含已知的 a08 / b12 / b14 / b15 四个误注入案例、以及新增的三项指标。
 
 ### 逐题明细
 

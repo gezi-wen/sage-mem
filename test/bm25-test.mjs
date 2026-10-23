@@ -11,6 +11,7 @@ import {
   termFreq,
   buildStats,
   scoreDoc,
+  scoreDocBreakdown,
   coverageOf,
   queryTermsOf,
   idfOf,
@@ -170,6 +171,20 @@ ok(maxMatchedRun([], tfRun) === 0, '空 queryTokens → 0')
  * 隔着句号。真正防的是「同一个 CJK 连续段里的跨词假词元」，那段场景不受影响。
  */
 ok(maxMatchedRun(tokenize('甲。乙'), new Map([['甲', 1], ['乙', 1]])) === 2, '跨标点的两个词元在函数看来仍算连续（它只看序列）')
+
+console.log('== 16. scoreDocBreakdown：逐词元贡献（诊断报告用）==')
+const bdStats = { N: 100, avgdl: 10, df: new Map([['甲', 5], ['乙', 40], ['丙', 1]]) }
+const bdTf = new Map([['甲', 2], ['乙', 1], ['丙', 3]])
+const bdTerms = ['甲', '乙', '丙', '不存在']
+const bd = scoreDocBreakdown(bdTerms, bdTf, bdTf.size, bdStats)
+ok(bd.length === 3, `只返回命中的词元（4 个 query 词元 → ${bd.length} 条）`)
+ok(Math.abs(bd.reduce((s, x) => s + x.score, 0) - scoreDoc(bdTerms, bdTf, bdTf.size, bdStats)) < 1e-12,
+  '各项分数之和严格等于 scoreDoc（不存在第二份打分实现）')
+ok(bd.every(x => x.term && x.tf > 0 && x.idf > 0 && x.score > 0), '每条都带词元 / 词频 / IDF / 分数')
+ok(bd.find(x => x.term === '丙').score > bd.find(x => x.term === '乙').score,
+  '更冷门的词元贡献更大（丙 df=1 > 乙 df=40）')
+ok(scoreDocBreakdown(['不存在'], bdTf, 10, bdStats).length === 0, '一个都没命中 → 空数组')
+ok(scoreDocBreakdown([], bdTf, 10, bdStats).length === 0, '空 queryTerms → 空数组')
 
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

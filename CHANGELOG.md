@@ -7,6 +7,35 @@
 
 ---
 
+## 1.6.4
+
+**主题：审查响应 III —— 检索诊断与指标补齐（零检索算法改动）。**
+
+### 行为变更
+
+- **无。** 检索排序、注入选择、工具与 remote 面一字未改。
+- `scripts/eval-retrieval.mjs` 新增 `--report <path>`：生成可读的逐案例诊断报告。
+- 评测新增三项**诊断**指标（不进退化门禁，旧 baseline 仍可比）：`Precision@k`（标注相关集·下界）、`noAnswerRefusalRate`、`injectedBytesAvg`（候选片段代理）。
+
+### 新增
+
+- `scoreDocBreakdown()`（`lib/memory/bm25.js`）：逐词元贡献，各项之和严格等于 `scoreDoc()`；`scoreDoc` 改为它的求和，不存在第二份打分实现。
+- `docs/retrieval-diagnostics.md`：随版本生成的样本报告，覆盖 4 个已知误注入（a08 / b12 / b14 / b15）、白名单外、无答案注入、已知词法边界与 MISS。每个案例给命中层、evidence 门槛现场值（ratio / sum / rarestDf / run）、逐词元贡献与「为什么」。
+- `test/retrieval-report-test.mjs`（11 条）：报告能生成、仍在跑 baseline 比较、包含已知案例与三项新指标。
+- `test/eval/README.md` 与发布清单第 3 条同步：发版时用 `--report` 重新生成报告并提交。
+
+### 新增测试（2988 → 3005）
+
+- `bm25-test` 71 → 77（逐词元贡献 6 条，含「和严格等于 scoreDoc」）。
+- 新增 `retrieval-report-test.mjs` 11 条。
+
+### 实测
+
+- `npm test`：**3005 passed, 0 failed**。
+- 离线评测：`compared`、判定无退化、退出码 0；报告覆盖 17 个触发诊断的案例。
+
+---
+
 ## 1.6.3
 
 **主题：审查响应 II —— 读路径一致性、快照压力回归、npm 口径统一（零用户可见新能力）。**

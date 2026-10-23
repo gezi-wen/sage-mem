@@ -37,6 +37,8 @@ const SUITES = [
   'open-folder-test.mjs',
   'update-test.mjs',
   'retrieval-test.mjs',
+  // 1.6.4：检索诊断报告的可回归守卫（外部审查 RET-01 / OBS-01）。
+  'retrieval-report-test.mjs',
   // 1.2.0：注入链拆成纯函数后的直接单测（不需要 new MemoryGateway）。
   'recall-unit-test.mjs',
   'chunks-test.mjs',

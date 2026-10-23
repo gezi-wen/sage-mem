@@ -191,9 +191,9 @@ npm test \
 
 ---
 
-## 6. 1.6.3 追补（2026-10-23）
+## 6. 1.6.3 / 1.6.4 追补（2026-10-23）
 
-本响应发布后，1.6.3 把原「后续」里的四项做完了：
+本响应发布后，1.6.3 与 1.6.4 把原「后续」里的各项做完了：
 
 - **R11 / SEC-01 已修（行为）**：新增 `readVerified()` —— `open(路径)` 后对**同一句柄** `fstat`
   复核 `dev:ino` 与大小，再从该句柄读；检查后被换掉的路径返回 `changed`，不再交出未检查内容。
@@ -206,13 +206,36 @@ npm test \
   `pnpm test` 仍可用，只是 npm script 的别名。
 - **R19 已修（行为）**：星图面板读补 `shadowsReserved` + `inspectMemoryEntry` + `readVerified`，
   与另两条读路径同闸门。**可见变化**：面板打开超过 512 KB 的普通记忆现在会被拒绝。
-- 剩余：R13/R17（检索诊断与指标）仍排 1.6.4；Node 18 CI 覆盖、desktop 探针在候选池。
+- **R13 / RET-01 已修（诊断 + 指标）**：`eval-retrieval --report` 生成
+  [`retrieval-diagnostics.md`](retrieval-diagnostics.md)；4 个已知误注入逐案给出命中层、
+  evidence 门槛现场值（ratio / sum / rarestDf / run）与逐词元贡献；新增 `Precision@k`（下界）、
+  无答案拒绝率、注入字节（候选片段代理）三项诊断指标。
+- **R17 / OBS-01 已修（诊断标准化）**：报告只列触发条件的题；明确区分「摘要层无 evidence 门槛」
+  与「正文门槛」两条误注入路径；`test/retrieval-report-test.mjs`（11 条）盯「报告能生成且包含已知案例」。
+- 剩余：Node 18 CI 覆盖、desktop 探针在候选池；报告 P3 里的 UI 恶意字符串渲染测试、
+  隐私统计未单做（见下节）。
 
 复验：
 
 ```bash
 node test/safe-read-test.mjs && node test/snapshot-stress-test.mjs
+node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json --report docs/retrieval-diagnostics.md
 ```
+
+## 7. 审查建议中未单做的部分（如实列出）
+
+- **语义检索 / 向量库**：报告同样认为「先在评测数据证明现有检索不够用」；当前离线、可解释、
+  零外部依赖的设计是产品取舍，**不为技术时髦更换**（见路线图「明确不做」）。
+- **快照流式复制 + 增量 SHA-256**：实测收益上限≈最大单文件（真实 0.64 MB，约占 Node 基线 2%），
+  代价是重写失败路径与完整性语义，**不做**。
+- **P1-B 故障注入矩阵**：已有 `rollback-guard-test` / `race-guards-test` / `ad-smoke` 覆盖
+  枚举失败、残缺快照、并发回滚、清理保护等关键分支；本轮**没有**补齐报告列出的全部 9 种注入
+  （磁盘满、进程中断等），它们需要可注入的 fs 层，成本高于当前收益。
+- **P3 UI 恶意 / 极端字符串渲染测试**：本轮未逐一审阅 `client/*`，也未补渲染安全测试；
+  这条仍是**未验证**，不是「已确认安全」。
+- **P3 隐私安全统计**：插件没有遥测/统计功能，该建议**不适用**。
+- **P3 设计取舍文档**：现有 `docs/decisions.md` 已按条目记录「为什么这样做」；本轮未逐条补
+  「代价 / 什么证据会促使改变」，避免为了形式再抄一遍。
 
 > 本响应是基于有限环境的工程核验，不是完整逐行审计、正式渗透测试或全平台兼容性认证。
 > 报告与我们都没有声称「没有发现的 Bug 就不存在」。
