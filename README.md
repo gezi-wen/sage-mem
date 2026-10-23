@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current version 1.0.0 (the first stable release).** The public commitments, the capability boundaries and the list of things it explicitly cannot do are in the
+**Current release: `1.6.2`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -464,7 +464,7 @@ Your memories are the files in that directory, openable at any time for confirma
 
 sage-mem is a pure DSH plugin and declares its host requirement through **`engines.dsh`** in `package.json`: `>=0.1.2-rc.1` — **a one-sided open interval with no upper bound**, so no future DSH version will be blocked by this declaration. `engines.node` requires `>= 18`.
 
-Version-by-version verification record:
+Version-by-version compatibility record:
 
 | DSH version | Status |
 | --- | --- |
@@ -478,6 +478,9 @@ Version-by-version verification record:
 | 0.1.7-rc.2 | compatible |
 | 0.2.0-rc.1 | compatible |
 | 0.2.0-rc.2 | compatible |
+| 0.2.1-rc.1 | compatible |
+
+**How to read `compatible`.** It means this plugin's codec and manifest contract has been checked against that host generation (code-level comparison plus the unit/contract suite), **not** that an end-to-end probe was run on that exact host build. The table is a declaration; the evidence behind it is listed here. Real-host probes so far: `headless` (2026-10-15) and `web` (2026-10-16); the `desktop` profile has **not** been probed yet (see [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b). CI runs only on Ubuntu + Node 24 against the `0.2.0-rc.1` peer generation; `engines.node` still declares `>=18`, but Node 18 is not part of the CI matrix.
 
 Two points worth spelling out:
 

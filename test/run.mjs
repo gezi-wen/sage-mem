@@ -76,6 +76,8 @@ const SUITES = [
   'env-contract-test.mjs',
   // 1.2.0：结构守卫 —— 组合根体积 / 依赖方向 / typert 契约位置。
   'structure-test.mjs',
+  // 1.6.2：发布物一致性 —— 打包白名单 / 版本三处一致 / 兼容表对拍（本地操作，不联网）。
+  'release-test.mjs',
   // ⚠️ 下面两个必须排在最后：它们读的是**前面套件跑完落的断言台账**（见 `_passlog.mjs`），
   // 排在前面就会读到残缺的账。它们盯的是「契约里说了不验的承诺」与「两份文档说法不一致」。
   'contract-binding-test.mjs',

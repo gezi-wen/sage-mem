@@ -35,6 +35,10 @@ npm test
 
 - 本机跑一遍；**推上去之后看 CI**（`.github/workflows/test.yml`，ubuntu-latest + Node 24.x，
   `npm test` 跑两遍，第二遍 `TZ=UTC`）。
+- `npm test` 已包含 `test/release-test.mjs`：`npm pack --dry-run` 的白名单、`lib/` 运行时文件完整性、
+  包内版本、双语 README 与 CHANGELOG 的当前版本、兼容表对拍。**发布物一致性不再靠人工目测。**
+- **干净副本**：复制仓库（排除 `node_modules` / `.git`）→ `npm install` → `npm test`。
+  **不要**用 `pnpm install --frozen-lockfile`：`pnpm-workspace.yaml` 当前未入库（2026-10-23 核验发现，R18，1.6.3 处理）。
 - **Linux CI 能逮到 Windows 上永远测不出来的缺陷**（区分大小写的卷）：保留名身份集合、
   路径分隔符语义、时区。本机一万遍全绿也不代表 CI 会绿。
 - 断言里不许出现「只在某个平台成立」的机制性断言 —— 写成**两个平台都必须满足的不变量**。
@@ -90,15 +94,19 @@ dsh --profile web --patch $yml --port 0 --no-open
 - 新增 / 修复 / **行为变更**分节写。「行为变更」那一节是给升级者看的承诺，别把修复混进去。
 - 若某条旧承诺被**降级或被更正说法**，也要写 —— 静默改口径等于骗人。
 
-## 6. 四锚点核对
+## 6. 五锚点核对
 
-代码里的版本号、`CHANGELOG.md` 的标题、npm 上的版本、git tag —— 四个地方必须是同一个数字。
-改完代码忘记改 `package.json` 的 `version` 是这个项目**踩过**的坑（元数据不等于事实）。
+代码里的版本号、`CHANGELOG.md` 的标题、**双语 README 的「当前发布版本」**、npm 上的版本、git tag ——
+五个地方必须是同一个数字。改完代码忘记改 `package.json` 的 `version` 是这个项目**踩过**的坑
+（元数据不等于事实）；2026-10-23 外部审查又抓到 README 停在 `1.0.0` 而包已是 `1.6.1`。
 
-⚠️ **另有一处「手写数字」不在上面四个里**：README 顶部那两条静态徽章
-（`DSH ≥ x` / `node ≥ y`）。它们不从任何地方生成，改 `package.json` 的 `engines` 而忘了改徽章，
-图会**静静地继续撒谎**。`test/doc-consistency-test.mjs` 第 5 组会核对这两处并报红 ——
-**看到那组红，先去比对 `engines`，别去改断言。**
+前三处已由 `test/release-test.mjs` 第 5 组在 `npm test` 里自动核对（含反向对照）；
+后两处由本清单与 `scripts/verify-release.mjs` 核对。**别靠眼睛对。**
+
+⚠️ **另有两处「手写副本」已被对拍**：README 顶部那两条静态徽章（`DSH ≥ x` / `node ≥ y`）必须等于
+`package.json` 的 `engines`（`doc-consistency-test.mjs` 第 5 组看着）；双语兼容表必须等于
+`package.json.dsh.compatibility.dshReleases`（`release-test.mjs` 第 6 组看着）——
+**看到那组红，先去比对 `engines` / `dshReleases`，别去改断言。**
 
 ## 7. 推上去（release）
 
