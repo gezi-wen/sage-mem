@@ -83,6 +83,9 @@
 			".smem-dbg-dim{color:var(--dsw-alias-label-secondary);}",
 			".smem-dbg-query{font-size:12.5px;color:var(--dsw-alias-label-primary);white-space:pre-wrap;overflow-wrap:anywhere;}",
 			".smem-dbg-row{display:flex;gap:8px;align-items:flex-start;font-size:12px;}",
+			// 行首标签**不许被挤压**：flex 子项默认会收缩，「摘要得分」四个中文字会被挤成
+			// 一字一行（1.7.0 真机截图里就是这样）。标签固定不缩、不换行。
+			".smem-dbg-row>.smem-label{flex:none;white-space:nowrap;}",
 			".smem-dbg-scores{display:flex;flex-wrap:wrap;gap:4px 10px;}",
 			".smem-dbg-score{display:inline-flex;gap:4px;align-items:baseline;}",
 			".smem-dbg-file{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;overflow-wrap:anywhere;}",

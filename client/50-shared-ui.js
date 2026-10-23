@@ -528,7 +528,9 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 					: h("div", { key: "body" }, [
 							h("div", { className: "smem-dbg-head", key: "meta" }, [
 								h("span", { className: "smem-dbg-time", key: "t" }, clock(latest.at)),
-								h("span", { className: "smem-dbg-sess", key: "sid" }, String(latest.sessionId || "").slice(0, 8)),
+								// 会话 id 前 8 位：真机上的 id 常以 `session-` 开头，直接截 8 位会只剩
+								// 前缀（1.7.0 截图里那一行就是 `session-`）。先剥前缀再截，才有辨识度。
+								h("span", { className: "smem-dbg-sess", key: "sid" }, String(latest.sessionId || "").replace(/^session-?/, "").slice(0, 8) || "—"),
 								h("span", { className: "smem-dbg-out" + outcomeClass(latest), key: "o" }, outcomeText(latest)),
 							]),
 							h("div", { className: "smem-dbg-query", key: "q" }, "问题：" + (String(latest.query || "").trim() || "（无）")),

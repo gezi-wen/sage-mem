@@ -137,10 +137,25 @@ const SANDBOX_ENV = {
 mkdirSync(SANDBOX_ENV.SAGE_MEM_DIR, { recursive: true })
 mkdirSync(SANDBOX_ENV.SAGE_MEM_STATE_DIR, { recursive: true })
 
+/**
+ * **环境隔离**：套件必须跑在「干净环境」里，绝不继承开发机上的调参。
+ *
+ * 2026-10-24 实测：把 `SAGE_MEM_DEBUG=1` 设进用户级环境变量之后（为了看面板的注入调试），
+ * 宿主进程继承它 → 本运行器的子进程也继承它 → `access-test` 里「不开 DEBUG 时零日志 /
+ * 恰好一行」两条当场红。那不是产品回归，是**测试被环境污染**。
+ *
+ * 所以这里显式删掉一批「只在开发时才会设」的变量；将来再加同类开关（前缀 `SAGE_MEM_` 的
+ * 调试 / 探针变量）也放这个名单。注意**不能**把 DIR / STATE / MAX_* 也删 —— 下面
+ * SANDBOX_ENV 会给它们统一覆盖，删掉反而让个别套件读到默认值。
+ */
+const SCRUBBED = ['SAGE_MEM_DEBUG', 'SAGE_MEM_TASK_ID', 'SAGE_MEM_PROBE_AFTER_MS']
+const childEnv = { ...process.env, ...SANDBOX_ENV }
+for (const k of SCRUBBED) delete childEnv[k]
+
 for (const name of SUITES) {
   const r = spawnSync(process.execPath, [join(HERE, name)], {
     encoding: 'utf8',
-    env: { ...process.env, ...SANDBOX_ENV },
+    env: childEnv,
   })
   const out = `${r.stdout ?? ''}${r.stderr ?? ''}`
   const m = out.match(SUMMARY)
