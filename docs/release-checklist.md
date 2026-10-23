@@ -38,7 +38,7 @@ npm test
 - `npm test` 已包含 `test/release-test.mjs`：`npm pack --dry-run` 的白名单、`lib/` 运行时文件完整性、
   包内版本、双语 README 与 CHANGELOG 的当前版本、兼容表对拍。**发布物一致性不再靠人工目测。**
 - **干净副本**：复制仓库（排除 `node_modules` / `.git`）→ `npm install` → `npm test`。
-  **不要**用 `pnpm install --frozen-lockfile`：`pnpm-workspace.yaml` 当前未入库（2026-10-23 核验发现，R18，1.6.3 处理）。
+  仓库统一用 npm，没有 `pnpm-lock.yaml`（见 README「参与开发」）。
 - **Linux CI 能逮到 Windows 上永远测不出来的缺陷**（区分大小写的卷）：保留名身份集合、
   路径分隔符语义、时区。本机一万遍全绿也不代表 CI 会绿。
 - 断言里不许出现「只在某个平台成立」的机制性断言 —— 写成**两个平台都必须满足的不变量**。

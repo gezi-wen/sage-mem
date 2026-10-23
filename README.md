@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `1.6.2`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `1.6.3`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -460,6 +460,8 @@ sage-mem does three things only, all of them on your own machine:
 
 Your memories are the files in that directory, openable at any time for confirmation — which is also why file-based was chosen.
 
+**Trust boundary for the memory directory.** Anyone who can write the memory directory can change what gets injected into the model — that is **inside** the trust model, not a vulnerability in the plugin. The read path rejects symlinks, reserved-name aliases and files over 512 KB at check time, and re-verifies file identity when reading (a file swapped in after the check is refused instead of injected); it cannot defend against a writer who is already allowed to modify your memories. Keep the directory's permissions to your own account.
+
 ## Compatibility
 
 sage-mem is a pure DSH plugin and declares its host requirement through **`engines.dsh`** in `package.json`: `>=0.1.2-rc.1` — **a one-sided open interval with no upper bound**, so no future DSH version will be blocked by this declaration. `engines.node` requires `>= 18`.
@@ -524,6 +526,7 @@ npm test          # all assertions (including the three guards)
 ```
 
 - The assertion scripts depend only on `node:` built-in modules and **introduce no test framework**; each script hand-writes `ok()` and ends with a summary line.
+- This repository uses **npm** for install / test / CI. No `pnpm-lock.yaml` is kept: a stale one could not be frozen-installed from a fresh clone (its workspace file was untracked), so it was removed rather than left to mislead.
 - **Three guards** watch over "whether the tests themselves hold up": `suite-registry-test.mjs` (is there a suite that was written but never runs), `contract-binding-test.mjs` (is there a commitment that was made but never verified), `doc-consistency-test.mjs` (do the two documents characterize things identically line by line).
 - CI runs twice on `ubuntu-latest` (the second time with `TZ=UTC`) — a case-sensitive volume catches defects that are invisible on Windows.
 - When you change **user-visible behaviour**, please also update the corresponding line in the [contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md) and the CHANGELOG; a commitment you cannot write an assertion for can only be marked "best-effort".

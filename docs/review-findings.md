@@ -37,24 +37,21 @@
 | 编号 | 发现（外部审查原文摘） | 优先级 | 处置 | 断言 | 谁看着 |
 |---|---|---|---|---|---|
 | **R10** | **DOC-01**：README 的「当前版本」仍为 `1.0.0`，包版本为 `1.6.1`（已确认） | P2 | **已修（文档 + 门禁）**：双语 README 拆成「当前发布版本」与「契约基线 1.0.0」；版本一致性进 `npm test` | `release-test.mjs::README.md 的当前发布版本`<br>`release-test.mjs::CHANGELOG 最新一节的版本` | 断言；改任一处忘其余会红（含反向对照） |
-| **R11** | **SEC-01**：先 `lstat` 检查、再按路径 `readFile`，理论 TOCTOU 窗口（潜在风险，未复现） | P2 | **未修（窗口已实证，但无跨信任边界利用）**：确定性换文件测试证实「闸门看到的文件 ≠ 读到的文件」；威胁模型要求攻击者已能写记忆目录（本就能直接注入记忆），未新增提权/外带通道。排期 1.6.3 | — | `review-2026-10-23-response.md` 的核验节；1.6.3「读路径一致性」 |
-| **R12** | **PERF-01**：快照对每个顶层 Markdown 全量 `readFile`，可能内存峰值高（未压测） | P2 | **未修（实测不构成问题）**：真实目录 110 文件 / 1.6 MB → 峰值 45 MB、167 ms；1000×512 KB → 82 MB / 2.3 s。流式收益上限≈最大单文件。排期 1.6.3 补压力回归 | — | 1.6.3 压力回归；`review-2026-10-23-response.md` 的测量表 |
+| **R11** | **SEC-01**：先 `lstat` 检查、再按路径 `readFile`，理论 TOCTOU 窗口（潜在风险，未复现） | P2 | **已修（行为）**：新增 `readVerified()` —— `open` → 对同一句柄 `fstat` 复核 `dev:ino` 与大小 → 同句柄读；检查后被换掉的路径返回 `changed`。确定性换文件测试进 `npm test`；面板读同闸门（R19）。威胁模型仍成立：能写记忆目录者已在信任边界内 | `safe-read-test.mjs::闸门后换入更大的文件`<br>`safe-read-test.mjs::闸门后换成同尺寸的另一个文件` | 断言；威胁模型见 `review-2026-10-23-response.md`（可写目录者本就能注入） |
+| **R12** | **PERF-01**：快照对每个顶层 Markdown 全量 `readFile`，可能内存峰值高（未压测） | P2 | **已补压力回归（实现不改）**：8 × 20 MB 快照 + MANIFEST 逐文件 sha256 + 峰值 RSS < 256 MB（本机实测约 166 MB）；流式收益上限≈最大单文件，不做重写 | `snapshot-stress-test.mjs::8 × 20 MB`<br>`snapshot-stress-test.mjs::峰值 RSS` | 断言；真实规模测量表在响应文档 |
 | **R13** | **RET-01**：Recall@5 87.0% 有量化基准，但仍有词法边界与少量误注入 | P2 | **部分处置**：数字 5/5 复跑一致（60/69、67/81、4/71、1/10、摘要基线 33/69）；4 个误注入全部来自同一份「候鸟到达时间」记忆，3 条是 summary 层无相关性门槛。诊断输出与指标补齐排期 1.6.4 | — | 1.6.4 检索诊断；评测退出码由发布清单第 3 条人工核对 |
 | **R14** | **TEST-01**：审查环境缺 `zod`，完整测试未跑完（验证阻塞） | 阻塞 | **判定为环境阻塞，不是仓库缺陷**：本机 `npm test` 2949/0；干净副本按 README `npm install` 后 2949/0；裸解压（未装依赖）复现 `ERR_MODULE_NOT_FOUND` | — | CI 每次 clean checkout 装依赖并跑两遍；发布清单第 2 条 |
 | **R15** | **COMP-01**：宿主兼容性声明应与实际验证矩阵对应（待核实） | P2 | **已改说法（口径）**：README 写明 `compatible` = 契约核对，不等于该构建跑过端到端探针；补记 DSH `0.2.1-rc.1`；双语兼容表与 `dshReleases` 互相对拍 | `release-test.mjs::README.md 兼容表`<br>`release-test.mjs::README.zh.md 兼容表` | 断言；CI 覆盖 / 声明范围差异由发布清单人工复核 |
 | **R16** | **REL-01**：需确保发布包包含运行时必需文件与依赖声明（建议） | P2 | **未发现缺陷；已加门禁**：包内 64 条目、零 test/docs/tgz；装包后 `import` 正常。新增 `release-test.mjs` 盯白名单 + 运行时文件完整性 | `release-test.mjs::包内版本 = 仓库版本`<br>`release-test.mjs::包内路径全部在白名单内` | 断言；CI 每次 `npm test` 都跑 |
 | **R17** | **OBS-01**：检索失败与误注入的诊断输出可标准化（建议） | P3 | **未做**：现有输出有逐题 verdict / needed / top3 / `[lexfail]`，缺 token / 权重 / gate 数值与自动案例报告。排期 1.6.4 | — | 1.6.4 检索诊断 |
-| **R18** | （核验中发现，不在原报告）被跟踪的 `pnpm-lock.yaml` 在 fresh clone 下 `--frozen-lockfile` 失败：`pnpm-workspace.yaml` 被 `.gitignore` 掉了 | P2 | **未修**：干净副本已确认 `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`；README 的 `npm install` 路径可用。排期 1.6.3 决定「提交 workspace + 重生成锁」或「去掉 pnpm 锁」 | — | 1.6.3；`review-2026-10-23-response.md` 的「核验中发现」 |
-| **R19** | （核验中发现，不在原报告）`StarmapGateway.readFile` 只过 `safeName`，没有 `inspectMemoryEntry` / `shadowsReserved`；面板读，不进模型上下文 | P3 | **未修**：与另两条读路径不一致，排期 1.6.3 一起收口 | — | 1.6.3「读路径一致性」 |
+| **R18** | （核验中发现，不在原报告）被跟踪的 `pnpm-lock.yaml` 在 fresh clone 下 `--frozen-lockfile` 失败：`pnpm-workspace.yaml` 被 `.gitignore` 掉了 | P2 | **已修（流程）**：移除失效的 `pnpm-lock.yaml`，仓库统一用 npm；README「参与开发」写明；`pnpm test` 仍可用（只是 npm script 的别名） | — | README「参与开发」；发布清单 §2 干净副本步骤用 `npm install` |
+| **R19** | （核验中发现，不在原报告）`StarmapGateway.readFile` 只过 `safeName`，没有 `inspectMemoryEntry` / `shadowsReserved`；面板读，不进模型上下文 | P3 | **已修（行为）**：星图读补 `shadowsReserved` + `inspectMemoryEntry` + `readVerified`，与注入链 / 工具读同闸门 | `safe-read-test.mjs::超过 512 KB 的记忆被同一个体积闸门拒绝` | 断言；R11 同一套读取原语 |
 
 ## 仍未做（如实列出，不混进「已修」）
 
 | 事项 | 状态 |
 |---|---|
-| **读路径 TOCTOU 加固 / 统一安全读取原语** | 未做。窗口已确定性复现（闸门看到 57 B，换文件后读进 5,242,896 B），跨进程竞态 20000 次出现 8 次错配；但威胁模型评估为「无跨信任边界利用」，且 Node 无跨平台 `O_NOFOLLOW`。排 1.6.3，先补确定性测试与面板读收口 |
-| **快照大文件 / 大目录压力回归** | 未做。已用临时目录实测（1000×512KB → 82MB / 2.3s），但还没变成会红的回归。排 1.6.3 |
 | **检索误注入逐案例诊断报告** | 未做。当前 4 个案例已定位（a08 / b12 / b14 / b15，全部指向同一份记忆），缺自动生成的可读报告与 token / gate 数值。排 1.6.4 |
-| **pnpm 锁文件在 fresh clone 的 frozen 复现** | 未做。见 R18；排 1.6.3 |
 | **真实 desktop 宿主探针** | 未做。CLI 无法创建 desktop profile；仍只能走 GUI 侧动态加载，需逐次授权（见发布清单 §4b） |
 | **Node 18 CI 覆盖** | 未做。`engines.node` 声明 `>=18`，CI 实际只跑 Node 24；README 兼容性一节已如实写明，是否收窄声明或补 CI 覆盖待定（候选池） |
 | **目标机全链性能测量与修复** | **已完成**。热点是 `open` 这个系统调用而不是字节数；改为目录监视失效（`lib/memory/watch.js`），全链 p50 100 份 **37.12 → 1.99 ms**、1000 份 **357.70 → 12.77 ms**。过程中挖到一个宿主级隐患（Windows 上被监视目录被删后 `fs.watch` 空转：2.9 秒 388,196 个事件、不发 `error`、CPU 100%），已加洪流哨兵 + 回归断言。**残余风险**：watcher 漏掉「同名改内容」的事件时会供一次旧内容，直到下一次任何失效 |

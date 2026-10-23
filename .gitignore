@@ -1,5 +1,7 @@
 node_modules/
 *.bak-*
 pnpm-workspace.yaml
+# 本仓库统一用 npm（见 README 参与开发）；不留 pnpm 锁，避免「fresh clone 装不动」的误导
+pnpm-lock.yaml
 # 打包产物：发布时由 pnpm pack 现生成，不该进仓库
 *.tgz

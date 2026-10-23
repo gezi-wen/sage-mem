@@ -25,6 +25,8 @@ const SUITES = [
   // 1.0.1：报告撞上单次输出上限时的「接着写」与残篇标注（真实事故：10-17 凌晨那份报告断在半句）。
   'autodream-continuation-test.mjs',
   'rollback-guard-test.mjs',
+  // 1.6.3：快照在多文件 / 大文件下的正确性与内存峰值回归（外部审查 PERF-01）。
+  'snapshot-stress-test.mjs',
   'race-guards-test.mjs',
   'q-fixes-093.mjs',
   'q-fixes-094.mjs',
@@ -42,6 +44,8 @@ const SUITES = [
   'search-test.mjs',
   'intent-test.mjs',
   'reader-test.mjs',
+  // 1.6.3：检查与读取之间换文件的确定性复现 + 星图读收口（外部审查 SEC-01 / R19）。
+  'safe-read-test.mjs',
   'memory-tools-test.mjs',
   'observe-test.mjs',
   'write-gate-test.mjs',
