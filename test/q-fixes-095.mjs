@@ -10,8 +10,16 @@
 import { mkdtemp, mkdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { zstdCompressSync } from 'node:zlib'
+import * as zlib from 'node:zlib'
 import { spawn } from 'node:child_process'
+
+/**
+ * ⚠️ `zstdCompressSync` 是 Node 22.15+ 才有的 API；`engines.node` 声明 `>=18`，
+ * 所以 Node 18/20 上这个套件必须**跳过 Q07 而不是整份炸掉**（运行时本身已优雅降级：
+ * `autodream/tools.js` 在 zstd 不可用时返回「当前 Node 不支持 zstd 解压」）。
+ * 具名导入会在模块实例化阶段直接 SyntaxError，连 Q08 都跑不到 —— 所以用命名空间导入。
+ */
+const zstdCompressSync = zlib.zstdCompressSync
 
 const LIB = new URL('../lib/', import.meta.url)
 const { AutodreamEngine } = await import(new URL('autodream.js', LIB).href)
@@ -59,6 +67,12 @@ async function world(tag) {
 const multiFrame = (lines) => Buffer.concat(lines.map((l) => zstdCompressSync(Buffer.from(`${l}\n`, 'utf8'))))
 
 // ────────────────────────── Q07 · zstd 多帧 ──────────────────────────
+//
+// Node < 22.15 没有 zlib.zstdCompressSync：运行时已降级为「读不了会话记录」的明确提示，
+// 因此这里跳过 Q07、保留 Q08 的锁所有权断言，让声明的 Node 下限仍能跑完整套件。
+if (typeof zstdCompressSync !== 'function') {
+  skip('Q07（zstd 多帧）', `当前 Node ${process.version} 没有 zlib.zstdCompressSync（Node < 22.15），运行时已优雅降级`)
+} else {
 
 console.log('== Q07a：会话记录是逐行一个帧，关键词出现在**第二帧之后**也要命中 ==')
 {
@@ -139,6 +153,8 @@ console.log('== Q07c：limit 是「最多这么多段」，不是「超过才停
   const one = await runner.run('search_sessions', { query: 'LIMIT-NEEDLE', limit: 1 })
   const lines = String(one).split('\n').filter((l) => l.startsWith('['))
   ok(lines.length === 1, `limit=1 恰好返回 1 段（旧实现返回 2 段，实际 ${lines.length}）`, String(one).slice(0, 200))
+}
+
 }
 
 // ────────────────────────── Q08 · 锁所有权 ──────────────────────────

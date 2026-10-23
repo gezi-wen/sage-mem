@@ -482,7 +482,7 @@ Version-by-version compatibility record:
 | 0.2.0-rc.2 | compatible |
 | 0.2.1-rc.1 | compatible |
 
-**How to read `compatible`.** It means this plugin's codec and manifest contract has been checked against that host generation (code-level comparison plus the unit/contract suite), **not** that an end-to-end probe was run on that exact host build. The table is a declaration; how each claim was checked is summarized here. Real-host probes so far: `headless` (2026-10-15) and `web` (2026-10-16); the `desktop` profile has **not** been probed yet (see [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b). CI runs only on Ubuntu + Node 24 against the `0.2.0-rc.1` peer generation; `engines.node` still declares `>=18`, but Node 18 is not part of the CI matrix.
+**How to read `compatible`.** It means this plugin's codec and manifest contract has been checked against that host generation (code-level comparison plus the unit/contract suite), **not** that an end-to-end probe was run on that exact host build. The table is a declaration; how each claim was checked is summarized here. Real-host probes so far: `headless` (2026-10-15) and `web` (2026-10-16); the `desktop` profile has **not** been probed yet (see [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b). CI runs on Ubuntu against **Node 18.x / 20.x / 24.x** with the `0.2.0-rc.1` peer generation; macOS and Windows are not CI-covered, and there is no desktop-host probe yet.
 
 Two points worth spelling out:
 

@@ -33,8 +33,8 @@
 npm test
 ```
 
-- 本机跑一遍；**推上去之后看 CI**（`.github/workflows/test.yml`，ubuntu-latest + Node 24.x，
-  `npm test` 跑两遍，第二遍 `TZ=UTC`）。
+- 本机跑一遍；**推上去之后看 CI**（`.github/workflows/test.yml`，ubuntu-latest + **Node 18.x / 20.x / 24.x**，
+  `npm test` 在三个版本上各跑两遍，第二遍 `TZ=UTC`）。
 - `npm test` 已包含 `test/release-test.mjs`：`npm pack --dry-run` 的白名单、`lib/` 运行时文件完整性、
   包内版本、双语 README 与 CHANGELOG 的当前版本、兼容表对拍。**发布物一致性不再靠人工目测。**
 - **干净副本**：复制仓库（排除 `node_modules` / `.git`）→ `npm install` → `npm test`。

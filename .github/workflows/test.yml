@@ -21,7 +21,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ['24.x']
+        # 18 = engines.node 声明的最低版本；20 = 中间 LTS；24 = 当前开发版本。
+        # 2026-10-23 审查 COMP-01 的修复：声明了 Node ≥18，就必须真的在 18 上跑。
+        node-version: ['18.x', '20.x', '24.x']
     steps:
       - uses: actions/checkout@v4
 
