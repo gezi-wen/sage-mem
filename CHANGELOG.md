@@ -7,6 +7,27 @@
 
 ---
 
+## 1.6.5
+
+**主题：审查响应 IV —— Node 版本矩阵对齐（零运行时改动）。**
+
+### 行为变更
+
+- **无。** `lib/` 一行未改。
+
+### 工程口径
+
+- **CI 矩阵扩到 Node 18.x / 20.x / 24.x**（Ubuntu），每个版本都跑两遍（第二遍 `TZ=UTC`）。`engines.node >=18` 这个声明现在有 CI 证据，不再是「只写了没验」。
+- `q-fixes-095` 对 Node 版本容错：Node < 22.15 没有 `zlib.zstdCompressSync`，Q07（zstd 多帧）改为 **SKIP** 而不是模块实例化阶段 SyntaxError；Q08 的锁所有权断言照常跑。运行时本来就优雅降级 —— `search_sessions` 会明确返回「当前 Node 不支持 zstd 解压，无法读取会话记录」。
+- README 兼容性口径同步：CI 覆盖 Node 18/20/24（Ubuntu）；macOS / Windows 没有 CI 覆盖，desktop 宿主探针仍未做。
+
+### 实测
+
+- 本机 `npm test`：**3005 passed, 0 failed**。
+- CI 矩阵（Node 18 / 20 / 24）：全绿（run `39985251246`）。
+
+---
+
 ## 1.6.4
 
 **主题：审查响应 III —— 检索诊断与指标补齐（零检索算法改动）。**

@@ -212,7 +212,9 @@ npm test \
   无答案拒绝率、注入字节（候选片段代理）三项诊断指标。
 - **R17 / OBS-01 已修（诊断标准化）**：报告只列触发条件的题；明确区分「摘要层无 evidence 门槛」
   与「正文门槛」两条误注入路径；`test/retrieval-report-test.mjs`（11 条）盯「报告能生成且包含已知案例」。
-- 剩余：Node 18 CI 覆盖、desktop 探针在候选池；报告 P3 里的 UI 恶意字符串渲染测试、
+- **COMP-01 补强（1.6.5）**：CI 矩阵扩到 **Node 18 / 20 / 24**（Ubuntu），最低声明版本有 CI 证据；
+  `q-fixes-095` 在缺 `zlib.zstdCompressSync` 的 Node 上跳过 Q07 而不是整份失败（运行时本来就优雅降级）。
+- 剩余：desktop 探针与 macOS / Windows CI 未做；报告 P3 里的 UI 恶意字符串渲染测试、
   隐私统计未单做（见下节）。
 
 复验：
@@ -236,6 +238,8 @@ node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json --
 - **P3 隐私安全统计**：插件没有遥测/统计功能，该建议**不适用**。
 - **P3 设计取舍文档**：现有 `docs/decisions.md` 已按条目记录「为什么这样做」；本轮未逐条补
   「代价 / 什么证据会促使改变」，避免为了形式再抄一遍。
+- **macOS / Windows CI 与 desktop 探针**：CI 已覆盖 Ubuntu + Node 18 / 20 / 24；跨 OS CI
+  与真实 desktop 宿主探针仍未做（后者需要 GUI 侧动态加载并逐次授权）。
 
 > 本响应是基于有限环境的工程核验，不是完整逐行审计、正式渗透测试或全平台兼容性认证。
 > 报告与我们都没有声称「没有发现的 Bug 就不存在」。
