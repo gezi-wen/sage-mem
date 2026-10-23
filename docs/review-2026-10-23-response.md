@@ -57,7 +57,7 @@
   （提示注入不需要 TOCTOU）。唯一新增能力是「读记忆目录外的文件」：
   Windows 非管理员建不出文件符号链接（本机实测 EPERM）；junction 只对目录且 `readFile` 得 `EISDIR`；
   Linux 同用户可建符号链接，但同用户本就能读目标 —— 未找到把内容带回攻击者的通道。
-  这台机器上 `E:\shengdian\memory` 的 ACL 继承了 `Authenticated Users: Modify`，
+  这台机器上**本机记忆目录**的 ACL 继承了 `Authenticated Users: Modify`，
   「只有同用户可写」的假设不成立，但结论不变（可写者本就能注入）。
 - **为什么不本版修**：统一安全读取原语（`open` → `fstat` → 同句柄读）要改 5+ 调用点、
   回归 ENOENT / EISDIR / 超限语义、每文件多一次 `stat`，且 Node 没有跨平台的 `O_NOFOLLOW`
