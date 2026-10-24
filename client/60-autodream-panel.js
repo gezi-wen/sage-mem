@@ -42,6 +42,9 @@
 			const sLimitsDraft = react.useState(null); const limitsDraft = sLimitsDraft[0], setLimitsDraft = sLimitsDraft[1];
 			const sSaveBusy = react.useState(false); const saveBusy = sSaveBusy[0], setSaveBusy = sSaveBusy[1];
 			const sReservedNew = react.useState(""); const reservedNew = sReservedNew[0], setReservedNew = sReservedNew[1];
+			// ── 1.8.0 侧栏入口开关（客户端行为：改完立刻生效，不需要重启）──
+			const sSidebarBusy = react.useState(false); const sidebarBusy = sSidebarBusy[0], setSidebarBusy = sSidebarBusy[1];
+			const sSidebarErr = react.useState(""); const sidebarErr = sSidebarErr[0], setSidebarErr = sSidebarErr[1];
 
 			// 派生量放在 effect 之前：下面几个 effect 的依赖数组要在渲染期就能取到值。
 			const c = cfg || {};
@@ -56,6 +59,8 @@
 			const fixedReserved = ((memSet && memSet.reserved) || []).filter(function (n) {
 				return extraLower.indexOf(String(n).toLowerCase()) < 0;
 			});
+			// 默认开：宿主没回 ui 字段（旧版本）或值不是布尔，都按「开」显示。
+			const sidebarEntryOn = !(memSet && memSet.ui && memSet.ui.sidebarEntry === false);
 
 			react.useEffect(function () {
 				if (!remote) { setErr("remote.autodream 不可用 —— 插件的 宿主侧可能没加载成功，看 DSH 启动日志"); return undefined; }
@@ -164,6 +169,31 @@
 					else loadMemSettings();
 					setNotice("已保存 —— 需重启 DSH 才生效");
 				}, function (e) { setSaveBusy(false); setErr(detail(e)); });
+			}
+
+			/**
+			 * 侧栏入口开关（1.8.0）。
+			 *
+			 * 顺序是「先写设置、成功后再动槽位」：设置没落盘就不该让界面先变一个样。
+			 * 失败只报错、不改任何东西 —— checkbox 的勾选状态由 memSet 派生，于是自动回到原值。
+			 * 成功后调 `setSidebarEntry`：**立即**增删侧栏槽位，不刷新、不重启。
+			 */
+			function saveSidebarEntry(next) {
+				if (!memRemote || typeof memRemote.setSettings !== "function") {
+					setSidebarErr("宿主侧还没有 setSettings 接口（插件版本较旧）");
+					return;
+				}
+				if (sidebarBusy) return;
+				setSidebarBusy(true); setSidebarErr(""); setNotice("");
+				Promise.resolve(memRemote.setSettings({ ui: { sidebarEntry: !!next } })).then(function (out) {
+					setSidebarBusy(false);
+					// 与 saveLimits 同款：setSettings 是 {ok, settings, restartRequired} 形状，不要过 unwrap。
+					if (out && out.ok === false) { setSidebarErr(out.error || "保存被拒绝"); return; }
+					if (out && out.settings) setMemSet(out.settings);
+					else loadMemSettings();
+					setSidebarEntry(!!next);
+					setNotice(!!next ? "侧栏入口已开启（立即生效）" : "侧栏入口已关闭（设置页入口仍在）");
+				}, function (e) { setSidebarBusy(false); setSidebarErr(detail(e)); });
 			}
 
 			/**
@@ -437,6 +467,26 @@
 				]),
 				]) : null,
 				segOf === "settings" ? h("div", { key: "seg-set" }, [
+				// 1.8.0：侧栏入口开关。默认开；关掉只影响侧栏那个图标，
+				// 「设置 → 记忆管理」这个入口永远在（它注册在 80-apply，和这个开关无关）。
+				h("div", { className: "smem-autodream-sec", key: "sidebar-entry" }, [
+					h("div", { className: "smem-autodream-row", key: "h" }, [
+						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, "侧栏入口"),
+						h("span", { className: "smem-status", key: "s" }, sidebarEntryOn ? "已开启" : "已关闭"),
+					]),
+					h("div", { className: "smem-autodream-note", key: "n" },
+						"在 DSH 侧栏显示「记忆管理」图标，点它把中央主区切到本页。默认开启；关闭后「设置 → 记忆管理」这个入口仍然保留。改动立即生效，不需要重启。"),
+					h("label", { className: "smem-check", key: "row" }, [
+						h("input", {
+							type: "checkbox", key: "c",
+							checked: sidebarEntryOn,
+							disabled: sidebarBusy,
+							onChange: function (e) { saveSidebarEntry(!!(e.target && e.target.checked)); },
+						}),
+						h("span", { key: "l" }, "在侧栏显示「记忆管理」入口"),
+					]),
+					sidebarErr ? h("div", { className: "smem-autodream-note smem-ad-warn", key: "err" }, sidebarErr) : null,
+				]),
 				// 自动归档那一段（三档策略 + 三个阈值）**已挪到「自动归档」页签**（v0.9.9）：
 				// 归档是确定性规则、不调模型，和这一页的「让模型整理」不是一件事；
 				// 同一件事只在一处设定，这里不再重复摆一份。

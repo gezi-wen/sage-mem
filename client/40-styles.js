@@ -224,6 +224,13 @@
 			".smem-tabs-sep{width:1px;align-self:stretch;margin:6px 2px;background:var(--dsw-alias-border-l2);}",
 			// 窄窗口（≤420px）：头部带与筛选条各让一行，卡片动作允许换行、分隔符隐藏。
 			"@media (max-width:420px){.smem-root{gap:10px;}.smem-head{gap:6px;}.smem-head-actions{flex-wrap:wrap;}.smem-card-title{min-width:0;word-break:break-word;}.smem-actions{flex-wrap:wrap;}.smem-actions-sep{display:none;}.smem-num{width:56px;}.smem-search{min-width:100px;}}",
+			// ── 1.8.0：侧栏入口（设置开关 + 中央主区整页）──
+			".smem-check{display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer;user-select:none;}",
+			".smem-check input{margin:0;cursor:pointer;accent-color:var(--dsw-alias-brand-primary,#4d76e6);}",
+			".smem-page{display:flex;flex-direction:column;gap:10px;padding:14px 16px 18px;box-sizing:border-box;min-height:0;overflow:auto;}",
+			".smem-page-top{display:flex;align-items:center;}",
+			".smem-page-back{display:inline-flex;align-items:center;gap:5px;border:0;background:transparent;color:var(--dsw-alias-label-secondary);font-family:inherit;font-size:12.5px;line-height:1.4;padding:3px 6px 3px 2px;border-radius:6px;cursor:pointer;}",
+			".smem-page-back:hover{color:var(--dsw-alias-label-primary,#1f2329);background:var(--dsw-alias-bg-layer-2);}",
 			// ── 底部一行仓库链接（引流，不抢视线）──
 			".smem-star{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--dsw-alias-label-tertiary,#8b93a1);padding:2px 2px 0;}",
 			".smem-star-link{color:var(--dsw-alias-brand-primary,#4d76e6);text-decoration:underline;}",

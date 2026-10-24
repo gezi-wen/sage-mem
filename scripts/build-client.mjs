@@ -40,6 +40,7 @@ export const CLIENT_PARTS = [
   'client/72-files-view.js', // 1.5.3：文件列表这一屏（纯渲染，状态在上层）
   'client/74-filter-bar.js', // 1.5.2：筛选条（只吃 props，语义在 Section）
   'client/70-memory-panel.js', // 记忆管理 Section：文件列表 / 筛选 / 归档 / 工具面板 / tab
+  'client/76-sidebar-entry.js', // 1.8.0：侧栏入口（sidebar.panellist + main 整页 + 即时开关）
   'client/80-apply.js', // inject + apply(ctx) + 收尾
 ]
 

@@ -101,13 +101,32 @@ ok(mod && Array.isArray(mod.inject), `inject 是数组（${mod && JSON.stringify
 
 const mounts = []
 const slots = []
+/** 当前真正挂着的槽位条目（register 的返回值会把它摘掉）—— 用来验「注销后不残留」。 */
+const live = []
+let panelCleared = false
 const ctx = {
   remote: { $mount: (m) => mounts.push(m) },
   slots: {
-    inject: (name, cb) => { slots.push(['inject', name]); if (typeof cb === 'function') cb() },
-    register: (spec, comp) => { slots.push(['register', spec && spec.id]); return () => {} },
+    inject: (name, cb) => {
+      slots.push(['inject', name])
+      let disposeEntry = null
+      if (typeof cb === 'function') disposeEntry = cb()
+      return () => { if (typeof disposeEntry === 'function') disposeEntry() }
+    },
+    register: (spec, comp) => {
+      const rec = { spec, comp }
+      slots.push(['register', spec && spec.name, spec && (spec.id || spec.key)])
+      live.push(rec)
+      return () => {
+        const i = live.indexOf(rec)
+        if (i >= 0) live.splice(i, 1)
+      }
+    },
   },
-  get: () => undefined,
+  // 返回会话走 layout.selectPanel(null)：给一个能记账的假服务。
+  get: (name) => (name === 'layout'
+    ? { selectPanel: (panel) => { if (panel === null) panelCleared = true } }
+    : undefined),
 }
 let applyErr = null
 try {
@@ -117,7 +136,54 @@ try {
 }
 ok(!applyErr, 'apply(ctx) 跑通', applyErr ? (applyErr.stack || '').split('\n').slice(0, 4).join(' | ') : '')
 ok(mounts.length >= 1, `调了 remote.$mount（${mounts.length} 次）`)
-ok(slots.some((s) => s[0] === 'register' && s[1] === 'sage-mem'), '注册了设置页 section「sage-mem」')
+ok(slots.some((s) => s[0] === 'register' && s[1] === 'settings.section' && s[2] === 'sage-mem'), '注册了设置页 section「sage-mem」')
+
+// ── 2b. 1.8.0 侧栏入口：两个槽位 + 图标 + 主区页面 + 返回会话 ──────────────────
+const panRec = live.find((r) => r.spec && r.spec.name === 'sidebar.panellist' && r.spec.id === 'sage-mem')
+const mainRec = live.find((r) => r.spec && r.spec.name === 'main' && r.spec.key === 'sage-mem')
+ok(!!panRec, '注册了侧栏 list 槽 sidebar.panellist（id=sage-mem）')
+ok(!!mainRec, '注册了中央主区 keyed 槽 main（key=sage-mem，与侧栏 id 相同）')
+ok(!!panRec && panRec.spec.order === 20 && panRec.spec.label === '记忆管理',
+  '侧栏条目的 order / label 正确（宿主据此画行标题）', JSON.stringify(panRec && panRec.spec))
+ok(mod.inject.includes('slots') && mod.inject.includes('remote'), `inject 声明了 slots / remote：${JSON.stringify(mod.inject)}`)
+// layout 是**可选**依赖：返回会话优先用宿主注入的 props.backToConversation，layout 只是兜底。
+// 一旦写进 inject，旧外壳缺该服务时整个 client 插件都不会 apply（连设置页一起丢）。
+ok(!mod.inject.includes('layout'), `inject 不把可选服务 layout 写成硬依赖：${JSON.stringify(mod.inject)}`)
+
+/** 假 react 元素树的遍历 / 取文本（组件不执行，只看它返回了什么）。 */
+const walkFake = (el, fn) => {
+  if (!el || typeof el !== 'object') return
+  if (Array.isArray(el)) { el.forEach((x) => walkFake(x, fn)); return }
+  fn(el)
+  ;(el.children || []).forEach((x) => walkFake(x, fn))
+}
+const textOf = (el) => {
+  if (typeof el === 'string') return el
+  if (!el || typeof el !== 'object') return ''
+  if (Array.isArray(el)) return el.map(textOf).join('')
+  return (el.children || []).map(textOf).join('')
+}
+
+// 图标：内联 SVG、currentColor（不引外部图片/字体）、尺寸跟 props.size 走
+const icon = panRec ? panRec.comp({ size: 16 }) : null
+ok(!!icon && icon.type === 'svg' && icon.props.viewBox === '0 0 16 16', '侧栏图标是一个内联 svg（viewBox 16）')
+const iconStroked = []
+walkFake(icon, (n) => { if (n.props && typeof n.props.stroke === 'string') iconStroked.push(n.props.stroke) })
+ok(iconStroked.length >= 3 && iconStroked.every((s) => s === 'currentColor'),
+  '图标全部用 currentColor 描边（跟随宿主主题）', JSON.stringify(iconStroked))
+ok(panRec && panRec.comp({ size: 24 }).props.width === 24, '图标尺寸跟随宿主传入的 props.size')
+
+// 主区页面：用 inject 面拿到的 backToConversation，点「返回会话」真的调 layout.selectPanel(null)
+const face = mainRec && typeof mainRec.spec.inject === 'function' ? mainRec.spec.inject() : null
+ok(!!face && typeof face.backToConversation === 'function', 'main 槽的 inject 面提供 backToConversation')
+const page = mainRec ? mainRec.comp({ backToConversation: face.backToConversation }) : null
+let backBtn = null
+walkFake(page, (n) => { if (!backBtn && n.type === 'button' && textOf(n) === '返回会话') backBtn = n })
+ok(!!page && page.props.className === 'smem-page', '主区页面是一个 smem-page 容器')
+ok(!!backBtn, '页顶有「返回会话」按钮')
+panelCleared = false
+if (backBtn) backBtn.props.onClick()
+ok(panelCleared === true, '点「返回会话」调了 layout.selectPanel(null)（主区还给会话）')
 
 // ── 3. 描述符对表：客户端挂的 vs 宿主 manifest ────────────────────────────────
 console.log('== 3. 描述符对表 ==')

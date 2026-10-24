@@ -222,6 +222,68 @@ group('6. writeRaw()：>512KB 能存、逐字节原样、非保留名被拒')
   ok((await gw.readRaw('session-log.md')).content === big, '越界的写入没有落盘（还是上一份内容）')
 }
 
+// ── 7. 1.8.0 ui（侧栏入口）：默认开 / 严格校验 / 与 limits 同文件 / typert 往返 ──
+group('7. ui.sidebarEntry：默认开、坏值回落、严格校验、typert strict schema 往返')
+{
+  const s = await gw.getSettings()
+  ok(s.ui && s.ui.sidebarEntry === true, '默认 ui.sidebarEntry=true（文件里还没有该字段）', JSON.stringify(s.ui))
+
+  // 配置文件是用户可手改的：坏值 / 坏对象一律回落「开」，不能因为一个字段坏了就读崩或误关。
+  const raw = JSON.parse(readFileSync(SETTINGS_FILE, 'utf8'))
+  writeFileSync(SETTINGS_FILE, JSON.stringify({ ...raw, ui: { sidebarEntry: 'yes' } }, null, 2), 'utf8')
+  ok((await gw.getSettings()).ui.sidebarEntry === true, '文件里的坏值（字符串）回落 true')
+  writeFileSync(SETTINGS_FILE, JSON.stringify({ ...raw, ui: null }, null, 2), 'utf8')
+  ok((await gw.getSettings()).ui.sidebarEntry === true, 'ui 不是对象时回落 true')
+  writeFileSync(SETTINGS_FILE, JSON.stringify(raw, null, 2), 'utf8')
+
+  // 严格校验：非布尔 / 未知键 / ui 不是对象 / 空对象 → 一律 {ok:false} 且不写盘。
+  const before = readFileSync(SETTINGS_FILE, 'utf8')
+  const cases = [
+    ['ui 不是对象', { ui: 'off' }, 'must be an object'],
+    ['值不是布尔', { ui: { sidebarEntry: 'off' } }, 'must be a boolean'],
+    ['未知 ui 键', { ui: { sidebarEntry: true, nope: 1 } }, 'unknown ui setting'],
+    ['空 ui 对象', { ui: {} }, 'empty patch'],
+  ]
+  for (const [label, patch, needle] of cases) {
+    const res = await gw.setSettings(patch)
+    ok(res?.ok === false && String(res.error).includes(needle), `ui 非法值被拒（${label}）`, JSON.stringify(res))
+  }
+  ok(readFileSync(SETTINGS_FILE, 'utf8') === before, '被拒的 ui 补丁一次都没写盘（settings.json 逐字节未变）')
+
+  // 纯 ui 补丁不改「要不要重启」的语义：把 limits / reserved 两处覆盖都清掉后 restartRequired 仍是 false。
+  const clean = JSON.parse(readFileSync(SETTINGS_FILE, 'utf8'))
+  writeFileSync(SETTINGS_FILE, JSON.stringify({ ui: clean.ui ?? { sidebarEntry: true }, updatedAt: clean.updatedAt }, null, 2), 'utf8')
+  rmSync(RESERVED_FILE, { force: true })
+  const c0 = await gw.getSettings()
+  ok(c0.restartRequired === false, '前置：清掉 limits 覆盖后不喊重启', JSON.stringify(c0.restartRequired))
+  const set = await gw.setSettings({ ui: { sidebarEntry: false } })
+  ok(set.ok === true && set.settings.ui.sidebarEntry === false, 'ui 合法写入并原样回传', JSON.stringify(set).slice(0, 160))
+  ok(set.restartRequired === false, '纯 ui 补丁不喊重启（侧栏开关是客户端行为，立即生效）', String(set.restartRequired))
+  ok((await gw.getSettings()).ui.sidebarEntry === false, '落盘后 getSettings 读回 false')
+
+  // limits 与 ui 出现在同一个 patch：先全验、后一起写；limits 仍要重启。
+  const both = await gw.setSettings({ limits: { maxResults: 11 }, ui: { sidebarEntry: true } })
+  ok(both.ok === true && both.restartRequired === true, 'limits+ui 同补丁：都写入，limits 仍提示重启', JSON.stringify({ ok: both.ok, rr: both.restartRequired }))
+  const s2 = await gw.getSettings()
+  ok(s2.ui.sidebarEntry === true && s2.pendingLimits.maxResults === 11, '两者同时生效（ui=true, pending maxResults=11）', JSON.stringify({ ui: s2.ui, pending: s2.pendingLimits.maxResults }))
+  const disk = JSON.parse(readFileSync(SETTINGS_FILE, 'utf8'))
+  ok(disk.ui.sidebarEntry === true && disk.limits.maxResults === 11 && typeof disk.updatedAt === 'number',
+    'settings.json 结构 = { limits, ui, updatedAt }', JSON.stringify(disk))
+
+  // typert 层：result schema 与 patch schema 都必须认得 ui（浏览器侧是手写 codec，host 侧是 zod）。
+  const { TYPERT } = await import(new URL('typert.host.js', LIB).href)
+  const inv = new Map(TYPERT.invocations.map((i) => [i.method, i]))
+  const rs = inv.get('getSettings').result.schema.safeParse(await gw.getSettings())
+  ok(rs.success, 'getSettings 返回值过 MemorySettings strict schema', rs.success ? '' : JSON.stringify(rs.error.issues.slice(0, 4)))
+  const patchCodec = inv.get('setSettings').parameters[0].codec.schema
+  ok(patchCodec.safeParse({ ui: { sidebarEntry: false } }).success,
+    'setSettings({ui:{sidebarEntry:false}}) 过 MemorySettingsPatch strict schema')
+  ok(patchCodec.safeParse({ limits: { maxResults: 12 }, ui: { sidebarEntry: true } }).success,
+    'limits 与 ui 可同时出现在 patch schema 里')
+  ok(patchCodec.safeParse({ ui: { sidebarEntry: 'off' } }).success === false,
+    '非布尔在 typert schema 层就被拒（不会漏进 host）')
+}
+
 rmSync(sandbox, { recursive: true, force: true })
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

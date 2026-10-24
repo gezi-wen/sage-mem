@@ -7,6 +7,43 @@
 
 ---
 
+## 1.8.0
+
+**主题：侧栏「记忆管理」入口（minor —— 一件用户可感知的事：加一个入口，additive，旧入口保留）。**
+
+版本判定：1.8.0（MINOR）｜理由：新增用户可感知能力（侧栏入口 + 一个设置项）｜运行时源文件 **8 个**（lib 3 + client 5）、有效改动 **262 行**（不含生成物 `lib/client.js` 的 +200 行）。
+⚠️ **文件数超出 minor 的「≤5 个」护栏，不拆版**：槽位注册 / 即时开关 / 设置持久化 / 页内样式是同一个能力的四半，拆开任何一半都会发出半成品（例如只发设置字段而没有入口，或只发入口而关不掉）。
+
+### 行为变更
+
+- **侧栏多一个「记忆管理」图标**（`sidebar.panellist`，order 20）：点它把中央主区切到记忆管理页，页顶「返回会话」回到进来之前那个会话（不改当前选中的会话）。**「设置 → 记忆管理」原入口完全保留**。
+- **设置页新增开关**：在「记忆管理 → 自动做梦 → 设置」里，「在侧栏显示「记忆管理」入口」，**默认开**。关闭后侧栏图标**立即**消失（不用刷新/重启），刷新或重启后保持关闭；**设置页入口永远保留**。
+- **契约（additive）**：`memory/getSettings` 返回值新增 `ui: { sidebarEntry: boolean }`；`memory/setSettings` 接受可选 `{ ui: { sidebarEntry: boolean } }`，非布尔 / 未知 ui 键 / 空对象一律 `{ok:false}` 且**整份 patch 不落盘**（与 limits 同一套「先全验后写」）。**不新增 remote、不改方法名与签名。**
+- `setSettings` 的 `restartRequired` 语义更诚实：只有 limits / 保留名单补丁才强制 `true`；纯 `ui` 补丁照实回传（通常 `false`），因为侧栏入口是客户端行为、改完立刻生效。
+- 「返回会话」优先用宿主注入的 `props.backToConversation`；`layout` 作为**可选**依赖用 `ctx.get("layout")` 兜底，**不写进 `inject`** —— 写进去会让缺该服务的旧外壳整个 client 插件不 apply、连设置页一起丢。
+
+### 不变
+
+- 检索、注入、预算、自动做梦、归档、四个字段的 limits 语义（仍要重启）一行未动。
+- `settings.json` 旧文件无需迁移：缺 `ui` 按默认「开」；坏值同样回落「开」。
+- 客户端 codec 仍是「顶层严格、内部宽松」的 `objCodec`，host 的 zod schema 是字段级权威（与 audit / autodream 同一策略，避免旧客户端因新字段整体报错）。
+
+### 新增测试
+
+- `panel-api-test` 50→**69**：`ui` 默认 `true`、坏值 / 坏对象回落 `true`；非对象 / 非布尔 / 未知键 / 空对象全部 `{ok:false}` 且 `settings.json` 逐字节未变；纯 ui 补丁 `restartRequired=false`；limits+ui 同补丁一起写、limits 仍提示重启；`MemorySettings` / `MemorySettingsPatch` 两份 typert schema 往返。
+- `client-exec-test` 18→**30**：真实 `lib/client.js` 在 VM 里执行后，两个槽位都注册（id/key 均为 `sage-mem`）、order/label 正确、图标是内联 SVG 且全 `currentColor`、尺寸跟随 `size`；主区页「返回会话」点击真的调 `layout.selectPanel(null)`；**`inject` 不把可选的 `layout` 写成硬依赖**。
+- `client-render-test` 321→**343**：默认开 → 侧栏两槽位注册 + main 页渲染；关闭启动 → 侧栏 0 条、`settings.section` **仍在**；真实 checkbox handler 切换 0→1→0→1 且不重复；旧宿主无 `ui` 字段按开。
+
+### 实测
+
+- 本机 `npm test`：**3122 passed, 0 failed**（基线 3069，+53 全是新增断言）。
+- 界面快照 3 屏**重生成**：`autodream-settings` 的 DOM 真变了（多了侧栏入口卡片），`files-list` / `audit` 的 DOM 未变、变的是内联 CSS（快照序列化含整段插件 CSS）。
+  **顺带还了一笔欠账**：快照基线停在 1.7.0，1.7.1 改过 CSS 却没重生成 —— 这次一并更新，之后 `_client-snapshot.mjs` 6/6 通过。
+- **没有在真实 GUI 里点过**（重启会打断正在用的会话）。当前证据是三层：VM 执行真实 `lib/client.js` + 宿主源码契约（`sidebar.panellist` 行由槽位清单订阅推导、`slots.inject` 返回幂等清理器）+ 独立脚本直调 Gateway 复核读写与 `restartRequired`。
+  **首次真机验收由下一轮安装后补**：设置开关 → 侧栏即时增删 → 主区页与返回会话。
+
+---
+
 ## 1.7.2
 
 **主题：评测基线 —— 把四类难负例做成可测的分母，基线带版本、可跨版本对比（patch；插件运行时零变更）。**

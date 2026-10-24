@@ -181,6 +181,9 @@
 					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
 				},
 				{
+					// 1.8.0：结果里多了 `ui.sidebarEntry`（侧栏入口开关）。客户端这份 codec 是
+					// **顶层严格、内部宽松**的 objCodec —— host 加字段不需要改这里（与 audit /
+					// autodream 那批同一套理由）；host 侧真正的形状约束在 typert.host.js 的 zod schema。
 					id: "sage-mem#memory/getSettings",
 					service: "memory",
 					namespace: "memory",
@@ -191,6 +194,8 @@
 					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
 				},
 				{
+					// 1.8.0：patch 可带 `{ ui: { sidebarEntry: boolean } }`。objCodec 只保证顶层是对象，
+					// 字段级严格校验在 host 的 setSettings（非布尔 / 未知键都回 {ok:false}）。
 					id: "sage-mem#memory/setSettings",
 					service: "memory",
 					namespace: "memory",
