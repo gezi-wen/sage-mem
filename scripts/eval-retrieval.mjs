@@ -45,6 +45,29 @@ const DEFAULT_QUESTIONS = join(ROOT, 'test', 'eval', 'questions.jsonl')
 /** `note` 里带这个记号 = 已知的词法失败边界：语义上有答案，但 query 与原文没有词面重合。 */
 const LEXFAIL = '[lexfail]'
 
+/**
+ * 难负例的四种「为什么难」。每种单独给分母 —— 不能拿「有没有共享词元」当筛子：
+ * 恰恰是共享词元的那批里装着词法检索真正的失误（见 README「误注入的两个口径」）。
+ *
+ * 顺序即报告顺序；`dir` 是该类主指标的方向（看板上用）。
+ */
+const HARD_NEGATIVE_KINDS = [
+  ['shared-common-word', '共享常用词', 'down'],
+  ['same-name-different-project', '同名不同项目', 'down'],
+  ['same-entity-different-time', '相同实体不同时间', 'up'],
+  ['stale-content', '已失效内容', 'down'],
+]
+const HARD_NEGATIVE_SET = new Set(HARD_NEGATIVE_KINDS.map(([kind]) => kind))
+
+/** 当前包版本：写进基线，让「这份基线是哪一版量的」不用去猜 generatedAt。 */
+const CURRENT_VERSION = (() => {
+  try {
+    return JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version || ''
+  } catch {
+    return ''
+  }
+})()
+
 const USAGE = `sage-mem 检索评测（离线：不联网、不调模型）
 
   node scripts/eval-retrieval.mjs [选项]
@@ -58,6 +81,9 @@ const USAGE = `sage-mem 检索评测（离线：不联网、不调模型）
                                    MISS / 词法边界 / 无答案注入，含 evidence 门槛值与逐词元贡献
   --baseline <path>                与一份旧的 --json 产物对比，出现退化时退出码 1
   --allow-baseline-skip            允许「显式给了 --baseline 但比较没完成」时放行（默认不允许）
+  --diff <a.json> <b.json>         只比较两份历史基线（不跑检索）。与 --baseline 不同：
+                                   口径不同（mode/limit/问题集/语料指纹）也能比，但只给方向
+                                   与量级、并显式标出「口径不同·不可当回归判定」；退出码不判退化
   --strict                         任何黑/白名单误注入都算失败（默认只如实报告）
   --corpus <dir>                   语料目录（默认 test/eval/corpus）
   --questions <path>               问题集（默认 test/eval/questions.jsonl）
@@ -81,6 +107,7 @@ function parseArgs(argv) {
     json: '',
     report: '',
     baseline: '',
+    diff: null,
     allowBaselineSkip: false,
     strict: false,
     corpus: DEFAULT_CORPUS,
@@ -104,6 +131,11 @@ function parseArgs(argv) {
     else if (key === '--json') opts.json = take()
     else if (key === '--report') opts.report = resolve(process.cwd(), take())
     else if (key === '--baseline') opts.baseline = take()
+    else if (key === '--diff') {
+      const a = take()
+      const b = take()
+      opts.diff = [a, b]
+    }
     else if (key === '--allow-baseline-skip') opts.allowBaselineSkip = true
     else if (key === '--corpus') opts.corpus = resolve(process.cwd(), take())
     else if (key === '--questions') opts.questions = resolve(process.cwd(), take())
@@ -175,6 +207,13 @@ function loadQuestions(path) {
       shouldReturn: parsed.shouldReturn === 'body' ? 'body' : 'summary',
       mustNotInject: Array.isArray(parsed.mustNotInject) ? parsed.mustNotInject.map(String) : [],
       unresolved: parsed.unresolved === true,
+      // 难负例标注：透传 + 原样保留未识别值（合法性由 auditAnnotations 判，不在这里悄悄吞掉）。
+      // 只在 loadQuestions 里丢字段，会让 audit 变成空转 —— 所有分类都变成 0 题却「自检全 0」。
+      hardNegative: parsed.hardNegative === undefined ? undefined : String(parsed.hardNegative),
+      preferNewer:
+        parsed.preferNewer && typeof parsed.preferNewer === 'object'
+          ? { newer: String(parsed.preferNewer.newer ?? ''), older: String(parsed.preferNewer.older ?? '') }
+          : undefined,
       note: String(parsed.note ?? ''),
       line: i + 1,
     })
@@ -203,6 +242,9 @@ function auditAnnotations(questions, corpus) {
   const missingBlacklist = []
   const missingWhitelist = []
   const whitelistMissingNeeded = []
+  const badHardNegative = []
+  const missingPreferNewer = []
+  const preferNotInNeeded = []
   const sharedTokenPairs = new Set()
   const sharedTokenSamples = []
 
@@ -247,6 +289,32 @@ function auditAnnotations(questions, corpus) {
         if (!q.allowFiles.includes(need.file)) whitelistMissingNeeded.push(`${q.id} → ${need.file} 不在 allowFiles 里`)
       }
     }
+
+    // ── 难负例标注的合法性 ──
+    // 这些字段是给「按为什么难分组」用的量具标注，写错了会让分母悄悄变空，
+    // 所以和 needed/黑名单一样进「标注自检」、非零即退出码 1。
+    if (q.hardNegative !== undefined) {
+      if (!HARD_NEGATIVE_SET.has(q.hardNegative)) {
+        badHardNegative.push(`${q.id} → 未知取值 ${JSON.stringify(q.hardNegative)}`)
+      }
+      if (q.hardNegative === 'same-entity-different-time') {
+        const prefer = q.preferNewer
+        if (!prefer || typeof prefer !== 'object' || !prefer.newer || !prefer.older) {
+          missingPreferNewer.push(`${q.id} → same-entity-different-time 必须带 preferNewer:{newer,older}`)
+        } else {
+          for (const side of ['newer', 'older']) {
+            if (!byFile.has(prefer[side])) missingPreferNewer.push(`${q.id} → preferNewer.${side} 文件不存在：${prefer[side]}`)
+          }
+          if (!q.needed.some(n => n.file === prefer.newer)) {
+            preferNotInNeeded.push(`${q.id} → preferNewer.newer（${prefer.newer}）不在 needed 里，排序断言没有落点`)
+          }
+        }
+      } else if (q.preferNewer !== undefined) {
+        badHardNegative.push(`${q.id} → 只有 same-entity-different-time 才该带 preferNewer`)
+      }
+    } else if (q.preferNewer !== undefined) {
+      badHardNegative.push(`${q.id} → 带 preferNewer 却缺 hardNegative 分类`)
+    }
   }
 
   const blacklistChecks = questions.reduce((n, q) => n + q.mustNotInject.length, 0)
@@ -264,6 +332,9 @@ function auditAnnotations(questions, corpus) {
     missingBlacklist,
     missingWhitelist,
     whitelistMissingNeeded,
+    badHardNegative,
+    missingPreferNewer,
+    preferNotInNeeded,
     sharedTokenPairs,
     sharedTokenSamples,
     blacklistChecks,
@@ -327,8 +398,26 @@ function evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs) {
   const ranks = needed.filter(n => n.found).map(n => n.rank)
   const bestRank = ranks.length ? Math.min(...ranks) : 0
 
-  const blacklistHit = q.mustNotInject.filter(f => firstAt.has(f))
-  // 共享词元只说明「这条命中不需要任何语义解释」，**不说明标注错了**：
+  // 相同实体不同时间：不给「旧版必须消失」这种过严断言（README 允许两条都给），
+  // 只记录事实——新版召回了吗、旧版有没有压过新版。排序看板因此不撒谎。
+  const prefer = q.preferNewer
+    ? (() => {
+        const rankOf = file => (firstAt.has(file) ? firstAt.get(file) + 1 : 0)
+        const newerRank = rankOf(q.preferNewer.newer)
+        const olderRank = rankOf(q.preferNewer.older)
+        return {
+          newer: q.preferNewer.newer,
+          older: q.preferNewer.older,
+          newerRank,
+          olderRank,
+          newerRecalled: newerRank > 0,
+          olderRecalled: olderRank > 0,
+          olderOverNewer: olderRank > 0 && (newerRank === 0 || olderRank < newerRank),
+        }
+      })()
+    : null
+
+  const blacklistHit = q.mustNotInject.filter(f => firstAt.has(f))  // 共享词元只说明「这条命中不需要任何语义解释」，**不说明标注错了**：
   // 通用词碎片（时间 / 一次 / 器的）与跨词假词元都会命中，而真正的难负例
   // （同名不同项目、同实体不同时间、已失效内容）同样常常共享词元。
   // 所以这组计数只当诊断切片，主指标仍是全部检查项上的误注入。
@@ -377,6 +466,7 @@ function evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs) {
     bestRank,
     blacklistHit,
     blacklistHitSharedToken,
+    prefer,
     blacklistNoSharedTokenCount: q.mustNotInject.length - blacklistSharedTokenEntries.length,
     blacklistNoSharedTokenViolations: blacklistHit.filter(f => !sharedTokenPairs.has(`${q.id}\u0000${f}`)).length,
     whitelistHit,
@@ -505,8 +595,47 @@ function summarize(rows) {
   return m
 }
 
-function rates(m) {
+/**
+ * 难负例按「为什么难」分组统计。每类单独一个分母 —— 这是 README 里那条提案的落地：
+ * 不用「有没有共享词元」当筛子，而是四类各自数各自的，避免把最难的失败先扔掉再宣布没问题。
+ */
+function summarizeHard(rows) {
+  const out = {}
+  for (const [kind, label, dir] of HARD_NEGATIVE_KINDS) {
+    const groupRows = rows.filter(row => row.question.hardNegative === kind)
+    const preferRows = groupRows.filter(row => row.prefer)
+    out[kind] = {
+      label,
+      dir,
+      questions: groupRows.length,
+      neededQuestions: groupRows.filter(row => row.question.needed.length).length,
+      anyHit: groupRows.filter(row => row.foundCount > 0).length,
+      blacklistQuestions: groupRows.filter(row => row.question.mustNotInject.length).length,
+      blacklistChecks: groupRows.reduce((n, row) => n + row.question.mustNotInject.length, 0),
+      violationQuestions: groupRows.filter(row => row.blacklistHit.length).length,
+      violations: groupRows.reduce((n, row) => n + row.blacklistHit.length, 0),
+      preferQuestions: preferRows.length,
+      newerRecalled: preferRows.filter(row => row.prefer.newerRecalled).length,
+      olderOverNewer: preferRows.filter(row => row.prefer.olderOverNewer).length,
+    }
+  }
+  return out
+}
+
+/** 把难负例分组转成能进 `metrics.rates` 的比率，基线对比因此能盯住它们。 */
+function hardRates(hard) {
   const div = (n, d) => (d > 0 ? n / d : 0)
+  const k = kind => hard[kind] ?? { violationQuestions: 0, blacklistQuestions: 0, preferQuestions: 0, newerRecalled: 0, olderOverNewer: 0 }
+  return {
+    hardSharedWordInjectRate: div(k('shared-common-word').violationQuestions, k('shared-common-word').blacklistQuestions),
+    hardSameNameInjectRate: div(k('same-name-different-project').violationQuestions, k('same-name-different-project').blacklistQuestions),
+    hardNewerRecallRate: div(k('same-entity-different-time').newerRecalled, k('same-entity-different-time').preferQuestions),
+    hardOlderOverNewerRate: div(k('same-entity-different-time').olderOverNewer, k('same-entity-different-time').preferQuestions),
+    hardStaleInjectRate: div(k('stale-content').violationQuestions, k('stale-content').blacklistQuestions),
+  }
+}
+
+function rates(m) {  const div = (n, d) => (d > 0 ? n / d : 0)
   return {
     recallAny: div(m.anyHit, m.neededQuestions),
     recallAll: div(m.allHit, m.neededQuestions),
@@ -610,8 +739,28 @@ function printMetrics(title, rows, m, r) {
   void rows
 }
 
-// ─────────────────────────── 诊断报告 ───────────────────────────
+/**
+ * 难负例看板：四类各自一个分母。这是「误注入的两个口径」那节的正面修法 ——
+ * 不靠共享词元筛切片，而是按「为什么难」单列，谁失败一目了然。
+ */
+function printHardNegatives(hard) {
+  console.log('\n== 难负例（按为什么难单列）==')
+  for (const [kind, label] of HARD_NEGATIVE_KINDS) {
+    const h = hard[kind]
+    if (!h.questions) {
+      line(label, '0 题（本版题集未覆盖）')
+      continue
+    }
+    if (kind === 'same-entity-different-time') {
+      line(label, `新版召回 ${frac(h.newerRecalled, h.preferQuestions)} | 旧版压新版 ${frac(h.olderOverNewer, h.preferQuestions)} | 题数 ${h.questions}`)
+    } else {
+      line(label, `误注入 ${frac(h.violationQuestions, h.blacklistQuestions)} | 检查项 ${h.blacklistChecks}（命中 ${h.violations}）| 题数 ${h.questions}`)
+    }
+  }
+  console.log('      四类各自独立分母；不要拿「无共享词元子集」代替它们 —— 那个切片刻意排除了这四类。')
+}
 
+// ─────────────────────────── 诊断报告 ───────────────────────────
 function pctOf(num, den) {
   return den > 0 ? `${((num / den) * 100).toFixed(1)}%` : NA
 }
@@ -620,7 +769,7 @@ function pctOf(num, den) {
  * 可读的逐案例诊断报告。目标不是再印一遍指标，而是回答：
  * 「这条命中凭什么被放进来 / 这条 needed 为什么没命中 / 这个误注入走的是哪条路」。
  */
-function renderDiagnostics({ opts, corpus, rows, m, r, audit, corpusHash, questionHash, baselineReport }) {
+function renderDiagnostics({ opts, corpus, rows, m, r, audit, corpusHash, questionHash, baselineReport, hard }) {
   const { chunks, stats } = chunksOf(corpus)
   const chunkById = new Map(chunks.map((c) => [c.id, c]))
   const flagged = rows.filter((row) =>
@@ -629,7 +778,8 @@ function renderDiagnostics({ opts, corpus, rows, m, r, audit, corpusHash, questi
     row.verdict === 'MISS' ||
     row.verdict === 'ERROR' ||
     (row.question.unresolved && row.hits.length > 0) ||
-    row.question.note.includes(LEXFAIL),
+    row.question.note.includes(LEXFAIL) ||
+    row.prefer?.olderOverNewer === true,
   )
   const out = []
   const push = (...xs) => out.push(...xs)
@@ -659,6 +809,21 @@ function renderDiagnostics({ opts, corpus, rows, m, r, audit, corpusHash, questi
   push(`| 注入字节（候选片段代理） | ${m.injectedBytes} 总 / ${r.injectedBytesAvg.toFixed(1)} 平均每题 |`)
   push(`| 延迟 p50 / p95 | ${r.latencyP50.toFixed(3)} ms / ${r.latencyP95.toFixed(3)} ms |`)
   push('')
+  if (hard && Object.values(hard).some(h => h.questions)) {
+    push('## 难负例（按为什么难单列）', '')
+    push('| 类别 | 题数 | 主要读数 |', '|---|---|---|')
+    for (const [kind, label] of HARD_NEGATIVE_KINDS) {
+      const h = hard[kind]
+      if (!h.questions) continue
+      const reading =
+        kind === 'same-entity-different-time'
+          ? `新版召回 ${h.newerRecalled}/${h.preferQuestions}；旧版压新版 ${h.olderOverNewer}/${h.preferQuestions}`
+          : `误注入 ${h.violationQuestions}/${h.blacklistQuestions}（检查项 ${h.blacklistChecks}，命中 ${h.violations}）`
+      push(`| ${label} | ${h.questions} | ${reading} |`)
+    }
+    push('')
+    push('这四类各自独立分母；**不要**拿「无共享词元子集」代替它们（那个切片会把这四类排除掉）。', '')
+  }
   push('## 逐案例', '')
   push(`触发诊断的题：${flagged.length} 道（误注入 / 白名单外 / 无答案注入 / 词法边界 / MISS）。`, '')
   if (!flagged.length) push('（没有触发诊断条件的题）', '')
@@ -673,6 +838,7 @@ function renderDiagnostics({ opts, corpus, rows, m, r, audit, corpusHash, questi
     if (row.whitelistHit.length) flags.push(`白名单外：${row.whitelistHit.join(', ')}`)
     if (q.unresolved && row.hits.length) flags.push('无答案题仍注入')
     if (q.note.includes(LEXFAIL)) flags.push('已知词法边界（query 与原文没有词面重合）')
+    if (row.prefer?.olderOverNewer) flags.push(`旧版压新版（${row.prefer.older} @${row.prefer.olderRank || '未中'} 压过 ${row.prefer.newer} @${row.prefer.newerRank || '未中'}）`)
     if (!row.coverage.complete) flags.push(`切分不全（skipped ${row.coverage.skipped}）`)
     if (row.dupExtra > 0) flags.push(`同文件重复 ${row.dupExtra} 条`)
     if (flags.length) push(`- 标记：${flags.join('；')}`)
@@ -727,8 +893,8 @@ function renderDiagnostics({ opts, corpus, rows, m, r, audit, corpusHash, questi
   push('## 口径说明', '')
   push('- **Precision@k 是下界**：相关集取「标注 needed ∪ allowFiles」；合成语料里未标注但相关的文件不会计入分子。')
   push('- **注入字节**用候选片段字节代理；真实注入还受单场会话预算裁切（契约 2.5，软上限）。')
-  push('- **黑名单主指标**按「有黑名单检查的题」计，不按检查项计；71 是题数，检查项是 229（2026-10-23 审查口径纠正）。')
-  push('- **摘要层没有 evidence 门槛**是有意设计（摘要只有一句话，词面重合已经是较强信号）；代价是共享常用词的记忆会被误注入，这正是 1.7.1 难负例扩容要压的。')
+  push(`- **黑名单主指标**按「有黑名单检查的题」计，不按检查项计；本版是 ${m.blacklistViolationQuestions}/${m.blacklistQuestions} 题、检查项 ${m.blacklistChecks} 个。`)
+  push('- **摘要层没有 evidence 门槛**是有意设计（摘要只有一句话，词面重合已经是较强信号）；代价是共享常用词的记忆会被误注入，这正是 1.7.2 难负例扩容要压的。')
   push('')
   push('## 复现', '')
   push('```powershell')
@@ -745,6 +911,7 @@ function main(argv) {
     console.log(USAGE)
     return 0
   }
+  if (opts.diff) return diffBaselines(opts.diff[0], opts.diff[1])
   if (!['summary', 'body', 'all', 'mixed'].includes(opts.mode)) {
     throw new Error(`--mode 只能是 summary|body|all|mixed，收到 ${opts.mode}`)
   }
@@ -779,6 +946,8 @@ function main(argv) {
   line('黑名单文件缺失', String(audit.missingBlacklist.length))
   line('白名单文件缺失', String(audit.missingWhitelist.length))
   line('白名单缺 needed', String(audit.whitelistMissingNeeded.length))
+  line('难负例分类非法', String(audit.badHardNegative.length))
+  line('preferNewer 标注不全', String(audit.missingPreferNewer.length + audit.preferNotInNeeded.length))
   line('黑名单检查项', `${audit.blacklistChecks} 项，其中无共享词元 ${audit.noSharedTokenChecks} 项，涉及题数 ${audit.noSharedTokenQuestions}`)
   line('切片排除的检查项', `${audit.blacklistChecks - audit.noSharedTokenChecks} 项（query 词元与文件重合 —— 难负例候选）`)
   for (const s of audit.sharedTokenSamples) console.log(`      ${s}`)
@@ -791,6 +960,9 @@ function main(argv) {
 
   const m = summarize(rows)
   const r = rates(m)
+  const hard = summarizeHard(rows)
+  // 难负例比率并进 rates：这样它们能进 --baseline 对比，也能被 --json 消费方看到。
+  Object.assign(r, hardRates(hard))
   printMetrics(`指标（mode=${opts.mode}, limit=${limit}, per-file=${perFile}）`, rows, m, r)
 
   // 对照：同一批题目在 summary 面下再跑一遍。这是脚本自带的「改动有没有真的扩到正文」的证据，
@@ -814,6 +986,10 @@ function main(argv) {
     ['正文题（shouldReturn=body）', rows.filter(x => x.question.shouldReturn === 'body')],
     ['已知词法边界 ' + LEXFAIL, rows.filter(x => x.question.note.includes(LEXFAIL))],
     ['无答案题（unresolved 且不该注入）', rows.filter(x => x.question.unresolved && !x.question.shouldInject)],
+    // 把「原有题」与「难负例题」分开看：加难负例不该把原有题的召回数字拉下来，
+    // 这两个分组是把这句验收判据变成可读证据的地方。
+    ['原有题（无 hardNegative 标注）', rows.filter(x => !x.question.hardNegative)],
+    ['难负例题（有 hardNegative 标注）', rows.filter(x => Boolean(x.question.hardNegative))],
   ]
   for (const [name, groupRows] of groups) {
     if (!groupRows.length) continue
@@ -829,6 +1005,8 @@ function main(argv) {
     )
   }
 
+  printHardNegatives(hard)
+
   // ── 判定 ──
   const problems = [
     ...audit.missingNeeded.map(x => `needed 文件不存在：${x}`),
@@ -836,6 +1014,9 @@ function main(argv) {
     ...audit.missingBlacklist.map(x => `黑名单文件不存在：${x}`),
     ...audit.missingWhitelist.map(x => `白名单文件不存在：${x}`),
     ...audit.whitelistMissingNeeded.map(x => `白名单标注不全：${x}`),
+    ...audit.badHardNegative.map(x => `难负例分类非法：${x}`),
+    ...audit.missingPreferNewer.map(x => `preferNewer 标注不全：${x}`),
+    ...audit.preferNotInNeeded.map(x => `preferNewer 与 needed 不一致：${x}`),
   ]
   const structural = []
   for (const row of rows) {
@@ -897,6 +1078,8 @@ function main(argv) {
   if (opts.json) {
     const payload = {
       tool: 'sage-mem eval-retrieval',
+      // 基线自述身份：哪一版、什么时候、什么口径量的。--diff 直接读这两个字段。
+      version: CURRENT_VERSION,
       generatedAt: new Date().toISOString(),
       mode: opts.mode,
       limit,
@@ -909,6 +1092,9 @@ function main(argv) {
         missingBlacklist: audit.missingBlacklist,
         missingWhitelist: audit.missingWhitelist,
         whitelistMissingNeeded: audit.whitelistMissingNeeded,
+        badHardNegative: audit.badHardNegative,
+        missingPreferNewer: audit.missingPreferNewer,
+        preferNotInNeeded: audit.preferNotInNeeded,
         blacklistChecks: audit.blacklistChecks,
         noSharedTokenChecks: audit.noSharedTokenChecks,
         noSharedTokenQuestions: audit.noSharedTokenQuestions,
@@ -925,6 +1111,8 @@ function main(argv) {
           '不能由切片为 0 推出真实误注入为零。',
       },
       metrics: { raw: m, rates: r },
+      // 难负例四类的原始计数（题数/检查项/命中），比 rates 更能看出分母。
+      hardNegatives: hard,
       groups: Object.fromEntries(
         groups.filter(([, g]) => g.length).map(([name, g]) => {
           const gm = summarize(g)
@@ -971,7 +1159,7 @@ function main(argv) {
   }
 
   if (opts.report) {
-    const md = renderDiagnostics({ opts, corpus, rows, m, r, audit, corpusHash, questionHash, baselineReport })
+    const md = renderDiagnostics({ opts, corpus, rows, m, r, audit, corpusHash, questionHash, baselineReport, hard })
     mkdirSync(dirname(opts.report), { recursive: true })
     writeFileSync(opts.report, md, 'utf8')
     console.log(`\n诊断报告已写入 ${opts.report}`)
@@ -996,6 +1184,13 @@ const COMPARED = [
   ['whitelistViolationRate', 'down'],
   ['dupQuestionRate', 'down'],
   ['overInjectRate', 'down'],
+  // 难负例四类（1.7.2 起）：各自独立分母。方向按「该不该被压住」定，
+  // 别把它们和「无共享词元切片」混为一谈 —— 那个切片刻意排除了这四类。
+  ['hardSharedWordInjectRate', 'down'],
+  ['hardSameNameInjectRate', 'down'],
+  ['hardNewerRecallRate', 'up'],
+  ['hardOlderOverNewerRate', 'down'],
+  ['hardStaleInjectRate', 'down'],
 ]
 
 /**
@@ -1070,6 +1265,117 @@ function compareBaseline(path, current, m, r) {
   }
   void m
   return { status: 'compared', reason: '', rows, regressions, previousGeneratedAt: old.generatedAt ?? '' }
+}
+
+// ─────────────────────────── 任意两份基线对比（--diff） ───────────────────────────
+
+function loadBaselineFile(path) {
+  try {
+    return { ok: true, data: JSON.parse(readFileSync(path, 'utf8')) }
+  } catch (err) {
+    return { ok: false, why: `读不到或读不坏 ${path}：${err?.message ?? err}` }
+  }
+}
+
+/** 从一份历史产物里抽出可比对的自述与口径。缺字段写 `(未记录)`，不猜。 */
+function baselineFacts(path, data) {
+  return {
+    path,
+    version: typeof data.version === 'string' && data.version ? data.version : '(未记录)',
+    generatedAt: typeof data.generatedAt === 'string' && data.generatedAt ? data.generatedAt : '(未记录)',
+    mode: data.mode ?? '(未记录)',
+    limit: data.limit ?? '(未记录)',
+    perFile: data.perFile ?? '(未记录)',
+    questions: data.questions?.count ?? '(未记录)',
+    questionHash: data.questions?.hash ?? '(未记录)',
+    corpusFiles: data.corpus?.files ?? '(未记录)',
+    corpusHash: data.corpus?.hash ?? '(未记录)',
+    rates: data.metrics?.rates && typeof data.metrics.rates === 'object' ? data.metrics.rates : {},
+    hardNegatives: data.hardNegatives ?? null,
+  }
+}
+
+/**
+ * `--diff a b`：比较**任意两份**历史产物，不跑检索。
+ *
+ * 与 `--baseline` 的分工：
+ *   - `--baseline` 是**门禁**：口径（mode/limit/题集/语料指纹）必须一致，退化即退出码 1；
+ *   - `--diff` 是**考古**：口径不同也能比，但只给方向与量级，并显式说明「不可当回归判定」。
+ *
+ * 为什么需要后者：题集会随版本扩容（1.7.2 就在扩容），历史基线必然与当前不同口径；
+ * 若只有严格门禁，跨版本的趋势就永远读不出来了。所以这里放宽口径，但把话说清楚。
+ */
+function diffBaselines(aPath, bPath) {
+  console.log('sage-mem 基线对比（--diff：两份历史产物，不跑检索）')
+  const a = loadBaselineFile(aPath)
+  if (!a.ok) {
+    console.log(`  ! A 侧 ${a.why}`)
+    return 1
+  }
+  const b = loadBaselineFile(bPath)
+  if (!b.ok) {
+    console.log(`  ! B 侧 ${b.why}`)
+    return 1
+  }
+  const A = baselineFacts(aPath, a.data)
+  const B = baselineFacts(bPath, b.data)
+  const side = (label, facts) => {
+    line(label, facts.path)
+    line('  版本 / 生成时间', `${facts.version} · ${facts.generatedAt}`)
+    line('  口径', `mode=${facts.mode} limit=${facts.limit} per-file=${facts.perFile} · 题数 ${facts.questions} · 语料 ${facts.corpusFiles} 份`)
+    line('  指纹', `题集 ${facts.questionHash} · 语料 ${facts.corpusHash}`)
+  }
+  side('A（旧）', A)
+  side('B（新）', B)
+
+  const sameProfile =
+    String(A.mode) === String(B.mode) &&
+    String(A.limit) === String(B.limit) &&
+    String(A.questionHash) === String(B.questionHash) &&
+    String(A.corpusHash) === String(B.corpusHash)
+  console.log('')
+  line('口径判定', sameProfile ? '一致（可当回归判定）' : '不同（只可看方向与量级，不可当回归判定）')
+  if (!sameProfile) {
+    const why = []
+    if (String(A.mode) !== String(B.mode)) why.push(`mode ${A.mode} → ${B.mode}`)
+    if (String(A.limit) !== String(B.limit)) why.push(`limit ${A.limit} → ${B.limit}`)
+    if (String(A.questionHash) !== String(B.questionHash)) why.push(`题集指纹 ${A.questionHash} → ${B.questionHash}`)
+    if (String(A.corpusHash) !== String(B.corpusHash)) why.push(`语料指纹 ${A.corpusHash} → ${B.corpusHash}`)
+    console.log(`      ${why.join('；')}`)
+    console.log('      题集/语料变了，比率的分子分母含义也不同：看方向可以，别拿它告警。')
+  }
+
+  const eps = 1e-9
+  console.log('\n== 指标（A → B）==')
+  let improved = 0
+  let regressed = 0
+  let omitted = 0
+  for (const [key, dir] of COMPARED) {
+    const pick = rates => {
+      const candidates = [key, ...(RATE_ALIASES[key] ?? [])]
+      const found = candidates.find(k => Number.isFinite(rates[k]))
+      return found === undefined ? null : Number(rates[found])
+    }
+    const before = pick(A.rates)
+    const after = pick(B.rates)
+    if (before === null || after === null) {
+      omitted++
+      line(key, `${before === null ? '⊘ A 无此项' : before.toFixed(4)} → ${after === null ? '⊘ B 无此项' : after.toFixed(4)}   ？不可比（该项在某一侧未记录）`)
+      continue
+    }
+    const worse = dir === 'up' ? after < before - eps : after > before + eps
+    const better = dir === 'up' ? after > before + eps : after < before - eps
+    if (worse) regressed++
+    if (better) improved++
+    const verdict = worse ? '✗ 变差' : better ? '✓ 变好' : '＝ 持平'
+    // 口径不同时不给「退化」字眼，只给方向描述。
+    const label = sameProfile ? verdict : verdict.replace('✗ 变差', '✗ 方向变差').replace('✓ 变好', '✓ 方向变好')
+    line(`${key}（${dir === 'up' ? '越高越好' : '越低越好'}）`, `${before.toFixed(4)} → ${after.toFixed(4)} ${label}`)
+  }
+  console.log('')
+  line('汇总', `变好 ${improved} 项 / 变差 ${regressed} 项 / 两侧缺项 ${omitted} 项`)
+  console.log('      退出码不因「变差」而失败：--diff 是考古工具，门禁请用 --baseline。')
+  return 0
 }
 
 // ─────────────────────────── 入口 ───────────────────────────

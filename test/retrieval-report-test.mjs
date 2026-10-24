@@ -52,6 +52,22 @@ try {
   ok(report.includes('词元贡献'), '正文命中附带逐词元贡献')
   ok(report.includes('Precision@k') && report.includes('无答案题拒绝率') && report.includes('注入字节'),
     '报告包含新增的 Precision@k / 拒绝率 / 注入字节三项诊断指标')
+  ok(report.includes('## 难负例（按为什么难单列）') && report.includes('相同实体不同时间'),
+    '报告包含难负例四类看板')
+
+  // `--diff` 是 1.7.2 的跨版本考古工具：它必须能在「题集/语料变了」的情况下比较两份历史基线，
+  // 而且**不能把老基线缺的指标当 0**（那会让新增指标看起来像改善）。这里用真正的归档快照做一次烟雾。
+  const d = spawnSync(process.execPath, [
+    SCRIPT,
+    '--diff', 'test/eval/baselines/all-20261015.json', 'test/eval/baseline.json',
+  ], { cwd: ROOT, encoding: 'utf8' })
+  const dout = String(d.stdout ?? '')
+  const derr = String(d.stderr ?? '')
+  ok(d.status === 0, '--diff 两份历史基线退出 0（考古工具不因变差失败）', `status=${d.status} ${derr.split('\n').filter(Boolean).slice(0, 2).join(' / ')}`)
+  ok(dout.includes('口径判定') && dout.includes('不同'), '--diff 标出两侧口径不同（题集/语料已扩容）')
+  ok(dout.includes('⊘ A 无此项'), '--diff 把老基线缺的 hard* 指标标成「无此项」，不填 0')
+  ok(dout.includes('(未记录)'), '--diff 对没有 version 字段的老基线显示「未记录」，不猜版本')
+  ok(dout.includes('A（旧）') && dout.includes('all-20261015') && dout.includes('B（新）'), '--diff 打印两侧自述（版本/日期/指纹）')
 } finally {
   await rm(dir, { recursive: true, force: true }).catch(() => {})
 }

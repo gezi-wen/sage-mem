@@ -16,6 +16,7 @@ node scripts/eval-retrieval.mjs --mode all --limit 3          # 预算不足的�
 node scripts/eval-retrieval.mjs --mode all --strict           # 任何误注入都判失败
 node scripts/eval-retrieval.mjs --mode all --json /tmp/run.json
 node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json   # 回归门
+node scripts/eval-retrieval.mjs --diff test/eval/baselines/all-20261015.json test/eval/baseline.json  # 跨版本考古
 ```
 
 | 选项 | 作用 |
@@ -26,6 +27,7 @@ node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json   
 | `--json <path>` | 把完整结果（含逐题明细、标注自检、审计信息）写成 JSON |
 | `--report <path>` | 写一份可读的逐案例诊断报告（Markdown）：误注入 / 白名单外 / 无答案注入 / 词法边界 / MISS，含 evidence 门槛值、逐词元贡献与「为什么」 |
 | `--baseline <path>` | 与一份旧的 `--json` 产物对比，退化时退出码 1（**比较没完成也算失败**，见第 6 节） |
+| `--diff <a.json> <b.json>` | **只**比较两份历史产物（不跑检索）。与 `--baseline` 不同：口径不同也能比，但只给方向与量级、并显式标出「不可当回归判定」；**退出码不因变差而失败**（见第 6 节） |
 | `--allow-baseline-skip` | 允许「显式给了 `--baseline` 但比较没完成」时放行（默认不允许） |
 | `--strict` | 黑名单/白名单误注入一律算失败（默认只如实报告） |
 | `--corpus <dir>` / `--questions <path>` | 换语料目录 / 问题集 |
@@ -50,10 +52,13 @@ node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json   
    这一条是**失败关闭**（fail closed）：CI 里「没比较」绝不能长得像「比较通过」。
    探索场景确实要跳过时加 `--allow-baseline-skip`，JSON 里会留 `baseline.status = "inconclusive"`。
 
+`--diff` 是考古工具，**不参与退出码判定**：它只回答「两份历史基线之间哪些指标朝哪走了」。
+门禁永远是 `--baseline` —— 不能拿 `--diff` 的「变好」抵消 `--baseline` 的「没比成」。
+
 ## 2. 语料（`corpus/*.md`）
 
-30 份**全部为编造**的记忆文件，域名为虚构的「果园构建流水线 / 港口调度器 / 明灯界面 / 采石场索引 /
-灰烬项目 / 潮汐定时任务」等。
+38 份**全部为编造**的记忆文件，域名为虚构的「果园构建流水线 / 港口调度器 / 明灯界面 / 采石场索引 /
+灰烬项目 / 潮汐定时任务 / Atlas 摄取与网关 / Cobalt 配额与保留」等。
 
 > ⚠️ **公开仓库红线**：绝对不许把**任何真实记忆、会话、日志**的内容抄进来（连本机路径都不要写）。
 > 要加语料就自己编一段，宁可平淡也不许搬真实的。
@@ -72,6 +77,9 @@ node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json   
 | 同义改写 | `project_ember-chunking` / `project_ember-nightpass` / `feedback_credential-habit` | 正文明明有答案，但问法与原文用词不重合（记录词法方案的结构性边界） |
 | 另一领域（测误注入） | `reference_sourdough-starter` / `reference_birdwatching-log` / `reference_stargazing-nights` | 与上面所有技术主题无关；它们对「自己领域」的问句是真答案，对技术问句是干扰项 |
 | 同主题干扰 | `project_orchard-ci` / `project_lumen-sync` / `reference_harbor-metrics` / `project_tide-failures` | 与同名前缀的文档抢候选位 |
+| **同名不同项目 ×2** | `project_atlas-ingest` / `project_atlas-gateway` | 同一个代号指两个不同项目：`description` 都含 Atlas、都有「配置 / 失败处理 / 限制」三段，**只有正文能分辨**。用来测「名字重合时会不会把另一份顶进候选」 |
+| **相同实体不同时间 ×4**（2 对） | `project_cobalt-quota` / `-quota-revised`、`project_cobalt-retention` / `-retention-revised` | 正文几乎逐字相同，只有数值与 `metadata.updated` 不同；修订版正文写明「覆盖此前的数值，旧值一律作废」。用来测「较新是否优先」 |
+| **已失效内容 ×2** | `project_orchard-timeout-superseded` / `project_harbor-backpressure-superseded` | 正文第一句就是「⚠️ 已作废：现行口径见 X」，旧结论与题目词面高度重合。用来测「旧结论会不会被当当前事实注入」 |
 
 **怎么扩语料**：直接往 `corpus/` 里放 `.md` 就行，脚本按目录扫描、按文件名排序，
 新文件会自动进检索面（内部按内容 revision 缓存，改了内容会重算）。三件事要注意：
@@ -86,11 +94,11 @@ node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json   
 
 ## 3. 问题集（`questions.jsonl`）
 
-一行一题 JSON，共 79 题。字段（缺省值见括号）：
+一行一题 JSON，共 103 题。字段（缺省值见括号）：
 
 | 字段 | 含义 |
 |---|---|
-| `id` | 稳定题号，`a01`…`i04` 按类别分段 |
+| `id` | 稳定题号，`a01`…`m06` 按类别分段 |
 | `query` | 用户问句原文 |
 | `scope` | 这题的推荐检索面（`--mode mixed` 时才生效；其余模式被 `--mode` 覆盖） |
 | `allowFiles` | **白名单**。非空时，只有这些文件算「在范围内」；返回范围外的文件即记为白名单误注入（`[]` = 不限制） |
@@ -100,10 +108,13 @@ node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json   
 | `mustNotInject` | **黑名单**。返回里出现这些文件即记为误注入 |
 | `unresolved` | 语料里没有答案 / 意图不明确。与 `shouldInject:false` 一起用于「无答案题仍注入」这一项 |
 | `note` | 人读的说明；以 `[lexfail]` 开头的题会被单独分组，表示**已知的词法失败边界** |
+| `hardNegative` | 难负例分类，取值只能是 `shared-common-word` / `same-name-different-project` / `same-entity-different-time` / `stale-content`。写错会让分类分母悄悄变空，所以进「标注自检」，非零即退出码 1 |
+| `preferNewer` | 仅 `same-entity-different-time` 使用：`{newer, older}`，两个文件都必须存在，`newer` 必须在 `needed` 里 —— 否则「较新优先」没有落点 |
 
 类别分布：摘要直命中 18（`a*`）、正文独有 23（`b*`）、同义改写 4（`c*`）、精确错误码/标识符 12（`d*`）、
 长文噪音竞争 4（`e*`）、只说「继续」类 6（`f*`）、无关新问题 4（`g*`）、预算不足 4（`h*`）、
-白名单 4（`i*`）。
+白名单 4（`i*`）、**难负例 24（`j*` 8 共享常用词 / `k*` 6 同名不同项目 / `l*` 4 相同实体不同时间 / `m*` 6 已失效内容）**。
+本版共 103 题：82 题有 `needed`，60 题带 `span`，268 条黑名单检查项。
 
 ### 写 span 的两个坑
 
@@ -143,6 +154,7 @@ node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json   
 | **误注入率（全部检查项·主指标）** | 出现 `mustNotInject` 的题数 / 有黑名单的题数（另给「命中条目数/检查项数」） |
 | 误注入率（无共享词元子集·切片） | 同上，但**只留** query 与文件一个词元都不共享的检查项（**仅诊断，不能当结论**） |
 | 切片排除的检查项 | 被上一行排掉的项数与命中次数 —— **难负例就在这里** |
+| **难负例四类（按 `hardNegative` 分组·看板）** | 每类各自的分母（题数 / 检查项 / `preferNewer` 对数），见下方「难负例：按『为什么难』单列」；比率同时写进 `metrics.rates.hard*` 并参与 `--baseline` 对比 |
 | 白名单外误注入 | 返回里出现 `allowFiles` 之外文件的题数 / 有白名单的题数 |
 | 重复文件 | 同一次结果里同一文件出现第 2 次起的条数（不该发生，是结构不变量）与这些重复片段的字节数 |
 | 无答案题仍注入 | `unresolved && !shouldInject` 的题里 `hits.length > 0` 的题数 / 这类题数 |
@@ -175,21 +187,28 @@ node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json   
 **硬规矩：不能由「无共享词元子集 = 0」推出「真实误注入为零」。** 结构化输出里也带着这句话
 （`metricsSemantics.sliceCaveat`），免得看板只读 JSON 的人看反。
 
-#### 难负例该怎么单列（提案，尚未落地到题集）
+#### 难负例：按「为什么难」单列（1.7.2 已落地到题集）
 
 切片那条路要修的不是名字，是**难负例没有被正面测到**。正确做法是按「为什么难」把负例分四类单列，
-每类单独给一个分母，而不是拿「有没有共享词元」当过滤器：
+每类单独给一个分母，而不是拿「有没有共享词元」当过滤器。题集里的 `hardNegative` 字段就是这条分类，
+脚本按它汇总出 `== 难负例 ==` 看板与 `metrics.rates.hard*` 指标（也进 `--baseline` 对比）：
 
-| 类别 | 为什么难 | 该断言什么 | 现在题集里的状态 |
-|---|---|---|---|
-| 共享常用词 | 高频通用词本来就会命中，词法无法区分 | 通用词不该把无关文件顶进候选 | 只有 `a16` 这类间接覆盖 |
-| 同名不同项目 | 同一个词指两件不同的事，词面完全重合 | 命中哪一份要看上下文，不是首段 | **无** |
-| 相同实体不同时间 | 词面几乎相同，只有时间/版本不同 | 应给较新那条，或至少两条都给 | **无** |
-| 已失效内容 | 内容被后来的一次改动作废 | 不该把旧结论当当前事实注入 | **无** |
+| 类别 | 为什么难 | 题数 | 断言方式 | 1.7.2 实测（`--mode all`） |
+|---|---|---|---|---|
+| `shared-common-word` 共享常用词 | 高频通用词本来就会命中，词法无法区分 | 8（`j*`） | 无答案题：通用词不该把无关文件顶进候选（`mustNotInject`） | 误注入 **7/8**（24 项检查，命中 11） |
+| `same-name-different-project` 同名不同项目 | 同一个代号指两个项目，词面完全重合 | 6（`k*`） | 正例：`needed` 是 A、`mustNotInject` 是 B；另有 3 题两边都不该注入 | 误注入 **6/6**（9 项检查，命中 9） |
+| `same-entity-different-time` 相同实体不同时间 | 词面几乎相同，只有数值/版本不同 | 4（`l*`） | `preferNewer`：新版必须在结果里，且**不能被旧版压过** | 新版召回 **4/4**；旧版压新版 **4/4** |
+| `stale-content` 已失效内容 | 内容被后来的一次改动作废 | 6（`m*`） | `needed` 是现行文件、`mustNotInject` 是作废件 | 误注入 **4/6**（6 项检查，命中 4） |
 
-这四类各自需要**新的语料与题目**（现有的 30 份语料没有「同名不同项目 / 相同实体不同时间 /
-已失效内容」这三种构造）—— 属于**题集扩容，不是调参能解决的**：检索参数再怎么调，
-也不会让「词面完全相同、只有所指不同」的负例变得可分。本轮不改 `questions.jsonl`。
+**这些数字很高，是真实的。** 它们不是「新加的题把模型测坏了」，而是**之前的看板没有正面测这四类**：
+词法检索在「词面重合但所指不同」「只有时间不同」这两类上本来就没有分辨依据 —— 检索链里**没有时间信号**
+（评测里 `mtimeMs` 写死 0），也没有把「已作废」当语义否定的能力。修它们属于 1.9.0 的矛盾检测
+（`valid_at` / `invalid_at`），不是靠调 BM25 参数。
+
+**注意口径变化**：主指标「误注入率（全部检查项）」的**分母从 71 题 / 229 项扩到 91 题 / 268 项**，
+所以绝对值会从 5.6% 跳到 23.1%。这不是行为回归 —— 老题（`a*`–`i*`）那一组的读数仍然单独给出
+（`== 分组 ==` 里的「原有题」）：本版是 **4/71 = 5.6%**，与扩容前一致。
+**以后跨版本看误注入，先看「原有题」与「难负例」两组，再看总表。**
 
 ### 诊断报告（`--report`）
 
@@ -226,6 +245,9 @@ needed 后面的 `✓@n` 是排名，`⊂span`=行号严格包住 span、`△spa
 - `== 对照 ==` 每次非 summary 运行都会附一段「同题集、同 limit 下 `summary` 面」的结果，
   这是脚本内置的验收线，第一次跑就能看出「正文检索是否真的扩到了正文」。
 - `== 分组 ==` 按 `shouldReturn` 与 `[lexfail]` 切开看，避免总体数字把结构性问题平均掉。
+  1.7.2 起还有两组必须一起看：**「原有题（无 `hardNegative` 标注）」**与**「难负例题」** ——
+  题集扩容会改变总表的分子分母，只有这两组分着看才知道「原来那批题有没有被影响」。
+- `== 难负例 ==` 是四类难负例的专用看板（每类独立分母），数字与 `--json` 里的 `hardNegatives` 一致。
 
 ## 5. 参考结果（**第四条门槛落地之前**的一轮对照）
 
@@ -236,6 +258,7 @@ needed 后面的 `✓@n` 是排名，`⊂span`=行号严格包住 span、`△spa
 > ⚠️ **这张表只能当历史对照，不能当当前读数引用。** 当前值看
 > [`docs/1.0.0-eval-report.md`](../../docs/1.0.0-eval-report.md) 的 M1
 > （每个版本当轮的实测数字另见 `CHANGELOG.md` 的「实测」一节）。
+> **1.7.2 起题集与语料已扩容**（30 份 / 79 题 → 38 份 / 103 题），下表的分子分母与当前读数**不可直接比较**。
 
 语料 30 份（正文 302–1219 字符），问题集 79 题（69 题有 `needed`，81 条 `needed`，47 条带 span）。
 
@@ -283,8 +306,15 @@ needed 后面的 `✓@n` 是排名，`⊂span`=行号严格包住 span、`△spa
 8. **「…相关的笔记都有哪些」这类集合式问句排序不可靠。** `h01`（果园相关的笔记）排第一的是
    `project_ember-nightpass.md`；摘要覆盖率打分对「笔记 / 记录 / 相关」这种通用词没有分辨力。
    这类问句真正要的是「按前缀枚举」，不是检索排序。
+9. **四类难负例在 1.7.2 全部测红**（共享常用词 7/8、同名不同项目 6/6、相同实体不同时间旧版压新版 4/4、
+   已失效内容 4/6）。这不是新出现的退化，而是**过去没有正面测**；修它们属于 1.9.0 的
+   `valid_at` / `invalid_at` 矛盾检测，不是调 BM25 参数。详见第 4 节「难负例」。
+10. **语料扩容本身有副作用（1.7.2 实测，如实记录）**：38 份语料下老题（`a*`–`i*`）的
+   Recall@5 仍是 60/69（不变），但 MRR 从 0.7693 掉到 0.7597（`b05` 1→2、`d05` 2→3 等名次后移），
+   且 `g01`（「明天会不会下雨」）从 EMPTY 变成 INJ —— 新作废件里的「不会」与问句共享词元。
+   **文件级召回没降，排序与无答案拒绝各让了一点**，这是加难负例语料的真实代价，不能藏进脚注。
 
-## 6. 回归门：`baseline.json`
+## 6. 回归门：`baseline.json`（带版本与日期）
 
 `test/eval/baseline.json` 是 `--mode all`（limit 5、per-file 2）的**当前**记录，供回归门使用：
 
@@ -292,9 +322,44 @@ needed 后面的 `✓@n` 是排名，`⊂span`=行号严格包住 span、`△spa
 node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json
 ```
 
-⚠️ **它被重新记录过一次**（2026-10-15）：那之前的一份是「第四条门槛落地之前」的行为，
-落地后回归门报了 6 项退化 —— 那是**有意的取舍**，不是回归，所以按本节规则重立了基线。
+基线自己说明身份：顶层 `version`（生成时的包版本）、`generatedAt`（ISO 时间）、`mode` / `limit` / `perFile`、
+两侧指纹（`questions.hash` / `corpus.hash`）与逐题明细。**读基线先看 `version` 与 `generatedAt`**，
+不用再靠提交时间倒推。
+
+⚠️ **它被重新记录过两次**：
+
+- **2026-10-15**：那之前的一份是「第四条门槛落地之前」的行为，落地后回归门报了 6 项退化 ——
+  那是**有意的取舍**，不是回归。
+- **2026-10-24（1.7.2）**：难负例扩容把语料 30→38 份、题集 79→103 题，指纹必然变，
+  同时 `metrics.rates` 多了五个 `hard*` 指标 —— 按规则重立基线，**旧基线归档不清空**（见下）。
+
 重立手法：`--mode all --json test/eval/baseline.json`。
+
+### 历史基线归档与跨版本对比（1.7.2 新增）
+
+`test/eval/baselines/` 存**已发布的**基线快照，文件名带模式与版本/日期：
+
+| 文件 | 含义 |
+|---|---|
+| `all-20261015.json` | 1.7.2 之前的最后一份（30 份 / 79 题；**无 `version` 字段**，那时还没写入） |
+| `all-1.7.2-20261024.json` | 1.7.2 重立的那份（38 份 / 103 题，含 `hard*` 指标） |
+
+每重立一次就多存一份，`--diff` 因此能回答「任意两个版本之间哪些指标朝哪走了」：
+
+```bash
+node scripts/eval-retrieval.mjs --diff test/eval/baselines/all-20261015.json test/eval/baseline.json
+```
+
+`--diff` 与 `--baseline` 的分工是刻意的：
+
+| | `--baseline` | `--diff` |
+|---|---|---|
+| 用途 | **门禁** | **考古** |
+| 口径（mode/limit/指纹） | 必须一致，否则 inconclusive → 退出码 1 | 不一致也能比，但会打印「不可当回归判定」与差异原因 |
+| 缺项（老基线没有的指标） | 判为 schema 不合格（不许填 0） | 标 `⊘ 无此项`，不参与汇总 |
+| 退化 | 退出码 1 | 只打印方向，退出码 0 |
+
+**别拿 `--diff` 的结论代替门禁**：题集变了的比率，分子分母含义都不同，变好变差都可能是口径效应。
 
 对比的规则：
 
@@ -306,8 +371,9 @@ node scripts/eval-retrieval.mjs --mode all --baseline test/eval/baseline.json
   `metrics.raw.questions` 是正数、`mode` / `limit` / `corpus.hash` / `questions.hash` 齐全。
   **缺项不会被默认填 0** —— 填 0 会让「越高越好」和「越低越好」两类指标都变成「改善」，
   那是比读不到基线更危险的假通过。
-- **只比方向明确的比率**：Recall、全中率、条目级召回、段落命中（严格/相交）、MRR 越高越好；
-  误注入（**全部检查项**为主）、无共享词元切片、白名单外、重复、无答案仍注入越低越好。
+- **只比方向明确的比率**：Recall、全中率、条目级召回、段落命中（严格/相交）、MRR、
+  难负例「新版召回」越高越好；误注入（**全部检查项**为主）、无共享词元切片、白名单外、重复、
+  无答案仍注入、难负例「旧版压新版 / 各类误注入」越低越好。
   **延迟不进对比** —— 它随机器和负载变，比它只会天天报警。
 - 基线里的 `mode` / `limit` / **问题集指纹** / **语料指纹**任一与当前不符 → 判为 inconclusive
   （指纹取字节而不是题号列表，所以改了 span、黑名单或 note 也会让基线失效）。
@@ -329,9 +395,10 @@ node scripts/eval-retrieval.mjs --mode all --json test/eval/baseline.json
 
 | 路径 | 作用 |
 |---|---|
-| `test/eval/corpus/*.md` | 30 份合成记忆语料（金标） |
-| `test/eval/questions.jsonl` | 79 道标注题（金标） |
-| `test/eval/baseline.json` | `--mode all` 的当前记录，回归门基线（被重立过一次，见第 6 节） |
+| `test/eval/corpus/*.md` | 38 份合成记忆语料（金标；1.7.2 从 30 份扩到 38 份） |
+| `test/eval/questions.jsonl` | 103 道标注题（金标；1.7.2 从 79 题扩到 103 题，新增 24 道难负例） |
+| `test/eval/baseline.json` | `--mode all` 的当前记录，回归门基线（重立过两次，见第 6 节） |
+| `test/eval/baselines/*.json` | 已发布基线的归档快照，供 `--diff` 跨版本对比 |
 | `test/eval/README.md` | 本文档 |
 | `scripts/eval-retrieval.mjs` | 评测脚本（唯一入口，离线） |
 
