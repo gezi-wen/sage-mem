@@ -72,6 +72,8 @@ function dryRun() {
 // ── 1. 打包白名单（REL-01） ─────────────────────────────────────
 const ROOT_FILES = new Set([
   'package.json', 'README.md', 'README.zh.md', 'LICENSE', 'NOTICE', 'cordis.patch.yml',
+  // 1.8.2：品牌图标（package.json 的 `icon` 与 files 白名单一起声明）
+  'icon.png',
 ])
 const allowedPath = (p) => p.startsWith('lib/') || ROOT_FILES.has(p)
 
@@ -101,6 +103,7 @@ group('0. npm pack --dry-run 跑得通')
   group('2. 运行时必需文件一个不少')
   const required = [
     'package.json', 'README.md', 'README.zh.md', 'LICENSE', 'NOTICE', 'cordis.patch.yml',
+    'icon.png',
     'lib/index.js', 'lib/client.js', 'lib/typert.host.js',
   ]
   const missingRoot = required.filter((p) => !set.has(p))

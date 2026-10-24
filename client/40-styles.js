@@ -231,6 +231,16 @@
 			".smem-page-top{display:flex;align-items:center;}",
 			".smem-page-back{display:inline-flex;align-items:center;gap:5px;border:0;background:transparent;color:var(--dsw-alias-label-secondary);font-family:inherit;font-size:12.5px;line-height:1.4;padding:3px 6px 3px 2px;border-radius:6px;cursor:pointer;}",
 			".smem-page-back:hover{color:var(--dsw-alias-label-primary,#1f2329);background:var(--dsw-alias-bg-layer-2);}",
+			// ── 1.8.2：插件详情页的「侧栏入口」卡片 ──
+			// 融入宿主插件页：标题 13px/600、说明 12px 次要色，圆角与分隔线只用宿主 token。
+			// 不抄设置页的大标题 —— 这一块是插件页里的一张紧凑卡片，不是另一个 settings section。
+			".smem-plugin-card{display:flex;flex-direction:column;gap:8px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;padding:12px 14px;background:var(--dsw-alias-bg-layer-1,#fafbfc);box-sizing:border-box;}",
+			".smem-plugin-card-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}",
+			".smem-plugin-card-title{font-size:13px;font-weight:600;color:var(--dsw-alias-label-primary,#1f2430);line-height:1.4;}",
+			".smem-plugin-card-status{font-size:12px;color:var(--dsw-alias-label-secondary,#6b7280);line-height:1.4;}",
+			".smem-plugin-card-check{font-size:12.5px;}",
+			".smem-plugin-card-note{font-size:12px;line-height:1.55;color:var(--dsw-alias-label-secondary,#6b7280);}",
+			".smem-plugin-card-err{font-size:12px;line-height:1.5;color:var(--dsw-alias-state-error-primary,#ef4444);overflow-wrap:anywhere;}",
 			// ── 底部一行仓库链接（引流，不抢视线）──
 			".smem-star{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--dsw-alias-label-tertiary,#8b93a1);padding:2px 2px 0;}",
 			".smem-star-link{color:var(--dsw-alias-brand-primary,#4d76e6);text-decoration:underline;}",

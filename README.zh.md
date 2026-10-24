@@ -14,7 +14,7 @@
 
 > File-based cross-session memory for DeepSeek Harness — every memory is a plain markdown file you can open, edit and delete. No database, no worker, no port.
 
-**当前发布版本：`1.8.0`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
+**当前发布版本：`1.8.2`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
 [契约冻结](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)。
 
 如果它对你有用，给个 Star 是最直接的反馈。
@@ -84,7 +84,9 @@ sage-mem 补上这一层，做法是：**把该记住的事写成一张张卡片
 
 **1.8.0 起，记忆管理还能从侧栏直接进**：侧栏多一个「记忆管理」图标，点它把中央主区切到本页（页顶有「返回会话」）。
 设置页「记忆管理 → 自动做梦 → 设置」里可以关掉这个入口（默认开，立即生效、不用重启）；
+**1.8.2 起，插件详情页也有同一个开关**（「插件 → sage-mem」那张卡），改完立即生效；
 **关掉只影响侧栏图标，「设置 → 记忆管理」这个入口永远保留**。
+从 1.8.2 开始，sage-mem 在插件列表里有了自己的图标（金色记忆卡片），不再是默认的通用方图标。
 
 记忆管理页的「文件列表」头部还有一个「打开记忆文件夹」按钮：用系统文件管理器打开当前记忆目录
 （Windows Explorer / macOS Finder / Linux 文件管理器）。host 侧起一个 detached 进程就返回，不等窗口。

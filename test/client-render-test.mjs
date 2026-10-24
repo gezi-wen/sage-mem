@@ -2468,6 +2468,89 @@ async function main() {
     }
   }
 
+  // ── 21. 1.8.2 插件详情页的「侧栏入口」卡片（plugins.bundle.config）────────
+  group('21. 1.8.2 插件页「侧栏入口」卡片：summary 空 / page 渲染 / 即时增删 / 失败回原值')
+  {
+    const cardRegs = (regs) => regs.filter((r) => r.spec && r.spec.name === 'plugins.bundle.config')
+    const sidebarRegs = (regs) => regs.filter((r) => r.spec && r.spec.name === 'sidebar.panellist')
+    const mainRegs = (regs) => regs.filter((r) => r.spec && r.spec.name === 'main')
+    const cardBox = (tree) => all(tree, (n) => n.type === 'input' && n.props && n.props.type === 'checkbox')[0]
+
+    // 21a 注册 / summary 空 / page 渲染 / 真实 handler 即时增删
+    {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      const A = await loadClient(rt, { memory: mem })
+      const regs = cardRegs(A.regs)
+      ok(regs.length === 1 && regs[0].spec.key === 'sage-mem',
+        '21a 注册了 plugins.bundle.config（key = 包名 sage-mem）')
+      const C = regs.length ? regs[0].comp : null
+
+      ok(await rt.settle(C, { view: 'summary' }) === null,
+        '21a summary 视图返回 null（摘要位不渲染卡片）')
+
+      const tree = await rt.settle(C, { view: 'page' })
+      ok(!!all(tree, byClass('smem-plugin-card'))[0], '21a page 视图渲染出 smem-plugin-card 卡片')
+      ok(treeText(tree).indexOf('侧栏入口') >= 0, '21a 卡片标题是「侧栏入口」')
+      ok(treeText(tree).indexOf('在侧栏显示「记忆管理」入口') >= 0, '21a 卡片里有开关文案')
+      ok(treeText(tree).indexOf('默认开启') >= 0 &&
+        treeText(tree).indexOf('关闭后「设置 → 记忆管理」入口仍然保留') >= 0,
+        '21a 卡片说明写明默认开启、关闭后设置页入口保留')
+      ok(!!cardBox(tree) && cardBox(tree).props.checked === true,
+        '21a 挂载时 getSettings 回来的 ui.sidebarEntry=true 派生为勾选')
+      ok(mem.st.calls.some((c) => c[0] === 'getSettings'), '21a 卡片挂载时调了 getSettings 取开关状态')
+
+      // 关：写设置 → 立刻摘掉两个侧栏槽位
+      cardBox(tree).props.onChange({ target: { checked: false } })
+      const t2 = await rt.settle(C, { view: 'page' })
+      const setOff = mem.st.calls.filter((c) => c[0] === 'setSettings').pop()
+      ok(!!setOff && JSON.stringify(setOff[1]) === JSON.stringify({ ui: { sidebarEntry: false } }),
+        '21a 取消勾选调 setSettings({ui:{sidebarEntry:false}})', JSON.stringify(setOff && setOff[1]))
+      ok(sidebarRegs(A.regs).length === 0 && mainRegs(A.regs).length === 0,
+        '21a 关闭后**立刻**摘掉侧栏 + main（不需要刷新 / 重启）')
+      ok(cardBox(t2).props.checked === false && treeText(t2).indexOf('已关闭') >= 0,
+        '21a 勾选态与状态文案跟着服务端回传的设置走')
+
+      // 开：再写一次 → 立刻恢复
+      cardBox(t2).props.onChange({ target: { checked: true } })
+      const t3 = await rt.settle(C, { view: 'page' })
+      const setOn = mem.st.calls.filter((c) => c[0] === 'setSettings').pop()
+      ok(!!setOn && JSON.stringify(setOn[1]) === JSON.stringify({ ui: { sidebarEntry: true } }),
+        '21a 勾上调 setSettings({ui:{sidebarEntry:true}})')
+      ok(sidebarRegs(A.regs).length === 1 && mainRegs(A.regs).length === 1 &&
+        cardBox(t3).props.checked === true,
+        '21a 重新开启后**立刻**恢复侧栏 + main（各一份，不重复）')
+    }
+
+    // 21b setSettings 失败：报错、勾选态回原值、槽位一个都不动
+    {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      mem.st.settings = {
+        limits: { ...LIMITS_FIXTURE.limits }, pendingLimits: { ...LIMITS_FIXTURE.pendingLimits },
+        restartRequired: false, reserved: ['memory.md', 'session-log.md'], reservedExtra: [],
+        ui: { sidebarEntry: false },
+      }
+      mem.setSettings = function () {
+        mem.st.calls.push(['setSettings', 'refused'])
+        return Promise.resolve({ ok: false, error: '磁盘只读，拒绝写入' })
+      }
+      const B = await loadClient(rt, { memory: mem })
+      const reg = cardRegs(B.regs)[0]
+      ok(sidebarRegs(B.regs).length === 0, '21b 设置里关着：启动时侧栏不注册')
+
+      const before = await rt.settle(reg.comp, { view: 'page' })
+      ok(cardBox(before).props.checked === false, '21b 卡片显示关着')
+      cardBox(before).props.onChange({ target: { checked: true } })
+      const after = await rt.settle(reg.comp, { view: 'page' })
+      ok(cardBox(after).props.checked === false,
+        '21b 保存失败：勾选态回到原值（由服务端 settings 派生，不乐观更新）')
+      ok(treeText(after).indexOf('磁盘只读，拒绝写入') >= 0, '21b 保存失败：错误文案可见')
+      ok(sidebarRegs(B.regs).length === 0 && mainRegs(B.regs).length === 0,
+        '21b 保存失败：侧栏 / main 槽位一个都没动')
+    }
+  }
+
   console.log(`\n结果：${pass} passed, ${fail} failed`)
   process.exit(fail ? 1 : 0)
 }

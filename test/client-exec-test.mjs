@@ -172,6 +172,11 @@ walkFake(icon, (n) => { if (n.props && typeof n.props.stroke === 'string') iconS
 ok(iconStroked.length >= 3 && iconStroked.every((s) => s === 'currentColor'),
   '图标全部用 currentColor 描边（跟随宿主主题）', JSON.stringify(iconStroked))
 ok(panRec && panRec.comp({ size: 24 }).props.width === 24, '图标尺寸跟随宿主传入的 props.size')
+// 1.8.2：字形与仓库根 icon.png 同源 —— 两张错开的记忆卡片（后一张低透明只描边）。
+const iconRects = []
+walkFake(icon, (n) => { if (n.type === 'rect') iconRects.push(n) })
+ok(iconRects.length === 2 && iconRects.some((r) => r.props && r.props.opacity !== undefined),
+  '图标字形是「叠层记忆卡片」：两张圆角卡，后一张只描边 / 低透明', JSON.stringify(iconRects.map((r) => r.props)))
 
 // 主区页面：用 inject 面拿到的 backToConversation，点「返回会话」真的调 layout.selectPanel(null)
 const face = mainRec && typeof mainRec.spec.inject === 'function' ? mainRec.spec.inject() : null
@@ -184,6 +189,62 @@ ok(!!backBtn, '页顶有「返回会话」按钮')
 panelCleared = false
 if (backBtn) backBtn.props.onClick()
 ok(panelCleared === true, '点「返回会话」调了 layout.selectPanel(null)（主区还给会话）')
+
+// ── 2c. 1.8.2 插件详情页的「侧栏入口」卡片（plugins.bundle.config）──────────
+// 假 react 不执行组件，所以注册进来的 `(props) => h(Card, …)` 要自己再走一层。
+const renderFake = (el) => (el && typeof el === 'object' && typeof el.type === 'function'
+  ? renderFake(el.type(el.props || {}))
+  : el)
+const bundleCard = live.find((r) => r.spec && r.spec.name === 'plugins.bundle.config' && r.spec.key === 'sage-mem')
+ok(!!bundleCard, '注册了插件页 bundle 配置槽 plugins.bundle.config（key=sage-mem，= 包名）')
+ok(renderFake(bundleCard ? bundleCard.comp({ view: 'summary' }) : null) === null,
+  '插件页的 summary 视图返回 null（不在摘要位重复渲染卡片）')
+const pageCard = renderFake(bundleCard ? bundleCard.comp({ view: 'page' }) : null)
+ok(!!pageCard && pageCard.props && pageCard.props.className === 'smem-plugin-card',
+  '插件页的 page 视图渲染出 smem-plugin-card 卡片')
+ok(textOf(pageCard).indexOf('侧栏入口') >= 0 && textOf(pageCard).indexOf('在侧栏显示「记忆管理」入口') >= 0,
+  '卡片里有标题「侧栏入口」与开关文案')
+ok(textOf(pageCard).indexOf('默认开启') >= 0 && textOf(pageCard).indexOf('设置 → 记忆管理') >= 0,
+  '卡片说明写明默认开启、设置页入口保留')
+
+// 旧宿主：该槽 0.1.7+ 才有，inject 直接抛错 —— apply 必须照常完成，设置页 / 侧栏入口一个都不能丢。
+{
+  const oldLive = []
+  const oldCtx = {
+    remote: { $mount() {} },
+    slots: {
+      inject(name, cb) {
+        if (name === 'plugins.bundle.config') throw new Error('unknown slot: plugins.bundle.config')
+        const disposeEntry = typeof cb === 'function' ? cb() : null
+        return () => { if (typeof disposeEntry === 'function') disposeEntry() }
+      },
+      register(spec, comp) {
+        const rec = { spec, comp }
+        oldLive.push(rec)
+        return () => {
+          const i = oldLive.indexOf(rec)
+          if (i >= 0) oldLive.splice(i, 1)
+        }
+      },
+    },
+    get: () => undefined,
+  }
+  const oldMod = loaded.factory(requireFn)
+  let oldApplyErr = null
+  try {
+    await oldMod.apply(oldCtx)
+  } catch (e) {
+    oldApplyErr = e
+  }
+  ok(!oldApplyErr, '旧宿主没有 plugins.bundle.config 槽（inject 抛错）时 apply 不抛错',
+    oldApplyErr ? (oldApplyErr.stack || '').split('\n').slice(0, 3).join(' | ') : '')
+  ok(!!oldLive.find((r) => r.spec && r.spec.name === 'settings.section' && r.spec.id === 'sage-mem'),
+    '旧宿主：设置页 section 照常注册（不被插件页卡片拖垮）')
+  ok(!!oldLive.find((r) => r.spec && r.spec.name === 'sidebar.panellist' && r.spec.id === 'sage-mem'),
+    '旧宿主：侧栏入口照常注册')
+  ok(!oldLive.some((r) => r.spec && r.spec.name === 'plugins.bundle.config'),
+    '旧宿主：没有 plugins.bundle.config 条目（静默跳过）')
+}
 
 // ── 3. 描述符对表：客户端挂的 vs 宿主 manifest ────────────────────────────────
 console.log('== 3. 描述符对表 ==')

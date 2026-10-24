@@ -49,6 +49,29 @@
 				sidebarEnabled = true;
 			}
 			setSidebarEntry(sidebarEnabled);
+
+			// ── 1.8.2 插件详情页的「侧栏入口」卡片 ──────────────────────────────
+			// `plugins.bundle.config` 是 keyed 槽，key = 本 bundle 的 **package name**（sage-mem）。
+			// 宿主在插件页的 description 与「包含的组件」行之间渲染它；ownerProps 形如
+			// `{ view: "summary" | "page" }`，卡片里自己再判一次（summary 返回 null）。
+			//
+			// ⚠️ 这个槽 0.1.7+ 才有。旧宿主上 inject 会**抛错**，所以必须整段 try/catch ——
+			// 否则一个可选的插件页卡片会把设置页与侧栏入口一起拖垮（整个 client 插件不 apply）。
+			// 放在 apply 最后：即使这里因宿主差异出问题，前面的界面已经挂上去了。
+			try {
+				if (ctx.slots && typeof ctx.slots.inject === "function") {
+					ctx.slots.inject("plugins.bundle.config", function () {
+						return ctx.slots.register({
+							name: "plugins.bundle.config",
+							key: "sage-mem",
+						}, function (props) {
+							return react.createElement(SidebarEntryConfigCard, { ...(props || {}), ctx });
+						});
+					});
+				}
+			} catch (e) {
+				// 旧宿主没有这个槽 / 不接受注册：静默跳过，绝不影响其余界面。
+			}
 		}
 
 		exports.apply = apply;

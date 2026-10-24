@@ -7,6 +7,39 @@
 
 ---
 
+## 1.8.2
+
+**主题：插件详情页的「侧栏入口」开关 + 品牌图标（按维护者指定发 1.8.2）。**
+
+版本判定：1.8.2｜理由：按维护者的明确指定发 patch。**说清楚一处偏差**：本版新增了一个界面元素（插件页卡片），严格按 `release-standards` 的规则更接近 MINOR；维护者是这一版的决策者，按要求的版本号发。改动量在 patch 护栏内（client 源文件 3 个、有效改动约 136 行；宿主 `lib/` 零改动）。
+
+### 行为变更
+
+- **插件详情页多一张「侧栏入口」卡片**（「插件」页 → 点 `sage-mem`，位置在 description 与「包含的组件」之间）：显示当前状态 + checkbox「在侧栏显示「记忆管理」入口」+ 说明。切换后**立即**增删侧栏图标，不刷新、不重启；失败会显示错误并保持原值。数据与设置页开关是**同一份设置**（`settings.ui.sidebarEntry`），不存在两边打架。
+- **sage-mem 有了自己的插件图标**：金色记忆卡片叠层（深色圆角底，`icon.png`，256×256），声明在 `package.json` 的 `icon` 与 `files` 里。插件列表里不再是默认的通用蓝色方图标。
+- **侧栏那个小图标换成同源字形**：两张错开的圆角记忆卡片（单色 `currentColor`，跟随宿主明暗主题与选中态），替代原来的「文档三行」。
+
+### 不变
+
+- **宿主侧零改动**（`lib/` 除生成物 `lib/client.js` 外一行未动）；无新 remote、无契约变化、无设置字段变化。
+- 设置页里原来那个开关照旧在；关掉侧栏入口仍不影响「设置 → 记忆管理」。
+- 旧宿主没有 `plugins.bundle.config` 槽位时（0.1.7 之前的壳）：注入在 try/catch 里静默跳过，**设置页与侧栏入口照常工作**，不会因为一张可选的卡片拖垮整个 client 插件。
+
+### 新增测试
+
+- `client-exec-test` 30→**40**：插件页槽位注册（key=`sage-mem`）、summary 视图返回 null、page 视图卡片渲染、叠层图标仍是内联 SVG + 全 `currentColor`、**旧宿主 inject 抛错时 apply 不抛且设置页/侧栏槽位仍在**。
+- `client-render-test` 343→**361**：卡片渲染、真实 toggle handler 走 `getSettings → setSettings → 侧栏注册表即时 0↔1`、`setSettings` 失败时勾选态回原值且错误可见。
+- `release-test` 白名单与必需文件清单放行 `icon.png`。
+
+### 实测
+
+- 本机 `npm test`：**3150 passed, 0 failed**（基线 3122，+28）。
+- `npm pack --dry-run`：**65 个条目**（+`icon.png`），包大小 390.5 kB。
+- 界面快照 3 屏重生成；对照实验证明**只是内联 CSS 变化**：用 `git show HEAD:lib/client.js` 跑旧预览、当前代码跑新预览，三屏 `<body>` 段逐字节 SHA256 相同（8138 / 4766 / 3326 字符），差异全在预览页头部内联的 `.smem-plugin-card*` 样式。
+- **插件页卡片还没在真实桌面宿主里目视验收**（装 1.8.2 后需要重载插件）；槽位契约已从宿主源码确认（`renderSlot("plugins.bundle.config", { view: "page" }, { entryKey: pkg.name })`）。
+
+---
+
 ## 1.8.0
 
 **主题：侧栏「记忆管理」入口（minor —— 一件用户可感知的事：加一个入口，additive，旧入口保留）。**
