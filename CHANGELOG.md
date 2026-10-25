@@ -7,6 +7,16 @@
 
 ---
 
+## Unreleased（下一个 minor：英文界面 i18n，进行中）
+
+**主题：界面文案走宿主 locale 服务 —— 首个 pilot 由 @miztizm 贡献（PR #5）。**
+
+- **已落地**：新增 `client/55-i18n-memory.js`（`NS = "settings.memory"`，167 键 zh/en）并接进 `CLIENT_PARTS`（50 之后、60 之前）；记忆管理四屏（`70-memory-panel` / `72-files-view` / `74-filter-bar` / `76-sidebar-entry`）与 `apply` 接线。`zh` 与 1.8.2 **逐字节相同**（三屏界面快照哈希不变即证据），`en` 为完整草稿；locale 是**可选取服务**（缺它时回退内联中文），设置页签与侧栏入口的 label 改成 thunk。
+- **边界**：只做界面 chrome。模型面（工具描述 / 做梦提示词 / 注入状态行）与数据面（记忆正文、做梦报告、体检结论、`MEMORY.md` 索引骨架）一律未动。
+- **还没做**：`60-autodream-panel` / `62-archive-settings` / `50-shared-ui` 剩余面板 / 星图 的文案；英文单复数（n=1 会显示 "1 items"）；真机语言切换验收。
+- **贡献与核验**：PR #5 by @miztizm（squash 提交 `1758141`）。维护侧未采信自述、独立核验：从 1.8.2 产物抽出的 494 条中文字面量**零缺失**、三屏快照 6/6 不变、重跑构建一致（18 分片）、本机 `node test/run.mjs` **3156 passed / 0 failed**、CI Node 18/20/24 全绿。
+- **收尾（本提交）**：删掉 `50-shared-ui.js` 里已成死常量的 `TAB_LABEL`（目录 tooltip 改走 `tabLabel()`）；把「死键」断言改成真判据（原写法在构建产物里找键名，字典自己就在产物里，永远不会红）。
+
 ## 1.8.2
 
 **主题：插件详情页的「侧栏入口」开关 + 品牌图标（按维护者指定发 1.8.2）。**

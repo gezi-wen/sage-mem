@@ -8,7 +8,9 @@
  * 做法：给它一个假的 window.__ModuleLoader__ 与假 react，把文件跑一遍，
  * 抓 factory → apply(fakeCtx) → 比较 $mount 收到的描述符与 typert.host.js 的 invocations。
  */
+import { readdirSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
 
@@ -163,9 +165,23 @@ ok(zhKeys.length === enKeys.length && zhKeys.every((k, i) => k === enKeys[i]),
 ok(enKeys.every((k) => !/[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(registered.en[k])),
   'en 字典没有中日韩字符（含全角标点）',
   enKeys.filter((k) => /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(registered.en[k])).join(', '))
-const unused = zhKeys.filter((k) => !code.includes('"' + k + '"'))
-ok(unused.length === 0, '没有未被 t() 使用的死键（字典键都出现在 client 构建产物里）', unused.join(', '))
-const usedKeys = [...new Set([...code.matchAll(/\bt\(\s*"([^"]+)"/g)].map((m) => m[1]))]
+// 「死键」不能拿构建产物判：字典本身就在 `lib/client.js` 里，键总能自证存在（上一代断言
+// 就是这么写的，永远不会红）。判据改成回**字面量的出借方**找：55 之外每个分片里出现过的
+// 键串（含三元里当值传的、`t(...)` 参数），或 `type.` / `tab.` 这类由 typeLabel()/tabLabel()
+// 动态拼出来的前缀，才算「有人用」。
+const CLIENT_DIR = fileURLToPath(new URL('../client/', import.meta.url))
+const DICT_PART = '55-i18n-memory.js'
+const shardText = readdirSync(CLIENT_DIR)
+  .filter((f) => f.endsWith('.js') && f !== DICT_PART)
+  .map((f) => readFileSync(join(CLIENT_DIR, f), 'utf8'))
+  .join('\n')
+const sourceStrings = new Set([...shardText.matchAll(/"([A-Za-z0-9_.]+)"|'([A-Za-z0-9_.]+)'/g)].map((m) => m[1] ?? m[2]))
+const DYN_PREFIX = ['type.', 'tab.']
+const deadKeys = (keys) => keys.filter((k) => !sourceStrings.has(k) && !DYN_PREFIX.some((p) => k.startsWith(p)))
+const unused = deadKeys(zhKeys)
+ok(unused.length === 0, '没有死键（55 之外的分片里真的有人用每个键；type./tab. 走动态拼）', unused.join(', '))
+ok(deadKeys(['dead.synthetic_key']).length === 1, '【反向对照】没人用的键会被判成死键')
+const usedKeys = [...new Set([...shardText.matchAll(/\bt\(\s*"([^"]+)"/g)].map((m) => m[1]))]
 const missingKeys = usedKeys.filter((k) => !registered || !Object.prototype.hasOwnProperty.call(registered.zh, k))
 ok(missingKeys.length === 0, '没有 t() 用了但字典里没有的键', missingKeys.join(', '))
 ok(mounts.length >= 1, `调了 remote.$mount（${mounts.length} 次）`)
