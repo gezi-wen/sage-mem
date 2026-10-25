@@ -261,7 +261,7 @@
 			const isOpen = !!props.expanded;
 			return h("div", { className: "smem-card", key: item.file }, [
 				h("div", { className: "smem-card-head", key: "head" }, [
-					h("span", { className: "smem-badge", key: "badge", title: "类型 " + String(item.type) }, meta[0] + " " + meta[1]),
+					h("span", { className: "smem-badge", key: "badge", title: t("card.typeTitle", { type: String(item.type) }) }, meta[0] + " " + typeLabel(TYPE_META[item.type] ? item.type : "reference")),
 					h("span", { className: "smem-card-title", key: "title" }, item.file),
 					h("span", { className: "smem-muted", key: "size" }, fmtSize(item.size)),
 				]),
@@ -276,37 +276,36 @@
 							"data-clamp": isOpen ? "0" : "1",
 							key: "body",
 							onClick: function () { props.onToggle(item.file); },
-							title: isOpen ? "点击收起" : "点击展开全文",
+							title: isOpen ? t("card.collapse") : t("card.expand"),
 						}, String(item.description))
 					: null,
 				h("div", { className: "smem-card-foot", key: "foot" },
 					props.archiving
 						? h("div", { className: "smem-ar-confirm", key: "ar" }, [
-								h("div", { key: "what" }, "把「" + item.file + "」收进档案馆：它不再参与检索与星图，文件移进 archive/，随时可以恢复。"),
+								h("div", { key: "what" }, t("card.archiveWhat", { file: item.file })),
 								// 「可留空」必须跟输入框贴在一起、并且独立成行 —— 它是这一块最容易
 								// 被误读成「必须填才能按」的地方。
-								h("label", { className: "smem-label", key: "lb" }, "归档理由（可留空）"),
+								h("label", { className: "smem-label", key: "lb" }, t("card.archiveReason")),
 								h("input", {
 									className: "smem-input", key: "in",
 									value: props.archiveReason || "",
-									placeholder: "例如：结论已被 project_beta 取代",
+									placeholder: t("card.archiveReasonPlaceholder"),
 									onChange: function (e) { props.onArchiveReason(e.target.value); },
 								}),
-								h("div", { className: "smem-ar-hint", key: "hint" },
-									"写下当时的判断，以后翻到它时就知道这条还值不值得捞回来。"),
+								h("div", { className: "smem-ar-hint", key: "hint" }, t("card.archiveHint")),
 								h("div", { className: "smem-row", key: "btns" }, [
-									h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "ok", disabled: props.busy, onClick: function () { props.onConfirmArchive(item.file); } }, "确认归档"),
-									h("button", { type: "button", className: "smem-btn", key: "no", disabled: props.busy, onClick: props.onCancelArchive }, "取消"),
+									h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "ok", disabled: props.busy, onClick: function () { props.onConfirmArchive(item.file); } }, t("card.confirmArchive")),
+									h("button", { type: "button", className: "smem-btn", key: "no", disabled: props.busy, onClick: props.onCancelArchive }, t("card.cancel")),
 								]),
 							])
 						: h("div", { className: "smem-actions", key: "acts" },
 								props.deleting
 									? [
-											h("button", { type: "button", className: "smem-btn smem-btn-danger", key: "yes", onClick: function () { props.onConfirmDelete(item.file); } }, "确认删除"),
-											h("button", { type: "button", className: "smem-btn", key: "no", onClick: function () { props.onCancelDelete(); } }, "取消"),
+											h("button", { type: "button", className: "smem-btn smem-btn-danger", key: "yes", onClick: function () { props.onConfirmDelete(item.file); } }, t("card.confirmDelete")),
+											h("button", { type: "button", className: "smem-btn", key: "no", onClick: function () { props.onCancelDelete(); } }, t("card.cancel")),
 										]
 									: [
-											h("button", { type: "button", className: "smem-btn", key: "edit", onClick: function () { props.onEdit(item.file); } }, "编辑"),
+											h("button", { type: "button", className: "smem-btn", key: "edit", onClick: function () { props.onEdit(item.file); } }, t("card.edit")),
 											// 语义分组：左边只放「编辑」（安全、可逆），右边放「锁定 / 归档 / 删除」（对这条记忆的退役/保护决定）。
 											h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 											/**
@@ -322,21 +321,21 @@
 												className: "smem-btn" + (item.locked ? " smem-btn-locked" : ""),
 												key: "lock",
 												title: item.locked
-													? "已锁定：自动归档不会选它，手动归档也会被拒绝。点一下解锁"
-													: "锁定这条记忆：自动与手动归档都不再动它（重要的人设 / 偏好建议锁上）",
+													? t("card.lockedTitle")
+													: t("card.unlockedTitle"),
 												disabled: props.busy,
 												onClick: function () { props.onToggleLock(item.file, !item.locked); },
-											}, item.locked ? "🔒 已锁定" : "🔓 锁定"),
+											}, item.locked ? t("card.locked") : t("card.lock")),
 											// 归档排在「锁定」和「删除」之间：比编辑轻、比删除温和，且随时可逆。
 											h("button", {
 												type: "button", className: "smem-btn", key: "arch",
 												title: item.locked
-													? "这条已锁定，归档会被拒绝（先解锁）"
-													: "收进档案馆：不再参与检索与星图，随时可以恢复",
+													? t("card.archiveLockedTitle")
+													: t("card.archiveTitle"),
 												disabled: props.busy || item.locked === true,
 												onClick: function () { props.onAskArchive(item.file); },
-											}, "归档"),
-											h("button", { type: "button", className: "smem-btn smem-btn-danger-ghost", key: "del", onClick: function () { props.onAskDelete(item.file); } }, "删除"),
+											}, t("card.archive")),
+											h("button", { type: "button", className: "smem-btn smem-btn-danger-ghost", key: "del", onClick: function () { props.onAskDelete(item.file); } }, t("card.delete")),
 										])),
 			]);
 		}
@@ -364,9 +363,9 @@
 			const descOpen = sDescOpen[0], setDescOpen = sDescOpen[1];
 			return h("div", { className: "smem-card smem-card--archived", key: item.file }, [
 				h("div", { className: "smem-card-head", key: "head" }, [
-					h("span", { className: "smem-badge", key: "badge", title: "类型 " + String(item.type) }, meta[0] + " " + meta[1]),
+					h("span", { className: "smem-badge", key: "badge", title: t("card.typeTitle", { type: String(item.type) }) }, meta[0] + " " + typeLabel(TYPE_META[item.type] ? item.type : "reference")),
 					h("span", { className: "smem-card-title", key: "title" }, item.file),
-					h("span", { className: "smem-ar-meta", key: "at", title: "归档时间" }, "已归档 " + (item.archivedAt || "（时间未知）")),
+					h("span", { className: "smem-ar-meta", key: "at", title: t("card.archivedAtTitle") }, t("card.archivedAt", { at: item.archivedAt || t("card.unknownTime") })),
 					h("span", { className: "smem-muted", key: "size" }, fmtSize(item.size)),
 				]),
 				(item.tags && item.tags.length)
@@ -380,21 +379,20 @@
 					? h("div", {
 							className: "smem-narrative", key: "desc",
 							"data-clamp": descOpen ? "0" : "1",
-							title: descOpen ? "点击收起" : "点击展开全文",
+							title: descOpen ? t("card.collapse") : t("card.expand"),
 							onClick: function () { setDescOpen(!descOpen); },
 						}, String(item.description))
 					: null,
 				h("div", {
 					className: "smem-ar-reason smem-clamp-2" + (descOpen ? " smem-clamp-2--open" : ""),
-					key: "why", title: "归档理由：" + (item.archivedReason || "（没写）"),
+					key: "why", title: t("card.reason", { reason: item.archivedReason || t("card.noReason") }),
 					onClick: function () { setDescOpen(!descOpen); },
-				}, "归档理由：" + (item.archivedReason || "（没写）")),
+				}, t("card.reason", { reason: item.archivedReason || t("card.noReason") })),
 				props.editing
 					? h("div", { className: "smem-ar-edit", key: "edit" }, [
-							h("div", { className: "smem-ar-hint", key: "note" },
-								"原样文本编辑：下面就是这份文件的全文（含 frontmatter 与归档留痕），保存时原样写回，不会被重新生成。"),
+							h("div", { className: "smem-ar-hint", key: "note" }, t("card.rawEditNote")),
 							props.loading
-								? h("div", { className: "smem-status", key: "loading" }, "读取中…")
+								? h("div", { className: "smem-status", key: "loading" }, t("card.reading"))
 								: h("textarea", {
 										className: "smem-textarea smem-ar-editor", key: "ta",
 										value: props.text || "",
@@ -402,20 +400,17 @@
 										onChange: function (e) { props.onText(e.target.value); },
 									}),
 							h("div", { className: "smem-row", key: "btns" }, [
-								h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "save", disabled: props.busy || props.loading, onClick: function () { props.onSave(item.file); } }, props.saving ? "保存中…" : "保存"),
-								h("button", { type: "button", className: "smem-btn", key: "cancel", disabled: props.busy, onClick: props.onCancel }, "取消"),
+								h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "save", disabled: props.busy || props.loading, onClick: function () { props.onSave(item.file); } }, props.saving ? t("card.saving") : t("card.save")),
+								h("button", { type: "button", className: "smem-btn", key: "cancel", disabled: props.busy, onClick: props.onCancel }, t("card.cancel")),
 							]),
 						])
 					: props.deleting
 						? h("div", { className: "smem-ar-confirm", key: "del" }, [
-								h("div", { key: "what" },
-									"彻底删除「" + item.file + "」：它会从 archive/ 里被真的删掉，不能恢复。" +
-									"要保留它就先点「恢复」，把它放回活动记忆。"),
-								h("div", { className: "smem-ar-hint", key: "hint" },
-									"这一步之后没有任何界面能把内容找回来 —— 只剩你自己在磁盘上留过备份。"),
+								h("div", { key: "what" }, t("card.purgeWhat", { file: item.file })),
+								h("div", { className: "smem-ar-hint", key: "hint" }, t("card.purgeHint")),
 								h("div", { className: "smem-row", key: "btns" }, [
-									h("button", { type: "button", className: "smem-btn smem-btn-danger", key: "yes", disabled: props.busy, onClick: function () { props.onConfirmDelete(item.file); } }, "确认彻底删除"),
-									h("button", { type: "button", className: "smem-btn", key: "no", disabled: props.busy, onClick: props.onCancelDelete }, "取消"),
+									h("button", { type: "button", className: "smem-btn smem-btn-danger", key: "yes", disabled: props.busy, onClick: function () { props.onConfirmDelete(item.file); } }, t("card.confirmPurge")),
+									h("button", { type: "button", className: "smem-btn", key: "no", disabled: props.busy, onClick: props.onCancelDelete }, t("card.cancel")),
 								]),
 							])
 						: h("div", { className: "smem-card-foot", key: "foot" },
@@ -424,21 +419,21 @@
 										type: "button", className: "smem-btn", key: "edit",
 										disabled: props.busy,
 										onClick: function () { props.onEdit(item.file); },
-									}, "编辑"),
+									}, t("card.edit")),
 h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 																		h("button", {
 										type: "button", className: "smem-btn smem-btn-primary", key: "restore",
 										disabled: props.busy,
 										onClick: function () { props.onRestore(item.file); },
-									}, props.restoring ? "恢复中…" : "恢复"),
+									}, props.restoring ? t("card.restoring") : t("card.restore")),
 									// 放在最后、且用 danger-ghost：它是这张卡上唯一不可逆的动作，
 									// 不该跟「恢复」长得一样。
 									h("button", {
 										type: "button", className: "smem-btn smem-btn-danger-ghost", key: "purge",
 										disabled: props.busy,
-										title: "从 archive/ 里彻底删掉，不可恢复（要留就先恢复）",
+										title: t("card.purgeTitle"),
 										onClick: function () { props.onAskDelete(item.file); },
-									}, "彻底删除"),
+									}, t("card.purge")),
 								])),
 			]);
 		}
@@ -603,14 +598,14 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 		 */
 		function StarLine() {
 			return h("div", { className: "smem-star" }, [
-				h("span", { key: "ask" }, "⭐ 顺手留颗 Star，作者能高兴一整天"),
+				h("span", { key: "ask" }, t("star.ask")),
 				h("a", {
 					key: "cta",
 					href: "https://github.com/gezi-wen/sage-mem",
 					target: "_blank",
 					rel: "noreferrer",
 					className: "smem-star-link",
-				}, "行，给你一颗 Star"),
+				}, t("star.cta")),
 			]);
 		}
 

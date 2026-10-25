@@ -19,13 +19,14 @@
 				tag.textContent = CSS;
 				document.head.appendChild(tag);
 			}
+			setupI18n(ctx);
 			ctx.slots.inject("settings.section", () =>
 				ctx.slots.register(
 					{
 						name: "settings.section",
 						id: "sage-mem",
 						order: 20,
-						label: "记忆管理",
+						label: () => t("section.label"),
 						// 声明「记忆星图」子槽：sage-starmap 向它注入星空视图，
 						// 记忆管理页用 renderSlot 渲染。声明 children 后 shell 才会
 						// 向本 section 组件传入 renderSlot。

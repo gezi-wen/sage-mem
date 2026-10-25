@@ -10,24 +10,24 @@
 				}));
 			} else if (totalCount === 0) {
 				filesView = h("div", { className: "smem-empty", key: "empty" }, [
-					h("div", { key: "t" }, "还没有记忆文件。对话中值得记住的事会写到这里，也可以手动写入。"),
-					h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "add", onClick: openAdd }, "+ 添加记忆"),
-					h("button", { type: "button", className: "smem-btn", key: "idx", title: "写入一份 MEMORY.md 索引骨架（已有索引不会覆盖）", onClick: createIndexSkeleton }, "建立索引骨架"),
+					h("div", { key: "t" }, t("files.emptyTitle")),
+					h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "add", onClick: openAdd }, t("action.add")),
+					h("button", { type: "button", className: "smem-btn", key: "idx", title: t("files.skeletonTitle"), onClick: createIndexSkeleton }, t("files.skeleton")),
 				]);
 			} else if (statusFilter === "archived" && archiveItems.length === 0) {
 				filesView = h("div", { className: "smem-empty", key: "empty" }, [
-					h("div", { key: "t" }, "档案馆是空的 —— 在活动记忆那张卡上点「归档」，它就会收到这里。"),
-					h("button", { type: "button", className: "smem-btn", key: "back", onClick: function () { setStatusFilter("active"); } }, "回文件列表"),
+					h("div", { key: "t" }, t("files.archiveEmpty")),
+					h("button", { type: "button", className: "smem-btn", key: "back", onClick: function () { setStatusFilter("active"); } }, t("files.backToFiles")),
 				]);
 			} else if (statusFilter === "active" && items.length === 0) {
 				filesView = h("div", { className: "smem-empty", key: "empty" }, [
-					h("div", { key: "t" }, "活动记忆是空的 —— 状态筛到「已归档」还能捞出 " + archiveItems.length + " 条。"),
-					h("button", { type: "button", className: "smem-btn", key: "go", onClick: function () { setStatusFilter("archived"); } }, "切到已归档"),
+					h("div", { key: "t" }, t("files.activeEmpty", { count: archiveItems.length })),
+					h("button", { type: "button", className: "smem-btn", key: "go", onClick: function () { setStatusFilter("archived"); } }, t("files.goArchived")),
 				]);
 			} else if (filtered.length === 0) {
 				filesView = h("div", { className: "smem-empty", key: "empty" }, [
-					h("div", { key: "t" }, "没有符合搜索或筛选条件的文件。"),
-					h("button", { type: "button", className: "smem-btn", key: "clear", onClick: function () { setStatusFilter("all"); setTypeFilter([]); setTagFilter([]); setQuery(""); } }, "清除筛选"),
+					h("div", { key: "t" }, t("files.noMatch")),
+					h("button", { type: "button", className: "smem-btn", key: "clear", onClick: function () { setStatusFilter("all"); setTypeFilter([]); setTagFilter([]); setQuery(""); } }, t("filter.clear")),
 				]);
 			} else {
 				const list = h("div", { className: "smem-list", key: "list" }, filtered.map(function (it) {
@@ -79,9 +79,7 @@
 				}));
 				filesView = statusFilter === "archived"
 					? [
-							h("div", { className: "smem-ar-banner", key: "banner" },
-								"档案馆里的记忆不参与检索与星图，原文仍在记忆目录的 archive/ 下 —— 恢复后它就回到活动列表；" +
-								"「编辑」是原样文本编辑，改完存回同一份文件；「彻底删除」会真的从 archive/ 里删掉它（不可恢复，删除前还要再确认一次）。"),
+							h("div", { className: "smem-ar-banner", key: "banner" }, t("files.archiveIntro")),
 							list,
 						]
 					: list;
