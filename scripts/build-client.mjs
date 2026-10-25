@@ -35,6 +35,7 @@ export const CLIENT_PARTS = [
   'client/30-descriptors.js', // 主模块的 TYPERT_REMOTE 描述符表
   'client/40-styles.js', // 主模块那份 CSS（同名第二份，工厂作用域内）
   'client/50-shared-ui.js', // TYPE_META / frontmatter 纯逻辑 / Chip・Card・ArchivedCard / 体检・候选・原样编辑面板
+  'client/55-i18n-memory.js', // 1.9.0：settings.memory 的 zh/en 字典与可选 locale 绑定（必须在用词的 50 分片之后、60+ 之前）
   'client/60-autodream-panel.js', // 「自动做梦」面板
   'client/62-archive-settings.js', // 「自动归档」面板（三档策略 + 三个阈值；v0.9.9 独立成页）
   'client/72-files-view.js', // 1.5.3：文件列表这一屏（纯渲染，状态在上层）

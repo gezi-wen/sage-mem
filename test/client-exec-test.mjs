@@ -104,6 +104,22 @@ const slots = []
 /** 当前真正挂着的槽位条目（register 的返回值会把它摘掉）—— 用来验「注销后不残留」。 */
 const live = []
 let panelCleared = false
+/**
+ * 假 locale 服务：只做一件真宿主会做的事 —— 把插件 register(ns, {zh, en}) 的字典收下来。
+ * bind(ns) 返回的 t 在调用时才读 registered，所以注册与 bind 的先后顺序不影响结果。
+ */
+let registered = null
+const locale = {
+  register: (ns, dicts) => { registered = { ns, ...dicts }; return () => {} },
+  bind: (ns) => (key, params) => {
+    const dicts = registered && registered.ns === ns ? registered : null
+    const tpl = dicts && (dicts.zh[key] ?? dicts.en[key])
+    const text = tpl === undefined ? key : String(tpl)
+    return params
+      ? text.replace(/\{(\w+)\}/g, (m, name) => (name in params ? String(params[name]) : m))
+      : text
+  },
+}
 const ctx = {
   remote: { $mount: (m) => mounts.push(m) },
   slots: {
@@ -124,9 +140,10 @@ const ctx = {
     },
   },
   // 返回会话走 layout.selectPanel(null)：给一个能记账的假服务。
+  effect: (fn) => { fn() },
   get: (name) => (name === 'layout'
     ? { selectPanel: (panel) => { if (panel === null) panelCleared = true } }
-    : undefined),
+    : name === 'locale' ? locale : undefined),
 }
 let applyErr = null
 try {
@@ -135,6 +152,17 @@ try {
   applyErr = e
 }
 ok(!applyErr, 'apply(ctx) 跑通', applyErr ? (applyErr.stack || '').split('\n').slice(0, 4).join(' | ') : '')
+
+// ── 2a. i18n 字典：注册到 settings.memory，zh/en 键集一致、en 无中日韩字符 ──────
+ok(!!registered && registered.ns === 'settings.memory', '注册了 locale 命名空间 settings.memory')
+ok(!!registered && !!registered.zh && !!registered.en, 'zh / en 两本字典都注册了')
+const zhKeys = registered ? Object.keys(registered.zh).sort() : []
+const enKeys = registered ? Object.keys(registered.en).sort() : []
+ok(zhKeys.length === enKeys.length && zhKeys.every((k, i) => k === enKeys[i]),
+  'zh / en 字典键集完全一致', `zh=${zhKeys.length} en=${enKeys.length}`)
+ok(enKeys.every((k) => !/[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(registered.en[k])),
+  'en 字典没有中日韩字符（含全角标点）',
+  enKeys.filter((k) => /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(registered.en[k])).join(', '))
 ok(mounts.length >= 1, `调了 remote.$mount（${mounts.length} 次）`)
 ok(slots.some((s) => s[0] === 'register' && s[1] === 'settings.section' && s[2] === 'sage-mem'), '注册了设置页 section「sage-mem」')
 
