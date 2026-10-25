@@ -46,7 +46,7 @@
 
 		/** 卡片里的错误文案：remote 可能 reject 一个字符串 / 对象 / Error，尽量展开成人话。 */
 		function pluginCardErr(e) {
-			if (!e) return "保存失败（未知原因）";
+			if (!e) return t("pluginCard.saveFailed");
 			if (e instanceof Error) return e.message || String(e);
 			try {
 				const s = JSON.stringify(e);
@@ -96,7 +96,7 @@
 			function toggle(next) {
 				if (busy) return;
 				if (!remote || typeof remote.setSettings !== "function") {
-					setErr("宿主侧还没有 setSettings 接口（插件版本较旧）");
+					setErr(t("pluginCard.noSetSettings"));
 					return;
 				}
 				setBusy(true); setErr("");
@@ -104,7 +104,7 @@
 					setBusy(false);
 					// setSettings 是 { ok, settings, restartRequired } 形状，不要过 unwrap。
 					if (out && out.ok === false) {
-						setErr(out.error || "保存被拒绝");
+						setErr(out.error || t("error.saveRejected"));
 						return;
 					}
 					const settings = out && out.settings ? out.settings : null;
@@ -122,8 +122,8 @@
 
 			return h("div", { className: "smem-plugin-card" }, [
 				h("div", { className: "smem-plugin-card-head", key: "h" }, [
-					h("span", { className: "smem-plugin-card-title", key: "t" }, "侧栏入口"),
-					h("span", { className: "smem-plugin-card-status", key: "s" }, on ? "已开启" : "已关闭"),
+					h("span", { className: "smem-plugin-card-title", key: "t" }, t("pluginCard.title")),
+					h("span", { className: "smem-plugin-card-status", key: "s" }, on ? t("pluginCard.on") : t("pluginCard.off")),
 				]),
 				h("label", { className: "smem-check smem-plugin-card-check", key: "row" }, [
 					h("input", {
@@ -132,10 +132,10 @@
 						disabled: busy,
 						onChange: function (e) { toggle(!!(e.target && e.target.checked)); },
 					}),
-					h("span", { key: "l" }, "在侧栏显示「记忆管理」入口"),
+					h("span", { key: "l" }, t("pluginCard.label")),
 				]),
 				h("div", { className: "smem-plugin-card-note", key: "n" },
-					"默认开启；改动立即生效，不需要重启。关闭后「设置 → 记忆管理」入口仍然保留。"),
+					t("pluginCard.note")),
 				err ? h("div", { className: "smem-plugin-card-err", key: "e" }, err) : null,
 			]);
 		}
@@ -160,7 +160,7 @@
 				h("div", { className: "smem-page-top", key: "top" }, [
 					h("button", {
 						type: "button", className: "smem-page-back", key: "back",
-						title: "返回会话", onClick: onBack,
+						title: t("page.back"), onClick: onBack,
 					}, [
 						h("svg", {
 							key: "i", width: 14, height: 14, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true",
@@ -168,7 +168,7 @@
 							d: "M10 3.5 5.5 8l4.5 4.5", stroke: "currentColor", strokeWidth: "1.6",
 							strokeLinecap: "round", strokeLinejoin: "round",
 						})),
-						h("span", { key: "l" }, "返回会话"),
+						h("span", { key: "l" }, t("page.back")),
 					]),
 				]),
 				h(Section, { key: "sec", ...props, ctx: sidebarCtx }),
@@ -186,7 +186,7 @@
 					name: "sidebar.panellist",
 					id: SIDEBAR_ENTRY_ID,
 					order: 20,
-					label: "记忆管理",
+					label: () => t("sidebar.label"),
 				}, SidebarEntryIcon);
 			}));
 			// 中央主区 keyed 槽：key 与侧栏 id 相同；inject 面把「返回会话」交给页面组件。

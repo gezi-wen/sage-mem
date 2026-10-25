@@ -153,7 +153,7 @@ try {
 }
 ok(!applyErr, 'apply(ctx) 跑通', applyErr ? (applyErr.stack || '').split('\n').slice(0, 4).join(' | ') : '')
 
-// ── 2a. i18n 字典：注册到 settings.memory，zh/en 键集一致、en 无中日韩字符 ──────
+// ── 2a. i18n 字典：注册到 settings.memory，zh/en 键集一致、en 无中日韩字符、没有死键 ──────
 ok(!!registered && registered.ns === 'settings.memory', '注册了 locale 命名空间 settings.memory')
 ok(!!registered && !!registered.zh && !!registered.en, 'zh / en 两本字典都注册了')
 const zhKeys = registered ? Object.keys(registered.zh).sort() : []
@@ -163,6 +163,11 @@ ok(zhKeys.length === enKeys.length && zhKeys.every((k, i) => k === enKeys[i]),
 ok(enKeys.every((k) => !/[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(registered.en[k])),
   'en 字典没有中日韩字符（含全角标点）',
   enKeys.filter((k) => /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(registered.en[k])).join(', '))
+const unused = zhKeys.filter((k) => !code.includes('"' + k + '"'))
+ok(unused.length === 0, '没有未被 t() 使用的死键（字典键都出现在 client 构建产物里）', unused.join(', '))
+const usedKeys = [...new Set([...code.matchAll(/\bt\(\s*"([^"]+)"/g)].map((m) => m[1]))]
+const missingKeys = usedKeys.filter((k) => !registered || !Object.prototype.hasOwnProperty.call(registered.zh, k))
+ok(missingKeys.length === 0, '没有 t() 用了但字典里没有的键', missingKeys.join(', '))
 ok(mounts.length >= 1, `调了 remote.$mount（${mounts.length} 次）`)
 ok(slots.some((s) => s[0] === 'register' && s[1] === 'settings.section' && s[2] === 'sage-mem'), '注册了设置页 section「sage-mem」')
 
@@ -171,8 +176,10 @@ const panRec = live.find((r) => r.spec && r.spec.name === 'sidebar.panellist' &&
 const mainRec = live.find((r) => r.spec && r.spec.name === 'main' && r.spec.key === 'sage-mem')
 ok(!!panRec, '注册了侧栏 list 槽 sidebar.panellist（id=sage-mem）')
 ok(!!mainRec, '注册了中央主区 keyed 槽 main（key=sage-mem，与侧栏 id 相同）')
-ok(!!panRec && panRec.spec.order === 20 && panRec.spec.label === '记忆管理',
-  '侧栏条目的 order / label 正确（宿主据此画行标题）', JSON.stringify(panRec && panRec.spec))
+ok(!!panRec && panRec.spec.order === 20 && typeof panRec.spec.label === 'function'
+  && panRec.spec.label() === '记忆管理',
+  '侧栏条目的 order / label 正确（label 是每次投影都重读的 thunk）',
+  JSON.stringify(panRec && { ...panRec.spec, label: typeof panRec.spec.label }))
 ok(mod.inject.includes('slots') && mod.inject.includes('remote'), `inject 声明了 slots / remote：${JSON.stringify(mod.inject)}`)
 // layout 是**可选**依赖：返回会话优先用宿主注入的 props.backToConversation，layout 只是兜底。
 // 一旦写进 inject，旧外壳缺该服务时整个 client 插件都不会 apply（连设置页一起丢）。

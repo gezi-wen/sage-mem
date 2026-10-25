@@ -140,8 +140,8 @@
 				remote.listFiles()
 					.then(function (res) {
 						if (res && typeof res === "object" && res.ok === false) {
-							const msg = res.error && res.error.message ? res.error.message : "remote 调用失败";
-							throw new Error("listFiles RPC 失败: " + msg);
+							const msg = res.error && res.error.message ? res.error.message : t("error.remote");
+							throw new Error(t("error.listFiles", { message: msg }));
 						}
 						const list = unwrap(res);
 						setItems(Array.isArray(list) ? list : []);
@@ -254,20 +254,20 @@
 				setError(null);
 				setNotice("");
 				if (!remote || typeof remote.readRaw !== "function" || typeof remote.writeRaw !== "function") {
-					setError("宿主侧还没有 readRaw / writeRaw 接口（插件版本较旧）");
+					setError(t("error.noRaw"));
 					return;
 				}
 				setBusy(true);
 				// 先读再写：**已有索引绝不覆盖**。readRaw 对不存在的文件会 reject，正好当探针。
 				remote.readRaw("MEMORY.md").then(function () {
 					setBusy(false);
-					setNotice("MEMORY.md 已经存在，没有改动它。");
+					setNotice(t("notice.indexExists"));
 				}, function () {
 					return remote.writeRaw("MEMORY.md", INDEX_SKELETON).then(function (res) {
 						const out = unwrap(res);
 						setBusy(false);
-						if (out && out.ok === false) { setError(out.error || "建立索引骨架失败"); return; }
-						setNotice("已建立 MEMORY.md 索引骨架。");
+						if (out && out.ok === false) { setError(out.error || t("error.skeletonFailed")); return; }
+						setNotice(t("notice.indexCreated"));
 						load();
 					});
 				}).catch(function (e) {
@@ -279,13 +279,13 @@
 			function openMemoryFolder() {
 				setError(null);
 				if (!remote || typeof remote.openMemoryDir !== "function") {
-					setError("宿主侧还没有 openMemoryDir 接口（插件版本较旧）");
+					setError(t("error.noOpenDir"));
 					return;
 				}
 				remote.openMemoryDir()
 					.then(function (res) {
 						const result = unwrap(res);
-						if (result && result.ok === false) setError(result.error || "打开记忆目录失败");
+						if (result && result.ok === false) setError(result.error || t("error.openDirFailed"));
 					})
 					.catch(function (e) { setError(String((e && e.message) || e)); });
 			}
@@ -332,7 +332,7 @@
 			}
 
 			function submit() {
-				if (!formDesc.trim()) { setError("描述不能为空"); return; }
+				if (!formDesc.trim()) { setError(t("error.descEmpty")); return; }
 				setBusy(true); setError(null); setNotice("");
 				const type = formType;
 				const name = (formName.trim() || (type + "_note.md"));
@@ -357,9 +357,9 @@
 				remote.writeFile(safeName, content)
 					.then(function (r) {
 						// host 侧对保留名 / 非字符串内容 / 超限一律返回 { ok: false, error }，不再抛异常。
-						if (r && r.ok === false) { setError(r.error || "写入被拒绝"); return; }
+						if (r && r.ok === false) { setError(r.error || t("error.writeRejected")); return; }
 						closeForm();
-						setNotice(editingFile ? "已更新 " + safeName : "已保存 " + safeName);
+						setNotice(t(editingFile ? "notice.updated" : "notice.saved", { file: safeName }));
 						load();
 					})
 					.catch(function (e) { setError(String((e && e.message) || e)); })
@@ -370,9 +370,9 @@
 				setBusy(true); setError(null); setNotice("");
 				remote.deleteFile(file)
 					.then(function (r) {
-						if (r && r.ok === false) { setError(r.error || "删除被拒绝"); return; }
+						if (r && r.ok === false) { setError(r.error || t("error.deleteRejected")); return; }
 						setDeleting(null);
-						setNotice("已删除 " + file);
+						setNotice(t("notice.deleted", { file: file }));
 						load();
 					})
 					.catch(function (e) { setError(String((e && e.message) || e)); })
@@ -387,16 +387,16 @@
 			 */
 			function confirmArchive(file) {
 				if (typeof remote.archive !== "function") {
-					setError("宿主侧还没有 archive 接口（插件版本较旧）");
+					setError(t("error.noArchive"));
 					return;
 				}
 				setBusy(true); setError(null); setNotice("");
 				remote.archive(file, archiveReason.trim())
 					.then(function (r) {
-						if (r && r.ok === false) { setError(r.error || "归档被拒绝"); return; }
+						if (r && r.ok === false) { setError(r.error || t("error.archiveRejected")); return; }
 						setArchiving(null);
 						setArchiveReason("");
-						setNotice("已归档 " + file + " —— 它现在在「已归档」视图里，随时可以恢复");
+						setNotice(t("notice.archived", { file: file }));
 						load();
 					})
 					.catch(function (e) { setError(String((e && e.message) || e)); })
@@ -411,17 +411,17 @@
 			 */
 			function toggleLock(file, locked) {
 				if (typeof remote.setLocked !== "function") {
-					setError("宿主侧还没有 setLocked 接口（插件版本较旧）");
+					setError(t("error.noLock"));
 					return;
 				}
 				setBusy(true); setError(null); setNotice("");
 				remote.setLocked(file, locked)
 					.then(function (r) {
 						const d = unwrap(r);
-						if (d && d.ok === false) { setError(d.error || "锁定操作被拒绝"); return; }
+						if (d && d.ok === false) { setError(d.error || t("error.lockRejected")); return; }
 						setNotice(locked
-							? ("已锁定 " + file + " —— 自动归档不会再选它，手动归档也会被拒绝")
-							: ("已解锁 " + file));
+							? t("notice.locked", { file: file })
+							: t("notice.unlocked", { file: file }));
 						load();
 					})
 					.catch(function (e) { setError(String((e && e.message) || e)); })
@@ -430,7 +430,7 @@
 
 			/** 从档案馆捞回来：文件移回记忆目录，归档留痕被抹掉。 */
 			function restoreFile(file) {				if (typeof remote.restore !== "function") {
-					setError("宿主侧还没有 restore 接口（插件版本较旧）");
+					setError(t("error.noRestore"));
 					return;
 				}
 				setBusy(true); setError(null); setNotice("");
@@ -438,9 +438,9 @@
 				setArchDelete(null);
 				remote.restore(file)
 					.then(function (r) {
-						if (r && r.ok === false) { setError(r.error || "恢复被拒绝"); return; }
+						if (r && r.ok === false) { setError(r.error || t("error.restoreRejected")); return; }
 						// 恢复会顺带把这条补进索引：说清楚，否则用户不知道「漏索引」是怎么好的
-						setNotice("已恢复 " + file + " —— 它回到了活动记忆里" + (r && r.indexed ? "，并补进了索引" : ""));
+						setNotice(t(r && r.indexed ? "notice.restoredIndexed" : "notice.restored", { file: file }));
 						load();
 					})
 					.catch(function (e) { setError(String((e && e.message) || e)); })
@@ -455,7 +455,7 @@
 			 */
 			function deleteArchivedFile(file) {
 				if (typeof remote.deleteArchived !== "function") {
-					setError("宿主侧还没有 deleteArchived 接口（插件版本较旧）");
+					setError(t("error.noDeleteArchived"));
 					return;
 				}
 				const item = archiveItems.filter(function (x) { return x.file === file; })[0];
@@ -463,9 +463,9 @@
 				setBusy(true); setError(null); setNotice("");
 				remote.deleteArchived(file, stamp)
 					.then(function (r) {
-						if (r && r.ok === false) { setError(r.error || "删除被拒绝"); return; }
+						if (r && r.ok === false) { setError(r.error || t("error.deleteRejected")); return; }
 						setArchDelete(null);
-						setNotice("已彻底删除 " + file + " —— 归档区里也没有它了，找不回来");
+						setNotice(t("notice.purged", { file: file }));
 						load();
 					})
 					.catch(function (e) { setError(String((e && e.message) || e)); })
@@ -482,7 +482,7 @@
 			 */
 			function openArchEdit(file) {
 				if (typeof remote.readArchived !== "function") {
-					setError("宿主侧还没有 readArchived 接口（插件版本较旧）");
+					setError(t("error.noReadArchived"));
 					return;
 				}
 				setError(null); setNotice("");
@@ -505,16 +505,16 @@
 
 			function saveArchEdit(file) {
 				if (typeof remote.writeArchived !== "function") {
-					setError("宿主侧还没有 writeArchived 接口（插件版本较旧）");
+					setError(t("error.noWriteArchived"));
 					return;
 				}
 				setArchSaving(true); setError(null); setNotice("");
 				// 原样交回：不 trim、不补 frontmatter、不做任何「智能」处理。
 				remote.writeArchived(file, archText)
 					.then(function (r) {
-						if (r && r.ok === false) { setError(r.error || "保存被拒绝"); return; }
+						if (r && r.ok === false) { setError(r.error || t("error.saveRejected")); return; }
 						setArchEdit(null);
-						setNotice("已保存 " + file);
+						setNotice(t("notice.saved", { file: file }));
 						load();
 					})
 					.catch(function (e) { setError(String((e && e.message) || e)); })
@@ -526,7 +526,7 @@
 			// ── 工具面板的三个数据通道 ──────────────────────────────────────
 
 			function runAudit() {
-				if (typeof remote.audit !== "function") { setError("宿主侧还没有 audit 接口（插件版本较旧）"); return; }
+				if (typeof remote.audit !== "function") { setError(t("error.noAudit")); return; }
 				setAuditBusy(true); setError(null);
 				remote.audit()
 					.then(function (r) { setAudit(unwrap(r) || null); })
@@ -535,7 +535,7 @@
 			}
 
 			function loadCandidates() {
-				if (typeof remote.archiveCandidates !== "function") { setError("宿主侧还没有 archiveCandidates 接口（插件版本较旧）"); return; }
+				if (typeof remote.archiveCandidates !== "function") { setError(t("error.noArchiveCandidates")); return; }
 				setCandBusy(true); setError(null);
 				remote.archiveCandidates()
 					.then(function (r) {
@@ -552,7 +552,7 @@
 			}
 
 			function loadSettings() {
-				if (typeof remote.getSettings !== "function") { setError("宿主侧还没有 getSettings 接口（插件版本较旧）"); return; }
+				if (typeof remote.getSettings !== "function") { setError(t("error.noGetSettings")); return; }
 				remote.getSettings()
 					.then(function (r) { const d = unwrap(r) || {}; setSettings(d); })
 					.catch(function (e) { setError(String((e && e.message) || e)); });
@@ -620,7 +620,7 @@
 			 */
 			function archiveCandidates(list) {
 				if (!list.length) return;
-				if (typeof remote.archive !== "function") { setError("宿主侧还没有 archive 接口（插件版本较旧）"); return; }
+				if (typeof remote.archive !== "function") { setError(t("error.noArchive")); return; }
 				setBusy(true); setError(null); setNotice("");
 				const done = [];
 				const failed = [];
@@ -630,8 +630,8 @@
 						setCandConfirm(null);
 						setPicked({});
 						setNotice(failed.length
-							? ("已归档 " + done.length + " 条，" + failed.length + " 条没成功：" + failed.join("、"))
-							: ("已归档 " + done.length + " 条 —— 它们现在在档案馆里，随时可以恢复"));
+							? t("notice.batchPartial", { done: done.length, failed: failed.length, files: failed.join("、") })
+							: t("notice.batchDone", { done: done.length }));
 						load();
 						loadCandidates();
 						return;
@@ -648,7 +648,7 @@
 			}
 
 			function openRaw(name) {
-				if (typeof remote.readRaw !== "function") { setError("宿主侧还没有 readRaw 接口（插件版本较旧）"); return; }
+				if (typeof remote.readRaw !== "function") { setError(t("error.noReadRaw")); return; }
 				setError(null); setNotice("");
 				setRawName(name);
 				setRawText("");
@@ -671,20 +671,20 @@
 							setRawLoading(false);
 							return;
 						}
-						setError("读不到 " + name + "：" + msg);
+						setError(t("error.readFailed", { file: name, message: msg }));
 						setRawLoading(false);
 						setRawName(null);
 					});
 			}
 
 			function saveRaw(name) {
-				if (typeof remote.writeRaw !== "function") { setError("宿主侧还没有 writeRaw 接口（插件版本较旧）"); return; }
+				if (typeof remote.writeRaw !== "function") { setError(t("error.noWriteRaw")); return; }
 				setRawBusy(true); setError(null); setNotice("");
 				// 原样交回：不 trim、不补 frontmatter、不做任何「智能」处理。
 				remote.writeRaw(name, rawText)
 					.then(function (r) {
-						if (r && r.ok === false) { setError(r.error || "保存被拒绝"); return; }
-						setNotice((rawIsNew ? "已新建 " : "已保存 ") + name);
+						if (r && r.ok === false) { setError(r.error || t("error.saveRejected")); return; }
+						setNotice(t(rawIsNew ? "notice.rawNew" : "notice.saved", { file: name }));
 						setRawIsNew(false);
 					})
 					.catch(function (e) { setError(String((e && e.message) || e)); })
@@ -753,12 +753,13 @@
 			function sumItem(label, onRemove) {
 				return h("span", { className: "smem-sum-item", key: "sum-" + label }, [
 					label,
-					h("button", { type: "button", className: "smem-sum-x", key: "x", title: "撤掉这项筛选", onClick: onRemove }, "×"),
+					h("button", { type: "button", className: "smem-sum-x", key: "x", title: t("filter.remove"), onClick: onRemove }, "×"),
 				]);
 			}
 			// 两个计数永远一起露脸：用户不必先筛状态才知道档案馆里有没有东西。
-			const headerCount = (hasFilter ? "筛出 " + String(filtered.length) + " / " + String(statusItems.length) + " · " : "") +
-				"活动中 " + String(items.length) + " · 已归档 " + String(archiveItems.length);
+			const headerCount = hasFilter
+				? t("header.countsFiltered", { shown: filtered.length, total: statusItems.length, active: items.length, archived: archiveItems.length })
+				: t("header.counts", { active: items.length, archived: archiveItems.length });
 			// 头部带的「待重启生效」徽标：有多少项要重启才生效，从 limits / pendingLimits 的差算出来
 			// （reserved 名单的变化 getSettings 只给 restartRequired 布尔值，数不出来就不写数）。
 			const LIMIT_KEYS = ["maxResults", "maxChars", "maxBaseline", "maxSessionBytes", "staleDays"];
@@ -789,39 +790,39 @@
 
 			return h("div", { className: "smem-root" }, [
 				h("div", { className: "smem-tabs", key: "tabs", role: "tablist" }, [
-					h("button", { type: "button", className: "smem-tab" + (tab === "files" ? " smem-tab--on" : ""), key: "f", role: "tab", "aria-selected": tab === "files" ? "true" : "false", onClick: function () { setTab("files"); } }, "文件列表"),
-					h("button", { type: "button", className: "smem-tab" + (tab === "star" ? " smem-tab--on" : ""), key: "s", role: "tab", "aria-selected": tab === "star" ? "true" : "false", onClick: function () { setTab("star"); } }, "记忆星图"),
-					h("button", { type: "button", className: "smem-tab" + (tab === "autodream" ? " smem-tab--on" : ""), key: "d", role: "tab", "aria-selected": tab === "autodream" ? "true" : "false", onClick: function () { setTab("autodream"); } }, "自动做梦"),
+					h("button", { type: "button", className: "smem-tab" + (tab === "files" ? " smem-tab--on" : ""), key: "f", role: "tab", "aria-selected": tab === "files" ? "true" : "false", onClick: function () { setTab("files"); } }, t("tab.files")),
+					h("button", { type: "button", className: "smem-tab" + (tab === "star" ? " smem-tab--on" : ""), key: "s", role: "tab", "aria-selected": tab === "star" ? "true" : "false", onClick: function () { setTab("star"); } }, t("tab.star")),
+					h("button", { type: "button", className: "smem-tab" + (tab === "autodream" ? " smem-tab--on" : ""), key: "d", role: "tab", "aria-selected": tab === "autodream" ? "true" : "false", onClick: function () { setTab("autodream"); } }, t("tab.autodream")),
 					// 视觉分组：左边「看」（文件列表 / 星图），右边「设置 · 自动化」。
 					h("span", { className: "smem-tabs-sep", key: "sep", "aria-hidden": "true" }),
 					// 「自动归档」排在自动做梦之后：归档是**确定性规则**（按闲置天数算，不调模型），
 					// 和「让模型整理记忆」是两件事。塞在自动做梦的设置里用户找不到
 					// （2026-10-11 用户原话：「扔这里连我都找不到」）。
-					h("button", { type: "button", className: "smem-tab" + (tab === "archive" ? " smem-tab--on" : ""), key: "ar", role: "tab", "aria-selected": tab === "archive" ? "true" : "false", onClick: function () { setTab("archive"); } }, "自动归档"),
+					h("button", { type: "button", className: "smem-tab" + (tab === "archive" ? " smem-tab--on" : ""), key: "ar", role: "tab", "aria-selected": tab === "archive" ? "true" : "false", onClick: function () { setTab("archive"); } }, t("tab.archive")),
 					// 体检再排在「自动归档」之后、独立成一屏：它只报告不修改，和「文件列表」里的
 					// 增删改是两件事，塞在工具抽屉里会让人以为它是个动作按钮。
-					h("button", { type: "button", className: "smem-tab" + (tab === "audit" ? " smem-tab--on" : ""), key: "a", role: "tab", "aria-selected": tab === "audit" ? "true" : "false", onClick: openAuditTab }, "体检"),
+					h("button", { type: "button", className: "smem-tab" + (tab === "audit" ? " smem-tab--on" : ""), key: "a", role: "tab", "aria-selected": tab === "audit" ? "true" : "false", onClick: openAuditTab }, t("tab.audit")),
 				]),
 				// 四个 tab 共用的一条头部带：我在哪 · 目录状态 · 活动/归档计数 · 体检徽标 · 待重启徽标 · 主操作。
 				// 层级形状固定：导航＝下划线（.smem-tabs）、筛选＝chip、动作＝按钮，三种不混用。
 				h("div", { className: "smem-head", key: "head" }, [
-					h("span", { className: "smem-title", key: "t" }, "记忆管理"),
+					h("span", { className: "smem-title", key: "t" }, t("section.label")),
 					// 目录状态收进状态点的 title（不可读时下面另有一条 smem-err，错误本来就该显眼）。
-					h("span", { className: "smem-dot" + (dirOk ? "" : " smem-dot--bad"), key: "dot", title: (dirOk ? "memory 目录可读" : "memory 目录不可读") + " · " + String(TAB_LABEL[tab] || "") }),
+					h("span", { className: "smem-dot" + (dirOk ? "" : " smem-dot--bad"), key: "dot", title: t("header.dirTitle", { state: dirOk ? t("header.dirReadable") : t("header.dirUnreadable"), tab: tabLabel(tab) }) }),
 					h("span", { className: "smem-badge", key: "cnt" }, headerCount),
 					// 体检徽标：**抽屉关着也一直看得见**，点它就切到「体检」那一屏。
 					h("button", {
 						type: "button", key: "aud",
 						className: "smem-tool-badge" + (audit && audit.problems ? " smem-tool-badge--bad" : ""),
-						title: audit ? (audit.problems ? "切到体检看是哪几条" : "体检没有发现问题") : "跑一次体检（只读）",
+						title: audit ? (audit.problems ? t("header.auditSwitch") : t("header.auditClean")) : t("header.auditRun"),
 						onClick: openAuditTab,
-					}, audit ? (audit.problems ? ("体检 " + audit.problems + " 个问题") : "体检 通过") : "体检 · 未跑"),
+					}, audit ? (audit.problems ? t("header.auditProblems", { count: audit.problems }) : t("header.auditPass")) : t("header.auditNotRun")),
 					restartPending
 						? h("button", {
 								type: "button", key: "rs", className: "smem-tool-badge smem-ad-badge--warn",
-								title: "有改动要重启 DSH 才生效",
+								title: t("header.restartTitle"),
 								onClick: function () { setTab("autodream"); setAdSeg("settings"); },
-							}, (pendingDiff ? (pendingDiff + " 项") : "") + "待重启生效")
+							}, t(pendingDiff ? "header.restartPendingCount" : "header.restartPending", { count: pendingDiff }))
 						: null,
 					// 主操作：只放当前 tab 的那一个（星图/自动做梦的主操作在各自面板里，不重复摆一份）。
 					// 弹簧：把主操作顶到右边。**换行时它留在上一行**，主操作于是落到下一行、
@@ -829,30 +830,30 @@
 					// 也推到最右，看起来像"跑出格子了"）。
 					h("span", { className: "smem-head-spacer", key: "sp" }),
 					h("span", { className: "smem-head-actions", key: "act" }, tab === "files" ? [
-						h("button", { type: "button", className: "smem-btn", key: "open", disabled: busy || !dirOk, title: "在系统文件管理器里打开记忆目录", onClick: openMemoryFolder }, "打开记忆文件夹"),
-						h("button", { type: "button", className: "smem-btn", key: "refresh", disabled: busy || loading, onClick: load }, "刷新"),
-						h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "add", onClick: openAdd }, "+ 添加记忆"),
+						h("button", { type: "button", className: "smem-btn", key: "open", disabled: busy || !dirOk, title: t("header.openFolderTitle"), onClick: openMemoryFolder }, t("header.openFolder")),
+						h("button", { type: "button", className: "smem-btn", key: "refresh", disabled: busy || loading, onClick: load }, t("header.refresh")),
+						h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "add", onClick: openAdd }, t("action.add")),
 					] : null),
 				]),
 				// 更新提示：四个 tab 共用一条，只在真有新版时出现；「×」只是这次不看
 				updateInfo
 					? h("div", { className: "smem-update", key: "update" }, [
-							h("span", { key: "t" }, "发现新版本 v" + String(updateInfo.latest) + "（当前 v" + String(updateInfo.current) + "）"),
+							h("span", { key: "t" }, t("update.found", { latest: updateInfo.latest, current: updateInfo.current })),
 							h("a", {
 								key: "l", className: "smem-update-link",
 								href: updateInfo.releasesUrl || "https://github.com/gezi-wen/sage-mem/releases",
 								target: "_blank", rel: "noreferrer",
-							}, "看更新内容"),
+							}, t("update.notes")),
 							h("button", {
 								type: "button", key: "x", className: "smem-update-x",
-								title: "这次不看了（下次进面板还会提示）",
+								title: t("update.dismissTitle"),
 								onClick: function () { setUpdateInfo(null); },
 							}, "×"),
 						])
 					: null,
 				// 工具栏只剩「搜索 + 工具 ▾」：刷新与添加已经收进头部带的主操作位。
 				tab === "files" ? h("div", { className: "smem-toolbar", key: "bar" }, [
-					h("input", { className: "smem-search", key: "q", value: query, placeholder: "搜索文件名 / 描述 / 类型 / 标签…", onChange: function (e) { setQuery(e.target.value); } }),
+					h("input", { className: "smem-search", key: "q", value: query, placeholder: t("toolbar.search"), onChange: function (e) { setQuery(e.target.value); } }),
 					// 工具抽屉：关着时这里只有一个按钮，零占位；面板一次只开一个。
 					// `data-smem-drawer` 是「点外部关闭」的排除标记：这一整块里的点击
 					// 都算「抽屉内部」，包括开抽屉的那一次点击本身（见上面 effect 的长注释）。
@@ -862,27 +863,27 @@
 							className: "smem-btn" + (drawer ? " smem-btn-primary" : ""),
 							"aria-expanded": drawer ? "true" : "false",
 							"aria-haspopup": "menu",
-							title: "归档候选 / 保留名编辑" + (dbgOn ? " / 注入调试" : ""),
+							title: t(dbgOn ? "tools.titleDebug" : "tools.title"),
 							onClick: function () { setDrawer(!drawer); },
-						}, "工具 ▾"),
+						}, t("tools.button")),
 						drawer ? h("div", { className: "smem-drawer-pop", key: "pop" }, [
 							// 体检独立成 tab 之后，抽屉里只剩这两件「要动手」的事。
 							h("button", {
 								type: "button", className: "smem-drawer-item", key: "c",
 								"data-on": tool === "candidates" ? "1" : "0",
 								onClick: function () { toggleTool("candidates"); setDrawer(false); },
-							}, ["归档候选", h("span", { className: "smem-status", key: "s" }, cand ? (cand.count + " 条") : "未取")]),
+							}, [t("tools.candidates"), h("span", { className: "smem-status", key: "s" }, cand ? t("tools.candidatesCount", { count: cand.count }) : t("tools.candidatesEmpty"))]),
 							h("button", {
 								type: "button", className: "smem-drawer-item", key: "r",
 								"data-on": tool === "raw" ? "1" : "0",
 								onClick: function () { toggleTool("raw"); setDrawer(false); },
-							}, ["保留名编辑", h("span", { className: "smem-status", key: "s" }, settings && settings.reserved ? (settings.reserved.length + " 个") : "")]),
+							}, [t("tools.raw"), h("span", { className: "smem-status", key: "s" }, settings && settings.reserved ? t("tools.rawCount", { count: settings.reserved.length }) : "")]),
 							// 1.7.0：只在调试开关打开时出现（关着时抽屉仍是两项，界面零变化）
 							dbgOn ? h("button", {
 								type: "button", className: "smem-drawer-item", key: "d",
 								"data-on": tool === "debug" ? "1" : "0",
 								onClick: function () { toggleTool("debug"); setDrawer(false); },
-							}, ["注入调试", h("span", { className: "smem-status", key: "s" }, dbg && Array.isArray(dbg.records) ? (dbg.records.length + " 次") : "")]) : null,
+							}, [t("tools.debug"), h("span", { className: "smem-status", key: "s" }, dbg && Array.isArray(dbg.records) ? t("tools.debugCount", { count: dbg.records.length }) : "")]) : null,
 						]) : null,
 					]),
 				]) : null,
@@ -960,25 +961,25 @@
 				notice && !error ? h("div", { className: "smem-ok", key: "ok", role: "status" }, "✓ " + notice) : null,
 				formOpen
 					? h("div", { className: "smem-form", key: "form" }, [
-							h("div", { className: "smem-form-title", key: "ft" }, editingFile ? "编辑 " + editingFile : "添加记忆"),
+							h("div", { className: "smem-form-title", key: "ft" }, editingFile ? t("form.editTitle", { file: editingFile }) : t("form.addTitle")),
 							h("div", { className: "smem-row", key: "cat" }, [
-								h("span", { className: "smem-label", key: "l" }, "类型："),
-								h("div", { className: "smem-chips", key: "chips" }, TYPE_ORDER.map(function (t) {
-									const meta = TYPE_META[t];
-									return h(Chip, { key: t, label: meta[0] + " " + meta[1], on: formType === t, onClick: function () { setFormType(t); } });
+								h("span", { className: "smem-label", key: "l" }, t("form.type")),
+								h("div", { className: "smem-chips", key: "chips" }, TYPE_ORDER.map(function (id) {
+									const meta = TYPE_META[id];
+									return h(Chip, { key: id, label: meta[0] + " " + typeLabel(id), on: formType === id, onClick: function () { setFormType(id); } });
 								})),
 							]),
-							h("label", { className: "smem-label", key: "ln" }, "文件名（.md，留空自动 " + formType + "_note.md）"),
-							h("input", { className: "smem-input", key: "tn", value: formName, onChange: function (e) { setFormName(e.target.value); }, placeholder: "例如 project_example.md" }),
-							h("label", { className: "smem-label", key: "ld" }, "描述（写进 frontmatter，检索与列表都靠它）"),
-							h("input", { className: "smem-input", key: "td", value: formDesc, onChange: function (e) { setFormDesc(e.target.value); }, placeholder: "一句话说清这条记忆是什么" }),
-							h("label", { className: "smem-label", key: "lt" }, "自定义标签（可选，逗号分隔；会写进 frontmatter 的 tags，列表页可按它筛）"),
-							h("input", { className: "smem-input", key: "tt", value: formTags, onChange: function (e) { setFormTags(e.target.value); }, placeholder: "例如 部署, 笔记, dsh" }),
-							h("label", { className: "smem-label", key: "lb" }, "正文（可选，frontmatter 自动生成）"),
-							h("textarea", { className: "smem-textarea", key: "tb", rows: 6, value: formBody, onChange: function (e) { setFormBody(e.target.value); }, placeholder: "要长期记住的细节" }),
+							h("label", { className: "smem-label", key: "ln" }, t("form.fileName", { type: formType })),
+							h("input", { className: "smem-input", key: "tn", value: formName, onChange: function (e) { setFormName(e.target.value); }, placeholder: t("form.fileNamePlaceholder") }),
+							h("label", { className: "smem-label", key: "ld" }, t("form.desc")),
+							h("input", { className: "smem-input", key: "td", value: formDesc, onChange: function (e) { setFormDesc(e.target.value); }, placeholder: t("form.descPlaceholder") }),
+							h("label", { className: "smem-label", key: "lt" }, t("form.tags")),
+							h("input", { className: "smem-input", key: "tt", value: formTags, onChange: function (e) { setFormTags(e.target.value); }, placeholder: t("form.tagsPlaceholder") }),
+							h("label", { className: "smem-label", key: "lb" }, t("form.body")),
+							h("textarea", { className: "smem-textarea", key: "tb", rows: 6, value: formBody, onChange: function (e) { setFormBody(e.target.value); }, placeholder: t("form.bodyPlaceholder") }),
 							h("div", { className: "smem-row", key: "btns" }, [
-								h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "save", disabled: busy, onClick: submit }, busy ? "保存中…" : "保存"),
-								h("button", { type: "button", className: "smem-btn", key: "cancel", disabled: busy, onClick: closeForm }, "取消"),
+								h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "save", disabled: busy, onClick: submit }, busy ? t("card.saving") : t("card.save")),
+								h("button", { type: "button", className: "smem-btn", key: "cancel", disabled: busy, onClick: closeForm }, t("card.cancel")),
 							]),
 						])
 					: null,

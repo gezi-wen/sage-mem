@@ -8,56 +8,56 @@
 							hasFilter
 								? h("div", { className: "smem-filter-summary", key: "sum" }, [
 										statusFilter !== "all"
-											? sumItem("状态：" + (statusFilter === "active" ? "活动中" : "已归档"), function () { setStatusFilter("all"); })
+											? sumItem(t("filter.sumStatus", { value: statusFilter === "active" ? t("filter.active") : t("filter.archived") }), function () { setStatusFilter("all"); })
 											: null,
-										typeFilter.map(function (t) {
-											return sumItem("类型：" + (TYPE_LABEL[t] || t), function () { toggleIn(setTypeFilter, t); });
+										typeFilter.map(function (typeId) {
+											return sumItem(t("filter.sumType", { value: typeLabel(typeId) }), function () { toggleIn(setTypeFilter, typeId); });
 										}),
 										tagFilter.map(function (g) {
-											return sumItem("标签：#" + g, function () { toggleIn(setTagFilter, g); });
+											return sumItem(t("filter.sumTag", { value: g }), function () { toggleIn(setTagFilter, g); });
 										}),
-										query.trim() ? sumItem("搜索：" + query.trim(), function () { setQuery(""); }) : null,
+										query.trim() ? sumItem(t("filter.sumQuery", { value: query.trim() }), function () { setQuery(""); }) : null,
 										h("button", {
 											type: "button", className: "smem-sum-clear", key: "all",
 											onClick: function () { setStatusFilter("all"); setTypeFilter([]); setTagFilter([]); setQuery(""); },
-										}, "清除全部"),
+										}, t("filter.clearAll")),
 									])
 								: null,
-							h("span", { className: "smem-filters-label", key: "lst" }, "状态"),
+							h("span", { className: "smem-filters-label", key: "lst" }, t("filter.statusLabel")),
 							h("button", {
 								type: "button", key: "st-all", className: "smem-chip",
 								"data-on": statusFilter === "all" ? "1" : "0",
-								title: "活动与已归档一起看（归档条走灰色）",
+								title: t("filter.allTitle"),
 								onClick: function () { setStatusFilter("all"); },
-							}, ["全部", h("span", { className: "smem-chip-n", key: "n" }, String(totalCount))]),
+							}, [t("filter.all"), h("span", { className: "smem-chip-n", key: "n" }, String(totalCount))]),
 							h("button", {
 								type: "button", key: "st-active", className: "smem-chip",
 								"data-on": statusFilter === "active" ? "1" : "0",
-								title: "正在参与检索与星图的记忆",
+								title: t("filter.activeTitle"),
 								onClick: function () { setStatusFilter("active"); },
-							}, ["活动中", h("span", { className: "smem-chip-n", key: "n" }, String(items.length))]),
+							}, [t("filter.active"), h("span", { className: "smem-chip-n", key: "n" }, String(items.length))]),
 							h("button", {
 								type: "button", key: "st-arch", className: "smem-chip",
 								"data-on": statusFilter === "archived" ? "1" : "0",
-								title: "已收进档案馆：不参与检索与星图，可编辑 / 恢复",
+								title: t("filter.archivedTitle"),
 								onClick: function () { setStatusFilter("archived"); },
-							}, ["已归档", h("span", { className: "smem-chip-n", key: "n" }, String(archiveItems.length))]),
+							}, [t("filter.archived"), h("span", { className: "smem-chip-n", key: "n" }, String(archiveItems.length))]),
 							h("span", { className: "smem-sep", key: "sep0" }),
-							h("span", { className: "smem-filters-label", key: "lt" }, "类型"),
+							h("span", { className: "smem-filters-label", key: "lt" }, t("filter.typeLabel")),
 							h("button", {
 								type: "button", key: "all", className: "smem-chip",
 								"data-on": typeFilter.length ? "0" : "1",
 								onClick: function () { setTypeFilter([]); },
-							}, ["全部", h("span", { className: "smem-chip-n", key: "n" }, String(statusItems.length))]),
-							typeList.map(function (t) {
+							}, [t("filter.all"), h("span", { className: "smem-chip-n", key: "n" }, String(statusItems.length))]),
+							typeList.map(function (typeId) {
 								return h("button", {
-									type: "button", key: t, className: "smem-chip",
-									"data-on": typeFilter.indexOf(t) >= 0 ? "1" : "0",
-									onClick: function () { toggleIn(setTypeFilter, t); },
-								}, [TYPE_LABEL[t] || t, h("span", { className: "smem-chip-n", key: "n" }, String(typeCounts[t]))]);
+									type: "button", key: typeId, className: "smem-chip",
+									"data-on": typeFilter.indexOf(typeId) >= 0 ? "1" : "0",
+									onClick: function () { toggleIn(setTypeFilter, typeId); },
+								}, [typeLabel(typeId), h("span", { className: "smem-chip-n", key: "n" }, String(typeCounts[typeId]))]);
 							}),
 							tagList.length ? h("span", { className: "smem-sep", key: "sep" }) : null,
-							tagList.length ? h("span", { className: "smem-filters-label", key: "lgt" }, "标签") : null,
+							tagList.length ? h("span", { className: "smem-filters-label", key: "lgt" }, t("filter.tags")) : null,
 							tagShown.map(function (g) {
 								return h("button", {
 									type: "button", key: "tag-" + g, className: "smem-chip",
@@ -68,15 +68,15 @@
 							tagList.length > TAG_VISIBLE_MAX
 								? h("button", {
 										type: "button", key: "moretag", className: "smem-btn",
-										title: tagOpen ? "收起标签" : "还有一些标签没显示",
+										title: tagOpen ? t("filter.collapseTags") : t("filter.moreTagsTitle"),
 										onClick: function () { setTagOpen(!tagOpen); },
-									}, tagOpen ? "收起标签" : ("更多标签 (" + String(tagHiddenCount) + ")") )
+									}, tagOpen ? t("filter.collapseTags") : t("filter.moreTags", { count: String(tagHiddenCount) }) )
 								: null,
 							hasFilter
 								? h("button", {
 										type: "button", key: "clear", className: "smem-btn",
 										onClick: function () { setStatusFilter("all"); setTypeFilter([]); setTagFilter([]); setQuery(""); },
-									}, "清除筛选")
+									}, t("filter.clear"))
 								: null,
 
 			]);
