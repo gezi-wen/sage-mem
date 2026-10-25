@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `1.8.2`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `1.9.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -163,6 +163,8 @@ The state directory (configuration, ledger, rollback points, conflict queue) def
 ## UI Preview
 
 Every image below is **rendered from the UI code in this repository** (the same CSS, the same component tree; the data is demo data for illustration, not a real memory directory).
+
+Since 1.9.0 the memory-management surface follows the harness language (**Settings → General → Language**); memory content itself stays in whatever language it was written in, and the remaining panels (autodream, archive, starmap, audit) are still Chinese until the next i18n batch.
 
 ![File list: one Markdown file per memory, greyed rows are archived](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/files-list.png)
 
