@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `1.9.1`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `1.9.2`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -293,7 +293,7 @@ The guard has two paths, with **different** coverage, spelled out:
 | **The plugin itself** writing (autodream consolidation) | The caller passes the version it read at write time | A pending record `<state directory>/conflicts/<id>.json` is written, keeping **the version on disk** and **the version it wanted to write** — with only one side there is nothing to judge |
 
 - **Conflicts are not merged automatically**; which side to keep is your decision (the record is JSON, open it directly when you need to). Silent retry and silent abandonment both decide on your behalf.
-- **The injection side does not read this queue yet**: a memory with an unresolved conflict is still injected as body text. The `conflict_pending` suppression rule arrives with **1.10.0 conflict detection**, together with the panel entry that resolves conflicts — wiring the suppression without that entry would make a memory **permanently non-injectable**, which is worse than the current state. For now, open `conflicts/<id>.json` and set `status` to `resolved` or `dismissed` (or delete the file).
+- **The injection side does not read this queue yet**: a memory with an unresolved conflict is still injected as body text. The `conflict_pending` suppression rule arrives with **2.0.0 conflict detection**, together with the panel entry that resolves conflicts — wiring the suppression without that entry would make a memory **permanently non-injectable**, which is worse than the current state. For now, open `conflicts/<id>.json` and set `status` to `resolved` or `dismissed` (or delete the file).
 - **The same conflict is not duplicated**: if a failure matches an unresolved record field for field (same file, both bodies, both versions), no extra copy is appended.
 - **The host file sandbox**: autodream runs **outside any session**, so it cannot inherit a session workspace. On a `workspace-write` host the plugin passes a per-call sandbox policy **narrowed to the memory directory** (narrower than the fallback root); on a `read-only` host it passes nothing, the write is still refused, and the run is recorded as a **failure** (not "success, nothing changed").
 - Known boundary: **editing memories in a shell does not go through this path**. The write gate guards "memory writes that go through the tools", not "all modifications to files"; redirection and the like inside `pwsh` are not recognized. If it cannot be sure, it does not claim it — so that "cannot see it" is not mistakenly recorded as fact.
@@ -343,6 +343,14 @@ Consolidation is a background batch job and need not be the same model as the on
 - Once chosen, **only that one is accepted**: if the route does not exist in the host, **it errors before starting work** (it compares only against the host's registered catalog and sends no request at all), so it does not fail halfway through, and it **does not silently fall back to the default model**.
 - The panel always shows **which one is actually in effect**; if the route named in the configuration happens to disappear from the catalog, the dropdown still shows it rather than quietly jumping back to the default.
 - When the model catalog cannot be obtained (host differences), it degrades to typing `provider` and `model` by hand.
+
+### When the Report Does Not Fit
+
+The consolidation report is written by the model in one go, and a single output has a length cap. **The cap, the retry and the truncated label** all have defined behaviour:
+
+- **The single-output cap is configurable**: Settings → Autodream → Settings → Advanced → "single output cap" (default 32768 tokens, range 1024–131072). For reasoning models the reasoning and the body **share** that budget; when the closing turn spends it all on reasoning, no body is left — raise the cap and run again.
+- **Retry when the body is empty**: if an output hits the cap with **no body at all** (reasoning only), one retry asks for "the body directly, do not re-analyse"; up to 2 times, and only then is the report marked truncated. When there is a partial body, the loop asks it to continue from where it stopped (up to 3 rounds).
+- **Truncation is stated**: the report's first screen, the consolidation manifest, the machine-readable record and the Settings → Autodream "last run" line all say "report truncated (fragment)" — a half report is never reported as "success". If the closing step produced no text, the report says "the model gave no textual summary" instead of reusing narration from an earlier step.
 
 ### Rollback Points
 

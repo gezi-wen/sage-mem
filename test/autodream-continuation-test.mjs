@@ -12,6 +12,12 @@
  *   B. 撞上上限就**回灌已写内容 + 要下一段**（最多 3 轮）；
  *   C. 续写名额用尽仍没写完时，报告与声明里**显式标注残篇**（不再静默）。
  *
+ * 2026-10-26（1.9.2）又改了三件，第 3 组与第 4b 组就是这三件的断言：
+ *   D. 单次上限从写死的 4096 改成配置项 `maxOutputTokens`（默认 32768）；
+ *   E. **零正文截断先重试「直接输出正文」**，重试用尽才标残篇 —— 思考型模型常把额度
+ *      全花在思考上，旧行为（直接标残篇）会让本来能写完的收尾白丢；
+ *   F. 收尾那一步零文字时 `finalText` 留空，不拿中途旁白顶替。
+ *
  * 用法: node autodream-continuation-test.mjs
  */
 import { mkdtemp, mkdir, writeFile, readFile } from 'node:fs/promises'
@@ -82,6 +88,17 @@ const toolStep = (id, name, args) => [
   usage(10, 20),
   { type: 'finish', reason: { kind: 'tool-calls' } },
 ]
+/** 「说了几句 + 要一个工具」：用来构造「中途有旁白、收尾却零文字」的场景（4b）。 */
+const textAndToolStep = (text, id, name, args) => [
+  { type: 'block-start', index: 0, blockType: 'text' },
+  { type: 'text-delta', index: 0, text },
+  { type: 'block-end', index: 0, block: { type: 'text', text } },
+  { type: 'block-start', index: 1, blockType: 'tool-call' },
+  { type: 'tool-call-delta', index: 1, id, name, argumentsDelta: JSON.stringify(args) },
+  { type: 'block-end', index: 1, block: { type: 'tool-call', id, name, arguments: JSON.stringify(args) } },
+  usage(10, 30),
+  { type: 'finish', reason: { kind: 'tool-calls' } },
+]
 
 async function world(lmm, config = {}) {
   const root = await mkdtemp(join(tmpdir(), 'ad-cont-'))
@@ -131,7 +148,7 @@ group('1. 撞上上限 → 自动续写（报告应当是完整的）')
   // 看不出「哪几条判据没成立」——变异验证时就踩到了这个。
   ok((lmm.calls[1]?.messageCount ?? 0) > lmm.calls[0].messageCount, '续写那次把已写内容回灌进了消息历史')
   ok((lmm.calls[1]?.lastUser ?? '').includes('继续写'), '续写那次的最后一条 user 是「接着写」指令', lmm.calls[1]?.lastUser)
-  ok(lmm.calls.every((c) => c.maxTokens === 4096), '单次上限没有被偷偷改大（B 是接写，不是调大数字）')
+  ok(lmm.calls.every((c) => c.maxTokens === 32768), '单次上限取配置默认值 32768（1.9.2 起可配，不再是写死的 4096）')
 
   const joined = `${seg1}${seg2}${seg3}`
   ok(report.includes(joined), '报告里的收尾说明是**三段拼起来的完整文字**')
@@ -143,6 +160,28 @@ group('1. 撞上上限 → 自动续写（报告应当是完整的）')
   ok((report.match(/（截断续写）/g) ?? []).length === 2, '「过程」把两段续写都标了出来')
   ok(engine.stepLog.filter((s) => s.continuation === true).length === 2, 'stepLog 也记了续写（面板的步骤列表）')
   ok(engine.stepLog.filter((s) => s.continuation !== true).length === 1, '未被标成续写的那条是第一步')
+}
+
+// ────────────────────────────── 1b. 单次上限可配置 ──────────────────────────────
+
+group('1b. 单次输出上限可在配置里改（1.9.2）')
+{
+  const lmm = makeLlm([stopStep('写完。')])
+  const { engine } = await world(lmm, { maxOutputTokens: 8192 })
+  await engine.run({ reason: 'x', force: true })
+  ok(lmm.calls.length === 1, '（前提）只调了一次')
+  ok(lmm.calls.every((c) => c.maxTokens === 8192), '配置里的 maxOutputTokens 真的被用上', JSON.stringify(lmm.calls.map((c) => c.maxTokens)))
+
+  const lmm2 = makeLlm([stopStep('写完。')])
+  const w2 = await world(lmm2)
+  const cfg = await w2.engine.getConfig()
+  ok(cfg.config.maxOutputTokens === 32768, '默认值是 32768', String(cfg.config.maxOutputTokens))
+  await w2.engine.setConfig({ maxOutputTokens: 999999 })
+  const clamp = await w2.engine.getConfig()
+  ok(clamp.config.maxOutputTokens === 131072, '越界值被收敛到上限 131072', String(clamp.config.maxOutputTokens))
+  await w2.engine.setConfig({ maxOutputTokens: 1 })
+  ok((await w2.engine.getConfig()).config.maxOutputTokens === 1024, '低于下限的值被夹到 1024（不写坏配置）',
+    String((await w2.engine.getConfig()).config.maxOutputTokens))
 }
 
 // ────────────────────────────── 2. 续写用尽 → 残篇被标出来 ──────────────────────────────
@@ -167,17 +206,44 @@ group('2. 续写用尽仍没写完 → 报告里显式标注残篇（不许静�
   ok(engine.stepLog.filter((s) => s.continuation === true).length === 3, '三段续写都进了 stepLog')
 }
 
-// ────────────────────────────── 3. 空段不许空转 ──────────────────────────────
+// ────────────────────────────── 3. 零正文截断：先重试，再判残篇 ──────────────────────────────
 
-group('3. 一个字都没有的截断段：不续写、不空转')
+group('3. 零正文截断：先重试「直接输出正文」，不直接判残篇（1.9.2）')
+{
+  const lmm = makeLlm([emptyCut(), stopStep('正文来了，这一轮写完了。')])
+  const { engine, memoryDir } = await world(lmm)
+  const r = await engine.run({ reason: 'x', force: true })
+  const { report, manifest } = await artifacts(engine, memoryDir, r.runId)
+
+  ok(lmm.calls.length === 2, `零正文后重试了一次（调用 ${lmm.calls.length} 次）`)
+  ok((lmm.calls[1]?.lastUser ?? '').includes('直接输出正文'), '重试那次的 user 要求直接输出正文', lmm.calls[1]?.lastUser)
+  ok(r.retries === 1, `重试次数 = 1，实际 ${r.retries}`)
+  ok(r.truncated === false, '重试拿到正文 → 不是残篇')
+  ok(r.continuations === 0, '零正文重试不计入「续写」（两本账分开）')
+  ok(manifest.finalText === '正文来了，这一轮写完了。', '收尾说明取重试那一段', JSON.stringify(manifest.finalText))
+  ok(report.includes('重试 1 次后补齐'), '报告写明「零正文重试后补齐」')
+  ok(!report.includes('本次输出被单次长度上限截断'), '补齐的报告里不出现残篇警告')
+  ok(manifest.retries === 1 && manifest.truncated === false, '机读记录：retries=1 / truncated=false',
+    JSON.stringify({ r: manifest.retries, t: manifest.truncated }))
+  ok(engine.stepLog.filter((s) => s.retry === true).length === 1, 'stepLog 记了零正文重试（面板步骤列表）')
+  ok(engine.stepLog.filter((s) => s.continuation === true).length === 0, '没把它记成「截断续写」')
+}
+
+group('3b. 零正文重试用尽 → 才标残篇，且不空转')
 {
   const lmm = makeLlm([emptyCut()])
-  const { engine } = await world(lmm)
+  const { engine, memoryDir } = await world(lmm)
   const r = await engine.run({ reason: 'x', force: true })
+  const { report, manifest } = await artifacts(engine, memoryDir, r.runId)
 
-  ok(lmm.calls.length === 1, `没有拿着空回复去要下一段（调用 ${lmm.calls.length} 次）`)
-  ok(r.continuations === 0, '续写轮数为 0')
-  ok(r.truncated === true, '空回复也算「没写完」，truncated=true')
+  ok(lmm.calls.length === 3, `1 次原始 + 2 次重试后停住（调用 ${lmm.calls.length} 次）`)
+  ok(r.retries === 2, `重试次数停在硬上限 2，实际 ${r.retries}`)
+  ok(r.continuations === 0, '没有可续写的正文，续写轮数为 0')
+  ok(r.truncated === true, '零正文重试用尽 → truncated=true')
+  ok(manifest.finalText === '', '收尾说明留空（不拿中途旁白顶替）', JSON.stringify(manifest.finalText))
+  ok(report.includes('零正文重试 2 次'), '报告写明零正文重试次数')
+  ok(manifest.truncated === true && manifest.retries === 2, '机读记录如实')
+  ok(report.includes('上面这段是残篇，后文缺失'), '「过程」末尾以「没写完」收尾')
 }
 
 // ────────────────────────────── 4. 回归：正常路径与工具路径 ──────────────────────────────
@@ -204,6 +270,25 @@ group('4. 回归：没截断时行为与从前一致，工具路径仍通')
   ok(lmm2.calls[1].roles.includes('tool'), '第二步的历史里有工具结果（回灌没断）', lmm2.calls[1].roles)
   ok(a2.manifest.finalText === '看完清单，收尾。', '收尾说明取的是最后一步的文字', JSON.stringify(a2.manifest.finalText))
   ok(a2.report.includes('调用 list_memory'), '「过程」记下了工具调用')
+}
+
+// ────────────────────────────── 4b. 收尾零文字 → finalText 留空 ──────────────────────────────
+
+group('4b. 收尾那一步零文字 → finalText 留空，不拿中途旁白顶替（1.9.2）')
+{
+  // 第 1 步有旁白 + 工具调用，第 2 步（收尾）一个字都没有。
+  // 旧行为会把第 1 步那句旁白当成「模型的收尾说明」写进报告 —— 残篇报告的伴随症状。
+  const lmm = makeLlm([textAndToolStep('我先看一眼清单。', 'call-1', 'list_memory', {}), stopStep('')])
+  const { engine, memoryDir } = await world(lmm)
+  const r = await engine.run({ reason: 'x', force: true })
+  const { report, manifest } = await artifacts(engine, memoryDir, r.runId)
+
+  ok(lmm.calls.length === 2, '两步都跑了（工具步 + 零文字收尾）', `实际 ${lmm.calls.length}`)
+  ok(manifest.finalText === '', '机读记录里的 finalText 是空的', JSON.stringify(manifest.finalText))
+  const tail = report.slice(report.indexOf('## 模型的收尾说明'), report.indexOf('## 过程'))
+  ok(tail.includes('（模型没有给出文字说明）'), '报告在收尾说明处写「模型没有给出文字说明」')
+  ok(!tail.includes('我先看一眼清单。'), '中途旁白没有被当成收尾说明')
+  ok(report.includes('我先看一眼清单。'), '但旁白仍如实留在「过程」里')
 }
 
 // ────────────────────────────── 5. 「过程」排版：模型文本不许把标题漏出来 ──────────────────────────────

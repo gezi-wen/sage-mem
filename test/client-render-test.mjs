@@ -2551,6 +2551,63 @@ async function main() {
     }
   }
 
+  // ── 22. 1.9.2 自动做梦：单次输出上限可改 / 残篇在状态行上可见 ──────────────
+  group('22. 1.9.2 单次输出上限可改 + 残篇状态可见')
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const ad = makeAutodreamRemote()
+    ad.st.config.maxOutputTokens = 32768
+    const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad })
+    let tree = await rt.settle(C, {})
+    click(btn(tree, '自动做梦')[0])
+    tree = await rt.settle(C, {})
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-subtab')(n) && textOf(n) === '设置')[0])
+    tree = await rt.settle(C, {})
+    const num = all(tree, (n) => n.type === 'input' && byClass('smem-num')(n) && String(n.props.value) === '32768')[0]
+    ok(!!num, '「单次输出上限」输入框在（值 32768）')
+    ok(num && num.props.min === '1024' && num.props.max === '131072', '带 1024–131072 范围', num ? `${num.props.min}-${num.props.max}` : '')
+    typeInto(num, '8192')
+    tree = await rt.settle(C, {})
+    ok(ad.st.calls.some((c) => c[0] === 'setConfig' && c[1] && c[1].maxOutputTokens === 8192),
+      '改它会调 setConfig({ maxOutputTokens: 8192 })', JSON.stringify(ad.st.calls.filter((c) => c[0] === 'setConfig')))
+  }
+  {
+    // 残篇：状态行必须自己说出来 —— 只写「成功」正是 2026-10-25 那次误判的来源。
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const ad = makeAutodreamRemote()
+    ad.status = () => Promise.resolve({
+      running: false, phase: '', config: { ...ad.st.config }, route: null,
+      lastResult: {
+        at: 1, atHuman: '2026-10-25 23:01', ok: true, apply: false, touched: [],
+        problemsBefore: 0, problemsAfter: 0, tokensIn: 10, tokensOut: 20,
+        continuations: 0, retries: 0, truncated: true, report: 'r.md',
+      },
+    })
+    const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad })
+    let tree = await rt.settle(C, {})
+    click(btn(tree, '自动做梦')[0])
+    tree = await rt.settle(C, {})
+    ok(treeText(tree).indexOf('报告被截断（残篇）') >= 0, '状态行把残篇标出来（不再只写「成功」）', treeText(tree).slice(0, 240))
+
+    const rt2 = makeReact()
+    const ad2 = makeAutodreamRemote()
+    ad2.status = () => Promise.resolve({
+      running: false, phase: '', config: { ...ad2.st.config }, route: null,
+      lastResult: {
+        at: 1, atHuman: 'x', ok: true, apply: false, touched: [],
+        problemsBefore: 0, problemsAfter: 0, tokensIn: 1, tokensOut: 2,
+        continuations: 0, retries: 1, truncated: false, report: 'r.md',
+      },
+    })
+    const { comp: C2 } = await loadClient(rt2, { memory: makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED), autodream: ad2 })
+    let t2 = await rt2.settle(C2, {})
+    click(btn(t2, '自动做梦')[0])
+    t2 = await rt2.settle(C2, {})
+    ok(treeText(t2).indexOf('零正文重试 1 次后补齐') >= 0, '重试补齐也写在状态行上', treeText(t2).slice(0, 240))
+  }
+
   console.log(`\n结果：${pass} passed, ${fail} failed`)
   process.exit(fail ? 1 : 0)
 }

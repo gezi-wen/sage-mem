@@ -38,11 +38,14 @@ console.log('== 1. typert patch schema 必须放行这些字段（strict 会剥�
     archiveAfterDaysProject: 30,
     archiveAfterDaysReference: 200,
     archiveAfterDaysUser: 500,
+    // 1.9.2：单次输出上限也必须能穿过 patch schema —— strict 剥掉它 = 界面改了值却不落盘。
+    maxOutputTokens: 8192,
   }
   const parsed = schema.safeParse(patch)
   ok(parsed.success === true, 'schema 接受了这份 patch', JSON.stringify(parsed.error?.issues ?? []))
   const got = parsed.success ? parsed.data : {}
   ok(got.autoArchive === 'auto', `autoArchive 没被剥掉（实际 ${JSON.stringify(got.autoArchive)}）`, JSON.stringify(got))
+  ok(got.maxOutputTokens === 8192, `maxOutputTokens 没被剥掉（实际 ${JSON.stringify(got.maxOutputTokens)}）`, JSON.stringify(got))
   for (const k of ['archiveAfterDaysProject', 'archiveAfterDaysReference', 'archiveAfterDaysUser']) {
     ok(got[k] === patch[k], `${k} 没被剥掉（实际 ${JSON.stringify(got[k])}）`, JSON.stringify(got))
   }
@@ -98,12 +101,13 @@ console.log('== 3. 端到端（走界面的真实路径：先过 codec，再 set
   const engine = new AutodreamEngine(ctx, { home: root, memoryDir: join(root, 'memory') })
   await engine.load()
 
-  const raw = { autoArchive: 'auto', archiveAfterDaysProject: 30, archiveAfterDaysReference: 200, archiveAfterDaysUser: 500 }
+  const raw = { autoArchive: 'auto', archiveAfterDaysProject: 30, archiveAfterDaysReference: 200, archiveAfterDaysUser: 500, maxOutputTokens: 8192 }
   const wired = schema.safeParse(raw).data // 客户端发出去时会被 codec 过一遍
   const r = await engine.setConfig(wired)
   ok(r.config.autoArchive === 'auto', `真实路径下 autoArchive 落盘（实际 ${r.config.autoArchive}）`)
   ok(r.config.archiveAfterDaysReference === 200 && r.config.archiveAfterDaysProject === 30 && r.config.archiveAfterDaysUser === 500,
     `真实路径下三个阈值都落盘（实际 ${r.config.archiveAfterDaysProject}/${r.config.archiveAfterDaysReference}/${r.config.archiveAfterDaysUser}）`)
+  ok(r.config.maxOutputTokens === 8192, `真实路径下 maxOutputTokens 落盘（实际 ${r.config.maxOutputTokens}）`)
 
   await rm(root, { recursive: true, force: true }).catch(() => {})
 }
