@@ -58,6 +58,8 @@ const SUITES = [
   'status-card-test.mjs',
   'conflicts-test.mjs',
   'stale-conflict-test.mjs',
+  // 1.9.1：三份外部报告（issue #6 沙箱 / #7 队列膨胀 / #8 索引假阳性）各一条会红的断言。
+  'issue-fixes-191.mjs',
   'watch-test.mjs',
   // 守卫放最后：它检查的是「上面这份名单完不完整」。
   'suite-registry-test.mjs',

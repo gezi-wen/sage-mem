@@ -7,6 +7,47 @@
 
 ---
 
+## 1.9.1
+
+**主题：三份外部报告（issue #6 / #7 / #8）的处理 —— 沙箱宿主上写入不再必然失败、索引体检不再常驻一条假问题、冲突队列不再重复堆积。**（2026-10-26 发布；三份报告均由 @AiranFS 提交，含 AI 生成声明）
+
+版本判定：1.9.1（PATCH）｜理由：修三处缺陷，无新对外面（无新工具 / remote / 设置项 / 界面元素）｜运行时源文件 **3**（`lib/autodream/{audit,tools,engine}.js`）｜有效改动 191 行，**超 150 行护栏**：其中约 130 行是解释宿主沙箱语义与「为什么不接上注入侧抑制」的注释，纯逻辑约 60 行；拆成三版会让用户为同一批缺陷装三次、且三次都要走同一套发布检查，故合为一次 PATCH 并在此写明理由。
+
+### 行为变更
+
+- **`workspace-write` 宿主上 autodream 的写入不再必然被拒**（issue #6）。自动做梦刻意在会话外运行、拿不到会话工作区，而宿主的 `sandboxPolicy.resolve()` 在没有 session 时退到部署回退根（缺省 `process.cwd()`）—— 默认记忆目录 `~/.sage-mem/memory` 必然在根外，于是每一次 `write_memory` 都被宿主围栏拒绝。现在写入时显式传**逐次沙箱策略** `{ mode: 'workspace-write', workspaceRoot: <记忆目录> }`，把可写根收窄到记忆目录本身。`read-only` 宿主**不被绕过**（不传策略、照旧拒绝）；没有 `sandboxPolicy` 服务的老宿主/测试假 ctx 不传，行为与 1.9.0 逐字一致。
+- **「零改动的空转」不再报成功**（issue #6）。被沙箱拒绝的写入会记进 `denials()` 与整理声明的 warnings；当 `apply` 为真、**一次改动都没有、且有拒绝**时，`lastResult` 记为 `ok: false` 并写明「N 次写入全部被宿主文件沙箱拒绝」，而不是「成功，没改什么」。部分成功仍算成功（其余改动确实落地了）。
+- **索引 `MEMORY.md` 不再被体检报「type 与前缀不一致」**（issue #8）。`f.split('_')[0]` 对 `MEMORY.md` 得到的就是整个文件名，而历史版 `write_memory` 硬要求 frontmatter，模型只好给索引补 `type: reference` → 每个健康记忆库常驻一条假问题，把 `problems` 这个唯一健康数字变成噪音。索引本来就在「无 frontmatter」这项豁免，现在与它一致。普通记忆文件的前缀检查**不受影响**（有反向对照断言）。
+- **`write_memory` 对索引免除 frontmatter 要求**（issue #8）。索引是清单、不是一条记忆，没有 type / 前缀；面板「建立索引骨架」写出来的骨架本来就没有 frontmatter，两条写入路径不该对同一个文件给两套规矩。普通记忆仍必须以 `---` 开头。
+- **同一件冲突不再重复堆盘**（issue #7）。冲突记录的 id 带着时间戳前缀，而「模型每趟都试图覆盖一份它没读过的记忆」是结构性的 —— 原先每一趟都追加一份完全相同的副本。现在落盘前查一次未裁决队列，**逐字段相同**（同一文件、两份正文、两个版本）就不再追加；任何一处不同仍然是两条独立记录（不合并、不裁决）。
+- **说法更正**：README 的写入安全一节原来只写「落一条待处理记录」，读者会以为有界面入口。现在写明**当前注入侧不读这个队列**（`conflict_pending` 抑制规则随 1.10.0 的矛盾检测一起做，因为只接抑制、不做裁决入口会让一条记忆永久不再被注入），并给出现阶段的手工处理方式；同时写明宿主沙箱下的写入语义与「同一件事不重复记录」。
+
+### 不变
+
+- **冲突队列的格式、状态机、上限与「不做自动裁决」**：id / 状态 / 字段全部未变（`conflicts-test` 的冻结断言逐条原样通过）。
+- **注入链、检索、客户端与设置面零改动**：`lib/client.js` 未重新生成，界面与 1.9.0 逐字节相同；无新 remote / 工具 / 参数 / 设置项。
+- `danger-full-access` 宿主与「没有 `fs` 服务」的回落路径行为不变；`archive_memory` 的门槛不变。
+- 走宿主的 `writeText` 仍带**读到内容那一刻的版本**（R01），本次只在它后面补了第 5 个参数。
+
+### 新增测试
+
+- 新增 `test/issue-fixes-191.mjs`（27 条，登记进 `test/run.mjs`），按三份报告分组，每处修复都配一条**反向对照**：
+  - 索引带/不带 frontmatter 都不报「type 与前缀」或「无 frontmatter」，而 `user_beta.md` 的 type 写错仍会被报；写入后的体检只剩那条真实问题。
+  - workspace-write 下第 5 个参数确实是 `{ mode, workspaceRoot: 记忆目录 }`；read-only 下不传、错误带可诊断出路、`denials()`/`warnings()` 都有记录、`judgeWriteOutcome` 判失败；danger-full-access 与无服务时不传；部分成功与「只出报告」不误判。
+  - 同一件事重复失败只落一条记录、记录本身仍是完整待裁决状态，内容不同仍落第二条。
+- 断言总数 **3157 → 3184**。
+
+### 实测
+
+- 本机 `node test/run.mjs`：**3184 passed / 0 failed**（含契约绑定与双语文档对拍）。
+- 宿主侧签名按本机 `@deepseek-ai/dsh-fs-sandbox` 0.2.1-rc.3 源码核对：`writeText(target, content, expected, signal, sandboxPolicy)`；`checkedTarget` 在省略第 5 参时走 `ctx.sandboxPolicy.resolve()`，`read-only` 直接拒绝、`workspace-write` 只认可写根。
+- **真宿主探针已跑（headless profile，DSH 0.2.1-rc.3，一次性插件探针，未入库）**，复现的正是 issue #6 的场景：部署策略 `resolve()` 返回 `workspace-write`、回退根 = 宿主 cwd；对一个位于用户主目录下的临时目录写入 ——
+  - 省略第 5 参：`FS_SANDBOX_DENIED`（**修复前 autodream 的每一次写入就是这个结果**）；
+  - 传 `{ mode: 'workspace-write', workspaceRoot: <该目录> }`：写入成功，返回 `operation: create` 与字符串版本；
+  - 传 `{ mode: 'read-only', … }`：仍被拒（`read-only mode`）—— 宿主侧对 read-only 的强制没有被绕过。
+  结论：第 5 个参数在真实宿主里确实生效，且收窄策略不等于放宽权限。LLM 调用因本机凭据被环境清理剥掉而未跑起来（`MISSING_CREDENTIAL`），但探针在 apply 阶段就完成了全部三次写入，取证不依赖模型调用。
+- 本版未做真机安装验收：改动全在宿主侧，且新增断言覆盖了三条宿主分支；安装后可在「自动做梦」面板的「上次运行」一行确认成功/失败文案。
+
 ## 1.9.0
 
 **主题：英文界面（i18n）开始落地 —— 记忆管理四屏跟随宿主的「设置 → 通用 → 语言」切换。**（2026-10-26 发布；首个 pilot 由 @miztizm 贡献，PR #5）
