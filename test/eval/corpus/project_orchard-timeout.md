@@ -2,6 +2,7 @@
 name: orchard-timeout
 description: 果园构建超时排查，缓存失效与并行度调整两处抓手
 aliases: [果园构建超时, orchard timeout, 构建超时排查]
+valid_at: 2026-09-01T00:00:00+08:00
 metadata:
   node_type: memory
   type: project

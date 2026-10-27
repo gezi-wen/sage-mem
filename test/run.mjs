@@ -88,6 +88,12 @@ const SUITES = [
   'structure-test.mjs',
   // 1.6.2：发布物一致性 —— 打包白名单 / 版本三处一致 / 兼容表对拍（本地操作，不联网）。
   'release-test.mjs',
+  // 2.0.0：有效性标注（三字段解析 / 失效判定 / 冲突→集合映射），每条都带反向对照。
+  'validity-test.mjs',
+  // 2.0.0：冲突记录模型 / 裁决状态机 / 写路径（版本守卫 + 沙箱 + CRLF 保真）/ 注入侧端到端。
+  'conflict-decision-test.mjs',
+  'conflict-arbitration-test.mjs',
+  'conflict-inject-test.mjs',
   // ⚠️ 下面两个必须排在最后：它们读的是**前面套件跑完落的断言台账**（见 `_passlog.mjs`），
   // 排在前面就会读到残缺的账。它们盯的是「契约里说了不验的承诺」与「两份文档说法不一致」。
   'contract-binding-test.mjs',

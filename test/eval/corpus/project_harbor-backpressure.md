@@ -2,6 +2,7 @@
 name: harbor-backpressure
 description: 港口调度器的杂项笔记，记了两条没进配置文档的观察
 aliases: [港口笔记, harbor notes]
+valid_at: 2026-09-01T00:00:00+08:00
 metadata:
   node_type: memory
   type: project

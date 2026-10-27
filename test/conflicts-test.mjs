@@ -96,8 +96,8 @@ ok(CONFLICTS_DIR_NAME === 'conflicts' && CONFLICT_FILE_SUFFIX === '.json', '目�
 ok(CONFLICT_MAX_BYTES === 256 * 1024, `整份记录上限 256 KB（实际 ${CONFLICT_MAX_BYTES}）`)
 ok(
   Object.isFrozen(CONFLICT_KINDS) &&
-    JSON.stringify(CONFLICT_KINDS) === JSON.stringify(['stale_version', 'external_change', 'unresolved_merge']),
-  'CONFLICT_KINDS 冻结且取值正确',
+    JSON.stringify(CONFLICT_KINDS) === JSON.stringify(['stale_version', 'external_change', 'unresolved_merge', 'contradiction']),
+  'CONFLICT_KINDS 冻结且取值正确（2.0.0 追加矛盾型，写失败型三条仍在）',
   JSON.stringify(CONFLICT_KINDS),
 )
 ok(
@@ -201,8 +201,14 @@ ok(
       'note',
       'tool',
       'truncated',
+      // 2.0.0 追加：只增不改、`v` 仍是 1 —— 1.9.x 读端只认 id 与非空 status，多出的键被忽略。
+      'otherFile',
+      'decision',
+      'decidedAt',
+      'appliedVersion',
+      'invalidatedFile',
     ]),
-  '字段与顺序都按冻结契约',
+  '字段与顺序都按冻结契约（2.0.0 的 5 个新字段必须**尾部追加**）',
   JSON.stringify(Object.keys(recA)),
 )
 ok(recA.v === 1 && recA.status === 'open' && recA.truncated === false, 'v=1 / status=open / truncated=false')
@@ -429,8 +435,8 @@ const rootD = join(world, 'state-d')
     JSON.stringify(listed.map((i) => [i.id, i.at])),
   )
   ok(
-    listed.length > 0 && Object.keys(listed[0]).length === 13 && !('path' in listed[0]),
-    'items 里就是记录本身（没有塞进去的额外键）',
+    listed.length > 0 && Object.keys(listed[0]).length === 18 && !('path' in listed[0]),
+    'items 里就是记录本身（没有塞进去的额外键；2.0.0 是 13 + 5 = 18 个字段）',
     JSON.stringify(listed.length > 0 ? Object.keys(listed[0]) : null),
   )
   ok(

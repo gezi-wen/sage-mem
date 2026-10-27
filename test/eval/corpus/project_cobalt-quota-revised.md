@@ -2,6 +2,7 @@
 name: cobalt-quota
 description: Cobalt 项目的调用配额口径（2026-09 修订），含每月上限与突发上限
 aliases: [Cobalt 配额, cobalt quota, 调用配额]
+valid_at: 2026-09-18T00:00:00+08:00
 metadata:
   node_type: memory
   type: project

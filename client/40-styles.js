@@ -244,5 +244,25 @@
 			// ── 底部一行仓库链接（引流，不抢视线）──
 			".smem-star{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--dsw-alias-label-tertiary,#8b93a1);padding:2px 2px 0;}",
 			".smem-star-link{color:var(--dsw-alias-brand-primary,#4d76e6);text-decoration:underline;}",
+			// ── 冲突页签（2.0.0 矛盾检测）──
+			// 一屏里要同时看「两份正文对照 + 动作 + 后果」，所以独立成套类名，不复用文件卡片：
+			// 文件卡片的灰系 / 动作语义是「这条记忆怎么处置」，裁决是另一件事，混用会让
+			// 「标失效」看起来像在编辑记忆本身。
+			".smem-conf{display:flex;flex-direction:column;gap:8px;}",
+			".smem-conf-list{display:flex;flex-direction:column;gap:10px;}",
+			".smem-conf-item{border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-1);padding:9px 11px;display:flex;flex-direction:column;gap:6px;}",
+			".smem-conf-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}",
+			".smem-conf-id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere;}",
+			".smem-conf-files{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}",
+			".smem-conf-file{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow-wrap:anywhere;white-space:normal;text-align:left;}",
+			".smem-conf-arrow{color:var(--dsw-alias-label-secondary);}",
+			".smem-conf-acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}",
+			".smem-conf-confirm{border:1px solid var(--dsw-alias-state-error-primary,#ef4444);border-radius:8px;padding:8px 10px;background:var(--dsw-alias-bg-layer-2);font-size:12px;line-height:1.55;display:flex;flex-direction:column;gap:6px;overflow-wrap:anywhere;}",
+			// 两份正文并排对照：窄窗口自动堆成一列（grid auto-fit，不用媒体查询）。
+			".smem-conf-bodies{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;}",
+			".smem-conf-body{border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:7px 9px;display:flex;flex-direction:column;gap:4px;min-width:0;}",
+			".smem-conf-label{font-size:11.5px;font-weight:600;color:var(--dsw-alias-label-secondary);}",
+			".smem-conf-pre{margin:0;max-height:220px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary);}",
+			".smem-conf-warn{font-size:11.5px;color:var(--dsw-alias-state-warn-primary,#d97706);}",
 		].join("\n");
 

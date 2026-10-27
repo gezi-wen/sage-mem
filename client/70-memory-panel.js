@@ -131,6 +131,28 @@
 			const dbg = sDbg[0], setDbg = sDbg[1];
 			const sDbgBusy = react.useState(false);
 			const dbgBusy = sDbgBusy[0], setDbgBusy = sDbgBusy[1];
+			// ── 冲突页签（2.0.0 矛盾检测）──
+			// 能力检测分两层：remote 整个不存在 → 页签与徽标都不出现（旧宿主）；
+			// remote 在、某个动作方法缺失 → 按钮禁用并在屏上写明缺哪个接口（版本错配时
+			// 绝不能变成「点了没反应」—— D25 的教训）。
+			const conflictRemote = stableRemote(props.ctx, "remote.conflict");
+			const conflictOk = !!(conflictRemote && typeof conflictRemote.list === "function");
+			const sConf = react.useState(null);
+			const conf = sConf[0], setConf = sConf[1];
+			const sConfLoad = react.useState(false);
+			const confLoad = sConfLoad[0], setConfLoad = sConfLoad[1];
+			const sConfErr = react.useState(null);
+			const confErr = sConfErr[0], setConfErr = sConfErr[1];
+			// 正文按 id 缓存（只在展开时去 read）；记录一变（裁决 / 刷新）就整批丢掉。
+			const sConfBodies = react.useState({});
+			const confBodies = sConfBodies[0], setConfBodies = sConfBodies[1];
+			const sConfExpanded = react.useState({});
+			const confExpanded = sConfExpanded[0], setConfExpanded = sConfExpanded[1];
+			// 危险动作的两段式确认：{id, action, file}（null = 没在问）。
+			const sConfConfirm = react.useState(null);
+			const confConfirm = sConfConfirm[0], setConfConfirm = sConfConfirm[1];
+			const sConfBusy = react.useState(null);
+			const confBusy = sConfBusy[0], setConfBusy = sConfBusy[1];
 			// renderSlot：shell 会经 props 传进来（见 80-apply 的 children 声明），
 			// 但本插件改用并列 tab 渲染星图，不再调用它 —— 声明保留给 shell，这里不取。
 
@@ -169,6 +191,9 @@
 				// 1.7.0：只读问一次「调试开关开着吗」—— 关着时抽屉里不会多出「注入调试」。
 				// 这是唯一一处为调试视图多付的调用（一次本地只读 remote，不碰磁盘）。
 				loadRecallDebug();
+				// 2.0.0：冲突徽标与体检徽标同一套道理 —— 不打开也知道有没有待裁决的。
+				// 旧宿主没有 conflict 面时 conflictOk=false，这里一个调用都不发。
+				loadConflicts();
 				/**
 				 * 更新检查：**静默**跑，失败一律不打扰 ——
 				 * 网络不通、被 GitHub 限流、仓库还没建 release，都不该在面板上冒一条红。
@@ -580,6 +605,187 @@
 			}
 
 			/**
+			 * 拉一次冲突队列（只读）。
+			 *
+			 * 头部徽标与「冲突」页签数的是同一批记录，所以挂载时就取一次（旧宿主没有
+			 * conflict 面 → conflictOk=false，这里整段不跑，界面一个像素都不变）。
+			 * 失败返回 `{ok:false, code}` 而不是抛 —— 契约的一部分，转成可读文案。
+			 */
+			function loadConflicts() {
+				if (!conflictOk) return;
+				setConfLoad(true); setConfErr(null);
+				Promise.resolve()
+					.then(function () { return conflictRemote.list(); })
+					.then(function (res) {
+						// ⚠️ 必须过 unwrap：typert remote 的通用传输层把返回值包成
+						// `{ok:true, value:<方法返回值>}`。**方法返回值里自带的 `ok` 是内层**，
+						// 与信封的 `ok` 是两个东西 —— 2026-10-27 真机就栽在这：直接把信封当
+						// payload 读，`items` 永远是 undefined，界面显示「0 条待裁决」，
+						// 而网络层明明返回了记录。与 76-sidebar-entry 的 setSettings 不同：
+						// 那是特例，这里是通用路径。
+						const d = unwrap(res) || {};
+						if (d.ok === false) { setConf(null); setConfErr(conflictErrText(d)); return; }
+						setConf({
+							items: Array.isArray(d.items) ? d.items : [],
+							broken: Array.isArray(d.broken) ? d.broken : [],
+							ignored: Array.isArray(d.ignored) ? d.ignored : [],
+							counts: d.counts && typeof d.counts === "object" ? d.counts : { open: 0, total: 0 },
+						});
+					})
+					.catch(function (e) { setConf(null); setConfErr(String((e && e.message) || e)); })
+					.then(function () { setConfLoad(false); });
+			}
+
+			/**
+			 * 冲突动作的失败文案：先按 `code` 给出路，再附上宿主给的一句细节。
+			 * 失败码是界面上**唯一**能把「为什么没成」翻译成下一步动作的地方 —— 尤其
+			 * stale_version / write_denied / unsupported 三条，不问清就只会反复点同一颗按钮。
+			 */
+			function conflictErrText(err) {
+				const code = err && typeof err.code === "string" ? err.code : "";
+				const key = CONFLICT_CODE_KEY[code] || "conflict.code.unknown";
+				const detail = err && typeof err.error === "string" ? err.error : "";
+				return t(key) + (detail ? t("conflict.code.detail", { detail: detail }) : "");
+			}
+
+			/** 打开「冲突」这一屏。数据没取过才取（挂载时已经取过一次，通常直接有内容）。 */
+			function openConflictTab() {
+				setTab("conflict");
+				setError(null); setNotice("");
+				if (!conf || confErr) loadConflicts();
+			}
+
+			/**
+			 * 展开 / 收起一条记录的两份正文。
+			 *
+			 * 正文只在**展开那一刻**才 read：列表阶段不取（记录里可能带几十 KB 正文），
+			 * 而且展开后要把「宿主截断了」这件事显示出来。
+			 */
+			function toggleConflictBodies(item) {
+				if (!conflictOk || typeof conflictRemote.read !== "function") return;
+				const was = confExpanded[item.id] === true;
+				const next = Object.assign({}, confExpanded);
+				if (was) {
+					delete next[item.id];
+					setConfExpanded(next);
+					return;
+				}
+				next[item.id] = true;
+				setConfExpanded(next);
+				if (confBodies[item.id] && confBodies[item.id].record) return;
+				const mark = function (patch) {
+					setConfBodies(function (cur) {
+						const nx = Object.assign({}, cur);
+						nx[item.id] = Object.assign({}, cur[item.id] || {}, patch);
+						return nx;
+					});
+				};
+				mark({ loading: true, error: null });
+				Promise.resolve()
+					.then(function () { return conflictRemote.read({ id: item.id }); })
+					.then(function (res) {
+						const d = unwrap(res) || {};
+						if (d.ok === false) { mark({ loading: false, error: conflictErrText(d) }); return; }
+						mark({
+							loading: false,
+							record: d.record || null,
+							warnings: Array.isArray(d.warnings) ? d.warnings : [],
+						});
+					})
+					.catch(function (e) { mark({ loading: false, error: String((e && e.message) || e) }); });
+			}
+
+			/**
+			 * 请求一个动作。dismiss 不写记忆文件、按设计表**不需要二次确认**；标失效 /
+			 * 撤销失效 / 删记录都会走两段式（前两个写文件，后一个不可恢复）。
+			 */
+			function askConflict(item, action) {
+				setError(null); setNotice("");
+				if (action === "dismiss") { runConflictNow(item.id, action, ""); return; }
+				// 标失效默认选记录里的 `file`（= 被提议标失效的一方）；撤销时默认显示
+				// 记录里真正被标过的那一方（invalidatedFile）。
+				const file = action === "undo"
+					? (item.invalidatedFile || item.file || "")
+					: (item.file || item.otherFile || "");
+				setConfConfirm({ id: item.id, action: action, file: file });
+			}
+
+			/** 两段式确认里改「标哪一方失效」（矛盾记录有两方）。 */
+			function pickConflictFile(file) {
+				setConfConfirm(function (cur) {
+					return cur ? Object.assign({}, cur, { file: file }) : cur;
+				});
+			}
+
+			function cancelConflictConfirm() { setConfConfirm(null); }
+
+			function runConflictAction() {
+				if (!confConfirm) return;
+				runConflictNow(confConfirm.id, confConfirm.action, confConfirm.file);
+			}
+
+			/**
+			 * 真正执行一个裁决动作。
+			 *
+			 * 顺序刻意固定：成功 → 清确认条 / 清正文缓存 → 重新拉队列 → 再刷记忆列表
+			 * （invalidate / undo 改了记忆文件，文件列表与星图都得跟着变）。
+			 * 失败**不动**记录之外的任何状态：错误文案（含出路）挂在全局错误条上。
+			 */
+			function runConflictNow(id, action, file) {
+				if (!conflictOk) { setError(t("error.noConflict")); return; }
+				const fn = conflictRemote[action];
+				if (typeof fn !== "function") {
+					setError(t("conflict.actionMissing", { method: action }));
+					return;
+				}
+				const opts = { id: id };
+				if (action === "invalidate" && file) opts.file = file;
+				setConfBusy(id); setError(null); setNotice("");
+				Promise.resolve()
+					.then(function () { return fn.call(conflictRemote, opts); })
+					.then(function (res) {
+						const d = unwrap(res) || {};
+						if (d.ok === false) { setError(conflictErrText(d)); return; }
+						const rec = d.record || {};
+						setConfConfirm(null);
+						// 记录变了：正文缓存与展开状态一起作废，避免展示已过期的正文。
+						setConfBodies({});
+						setConfExpanded({});
+						if (action === "invalidate") {
+							const wrote = d.wrote || {};
+							setNotice(t("notice.conflictInvalidated", {
+								file: rec.invalidatedFile || wrote.file || file,
+							}));
+						} else if (action === "dismiss") {
+							setNotice(t("notice.conflictDismissed"));
+						} else if (action === "undo") {
+							const cleared = d.cleared || {};
+							setNotice(t("notice.conflictUndone", {
+								file: rec.invalidatedFile || cleared.file || file,
+							}));
+						} else {
+							setNotice(t("notice.conflictRemoved"));
+						}
+						loadConflicts();
+						// 只有真的写过记忆文件的动作才需要重扫文件列表。
+						if (action === "invalidate" || action === "undo") load();
+					})
+					.catch(function (e) { setError(String((e && e.message) || e)); })
+					.then(function () { setConfBusy(null); });
+			}
+
+			/** 从冲突记录跳到文件列表看这条记忆（清掉筛选，否则可能被筛没）。 */
+			function openConflictFile(name) {
+				if (!name) return;
+				setError(null);
+				setTab("files");
+				setStatusFilter("all");
+				setTypeFilter([]);
+				setTagFilter([]);
+				setQuery(String(name));
+			}
+
+			/**
 			 * 打开 / 收起一个工具面板。数据只在第一次打开时拉；已经拉过就复用
 			 * （「刷新」「重新体检」是显式动作，别替用户反复扫目录）。
 			 */
@@ -767,6 +973,9 @@
 				? LIMIT_KEYS.filter(function (k) { return settings.limits[k] !== settings.pendingLimits[k]; }).length
 				: 0;
 			const restartPending = !!(settings && settings.restartRequired);
+			// 冲突徽标数的是**待裁决**（open）条数 —— 与冲突页签里的「N 条待裁决」同源。
+			// -1 = 还没取到队列（显示「未载」，不假装 0 条）。
+			const conflictOpen = conf && conf.counts && typeof conf.counts.open === "number" ? conf.counts.open : -1;
 
 			// 「文件列表」这一屏：状态筛选决定看哪一批，灰色卡片与留痕块自带「退役」语义。
 			// banner 只在**专门看归档**时出现，切到全部时不重复说一遍。
@@ -802,6 +1011,12 @@
 					// 体检再排在「自动归档」之后、独立成一屏：它只报告不修改，和「文件列表」里的
 					// 增删改是两件事，塞在工具抽屉里会让人以为它是个动作按钮。
 					h("button", { type: "button", className: "smem-tab" + (tab === "audit" ? " smem-tab--on" : ""), key: "a", role: "tab", "aria-selected": tab === "audit" ? "true" : "false", onClick: openAuditTab }, t("tab.audit")),
+					// 2.0.0「冲突」：裁决是**多动作、要逐条看两份正文**的流程，所以独立成第 6 个
+					// 页签，而不是塞进工具抽屉（抽屉方案的前提是「一年用不了几次」）。
+					// 没有 conflict 面的旧宿主：整颗不出现（能力检测，不是渲染错误）。
+					conflictOk
+						? h("button", { type: "button", className: "smem-tab" + (tab === "conflict" ? " smem-tab--on" : ""), key: "c", role: "tab", "aria-selected": tab === "conflict" ? "true" : "false", onClick: openConflictTab }, t("tab.conflict"))
+						: null,
 				]),
 				// 四个 tab 共用的一条头部带：我在哪 · 目录状态 · 活动/归档计数 · 体检徽标 · 待重启徽标 · 主操作。
 				// 层级形状固定：导航＝下划线（.smem-tabs）、筛选＝chip、动作＝按钮，三种不混用。
@@ -817,6 +1032,20 @@
 						title: audit ? (audit.problems ? t("header.auditSwitch") : t("header.auditClean")) : t("header.auditRun"),
 						onClick: openAuditTab,
 					}, audit ? (audit.problems ? t("header.auditProblems", { count: audit.problems }) : t("header.auditPass")) : t("header.auditNotRun")),
+					// 冲突徽标：与体检徽标同一套「抽屉关着也一直看得见」。**没有 conflict 面
+					// 的旧宿主整颗不出现**（页签也不出现），不是灰按钮 —— 那会让用户以为插件坏了。
+					conflictOk
+						? h("button", {
+								type: "button", key: "cf",
+								className: "smem-tool-badge" + (conflictOpen > 0 ? " smem-tool-badge--bad" : ""),
+								title: !conf
+									? t("header.conflictMissing")
+									: conflictOpen > 0 ? t("header.conflictSwitch") : t("header.conflictClean"),
+								onClick: openConflictTab,
+							}, !conf ? t("header.conflictNotRun")
+								: conflictOpen > 0 ? t("header.conflictOpen", { count: conflictOpen })
+								: t("header.conflictEmpty"))
+						: null,
 					restartPending
 						? h("button", {
 								type: "button", key: "rs", className: "smem-tool-badge smem-ad-badge--warn",
@@ -994,6 +1223,34 @@
 					// 体检面板在上面已经渲染过了 —— 这里必须显式给 null，
 					// 否则会落进下面那个 `filesView` 兜底分支，变成「体检 + 一整套文件列表」同屏。
 					? null
+					: tab === "conflict"
+					? h(ConflictPanel, {
+							key: "conflict",
+							data: conf,
+							loading: confLoad,
+							error: confErr,
+							bodies: confBodies,
+							expanded: confExpanded,
+							confirm: confConfirm,
+							busyId: confBusy,
+							// 逐动作的能力检测：宿主有 list 没 invalidate（版本错配）时按钮要禁用，
+							// 不是点了之后才报错。
+							tools: {
+								list: conflictOk,
+								read: !!(conflictOk && typeof conflictRemote.read === "function"),
+								invalidate: !!(conflictOk && typeof conflictRemote.invalidate === "function"),
+								dismiss: !!(conflictOk && typeof conflictRemote.dismiss === "function"),
+								undo: !!(conflictOk && typeof conflictRemote.undo === "function"),
+								removeRecord: !!(conflictOk && typeof conflictRemote.removeRecord === "function"),
+							},
+							onReload: loadConflicts,
+							onToggleBodies: toggleConflictBodies,
+							onAsk: askConflict,
+							onPickFile: pickConflictFile,
+							onCancelConfirm: cancelConflictConfirm,
+							onRun: runConflictAction,
+							onOpenFile: openConflictFile,
+						})
 					: filesView,
 				// 底部一行仓库链接（四个 tab 都在，不抢视线）
 				h(StarLine, { key: "star-line" }),

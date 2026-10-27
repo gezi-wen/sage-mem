@@ -3,7 +3,7 @@
 > English · [README.md](https://github.com/gezi-wen/sage-mem/blob/main/README.md)
 
 [![npm version](https://img.shields.io/npm/v/sage-mem?color=blue)](https://www.npmjs.com/package/sage-mem)
-[![npm downloads](https://img.shields.io/npm/dm/sage-mem)](https://www.npmjs.com/package/sage-mem)
+[![npm downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fgezi-wen%2Fsage-mem%2Fbadges%2Fnpm-downloads.json)](https://www.npmjs.com/package/sage-mem)
 [![tests](https://img.shields.io/github/actions/workflow/status/gezi-wen/sage-mem/test.yml?label=tests)](https://github.com/gezi-wen/sage-mem/actions/workflows/test.yml)
 [![node](https://img.shields.io/badge/node-%E2%89%A5%2018-3c873a)](#兼容性)
 [![DSH](https://img.shields.io/badge/DSH-%E2%89%A5%200.1.2--rc.1-8a2be2)](#兼容性)
@@ -14,7 +14,7 @@
 
 > File-based cross-session memory for DeepSeek Harness — every memory is a plain markdown file you can open, edit and delete. No database, no worker, no port.
 
-**当前发布版本：`1.9.2`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
+**当前发布版本：`2.0.0`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
 [契约冻结](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)。
 
 如果它对你有用，给个 Star 是最直接的反馈。
@@ -254,6 +254,10 @@ baselinePriority: 10 # 可选：多条 baseline 之间谁先注入（越大越�
 
 **缺口状态卡只在真有缺口时说话**：有候选没读、或有候选被预算省略时才出现，说清范围、条数、最佳线索和**一个可做的动作**；一条都没命中时，只有在你**问自己的历史**、或这条任务**有检查点**时才说（否则提示会被当噪音忽略）。单张卡上限 512 字节，且按内容签名去重。
 
+**「这条已经不作数了」会变成文件里可核对的事实（2.0.0 起）。** 记忆的 frontmatter 可以带三个可选字段：`valid_at`（说法从什么时候成立）、`invalid_at`（从什么时候起不再作数）、`superseded_by`（现行口径在哪条记忆里）。**注入侧会读它们**：`invalid_at` 已经到点的那条不再进正文（理由是 `expired_source`）；一对**未经裁决的矛盾**（`kind: contradiction` 的 open 记录）**两方都不进正文**（`conflict_pending`），直到你在「记忆管理 → 冲突」页签里裁决。**写失败型的冲突不抑制**（版本过期 / 文件在别处被改过 / 合并到一半）—— 盘上那份仍然是现行内容，把它们也藏起来等于把「这次没写进去」误报成「记忆不可信」。
+
+**抑制绝不静默。** 有矛盾待裁决时，状态卡会多一句「另有 N 条矛盾待裁决，相关记忆本轮未注入正文」（带具体条数，所以条数一变就能再发一次），面板头部也有一个常显徽标。**工具不受影响**：`search_memory` / `read_memory` 照旧能搜到、读到失效记忆，结果里会标「已失效」并带 `invalidAt` / `supersededBy` —— 问历史时旧口径是证据，不是噪音。想临时回到旧行为，把 `SAGE_MEM_VALIDITY` 设成 `0`（只关这一层过滤，本版其它修复都还在）。
+
 **摘要侧也有相关性门槛。** 中文里「怎么」「什么」这类词元在大量 `description` 里都有，一句无关的「今天天气怎么样」可能靠一个「怎么」命中十几份记忆。门槛按**语料自身的 IDF 尺度**归一，无关问题的候选数因此降到约七分之一；被清掉的主要是本就该落选的弱摘要候选。
 
 离线评测集上的对照（门槛前后）：**Recall@5 84.1% → 87.0%、误注入（注入了与问题无关的记忆）14.1% → 5.6%**。
@@ -293,7 +297,10 @@ sage-mem 给记忆目录的写入加了**版本守卫**：写入前记下当前�
 | **插件自己**写（自动做梦的整理） | 调用方在写入时带上读到的版本 | 落一条待处理记录 `<状态目录>/conflicts/<id>.json`，里面留着**盘上那一版**和**想要写的那一版** —— 只有一边等于没得判 |
 
 - **冲突不会自动合并**，保留哪边由你决定（记录是 JSON，需要时直接打开看）。静默重试和静默放弃都是在替你决定。
-- **注入侧目前不读这个队列**：有未裁决冲突的记忆照常作为正文注入；`conflict_pending` 这条抑制规则要等 **2.0.0 的矛盾检测**（连面板里的裁决入口一起）才生效 —— 只接抑制、不做入口，会让一条记忆**永久不再被注入**，比现在更糟。现阶段处理：打开 `conflicts/<id>.json`，把 `status` 改成 `resolved` 或 `dismissed`（或直接删掉文件）。
+- **2.0.0 起注入侧会读这个队列**：只有 `kind: contradiction` 且 `status: open` 的**矛盾型**两方被抑制；另外三种写失败型（`stale_version` / `external_change` / `unresolved_merge`）照常注入 —— 盘上那份才是现行内容。裁决入口与抑制是同一次交付，不再有「只接抑制、没有入口」的状态。
+- **裁决在「记忆管理 → 冲突」页签**（第 6 个页签，面板头部另有常显徽标）：逐条看两份正文，动作是「标此条失效」「撤销失效」「删除记录」，危险动作两段式确认。「标失效」只往记忆 frontmatter 加一行 `invalid_at`（可选再写 `superseded_by`）—— **文件留在原位、正文一个字节不动、不改 `updated`**；写盘幂等（连点两次不重写）、可撤销，失败时明确返回错误、记录保持待裁决。
+- **冲突记录字段只增不改**：2.0.0 在尾部追加 `otherFile` / `decision` / `decidedAt` / `appliedVersion` / `invalidatedFile` 五个，记录版本仍是 1；1.9.x 读端忽略不认识的键，双向都不用迁移。
+- **手工编辑不在看守范围**：直接改文件也生效（删掉 `invalid_at` 就恢复注入），插件不拦手改 —— 这是文件式记忆的取舍，见能力边界表 C11。
 - **同一件事不会越积越多**：一次失败如果与队列里某条未裁决记录逐字段相同（同一文件、两份正文、两个版本），不再追加副本。
 - **宿主的文件沙箱**：自动做梦在**会话外**运行，拿不到会话工作区。宿主用 `workspace-write` 时，插件给每次写入带上**收窄到记忆目录**的逐次沙箱策略（比回退根更窄）；宿主是 `read-only` 时不传策略、写入照旧被拒，且这一趟会被记成**失败**（不是「成功，没改什么」）。
 - 已知边界：**在 shell 里改记忆不走这条路**。写门守的是「经过工具的记忆写入」，不是「所有对文件的修改」；`pwsh` 里的重定向之类认不出来。认不准就不认，免得把「看不到」误记成事实。
@@ -409,6 +416,7 @@ sage-mem 给记忆目录的写入加了**版本守卫**：写入前记下当前�
 | `SAGE_MEM_STALE_DAYS` | `1`（0–365） | 标题标「保存于 N 天前」的门槛；0 = 每条都标 |
 | `SAGE_MEM_TASK_ID` | 空 | 任务检查点的作用域；空则回落会话 id |
 | `SAGE_MEM_DEBUG` | 关 | 调试日志；打开后面板「工具 ▾ → 注入调试」显示最近 8 次注入的账（只读、不落盘） |
+| `SAGE_MEM_VALIDITY` | 开 | 失效过滤与矛盾抑制的总开关。**只认 `0` / `false` / `off` 为关闭**（空值、拼错都按开启）；关掉后回到 1.9.x 的注入行为 |
 
 取值语义：**越界夹到边界，非法值（含纯空格）回落默认。**
 
@@ -421,7 +429,7 @@ sage-mem 给记忆目录的写入加了**版本守卫**：写入前记下当前�
 | 文件 | 用途 |
 |---|---|
 | `access.json` | 访问台账（`injected` / `read` / `use`） |
-| `conflicts/<id>.json` | 待人工处理的写入冲突 |
+| `conflicts/<id>.json` | 待处理的冲突：写入失败，或一对等待裁决的矛盾 |
 | `tasks/<任务 id>/WORKING.md` | 任务检查点 |
 | `settings.json` / `reserved.json` / `locked.json` | 设置、保留名、锁定 |
 | `autodream.json`、`autodream/` | 自动做梦的配置、快照、运行记录 |
@@ -451,7 +459,7 @@ sage-mem 给记忆目录的写入加了**版本守卫**：写入前记下当前�
 | 文件 | 内容 |
 |---|---|
 | [1.0.0-contract.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md) | 公开承诺逐条定性 + 每条保证指向的断言 |
-| [1.0.0-boundaries.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-boundaries.md) | 35 条能力逐条定性（含依据与验证手段） |
+| [1.0.0-boundaries.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-boundaries.md) | 38 条能力逐条定性（含依据与验证手段） |
 | [1.0.0-eval-report.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-eval-report.md) | 检索质量与预算的量化结果，以及这些数字**测不到**什么 |
 | [review-findings.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/review-findings.md) | 外部复审发现的永久账：每条发现、处置、**由哪条断言看着** |
 | [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) | 发版纪律（脱敏四查、评测退出码、探针、四锚点） |
@@ -502,8 +510,9 @@ sage-mem 是纯 DSH 插件，用 `package.json` 的 **`engines.dsh`** 声明宿�
 | 0.2.0-rc.1 | compatible |
 | 0.2.0-rc.2 | compatible |
 | 0.2.1-rc.1 | compatible |
+| 0.2.1-rc.3 | compatible |
 
-**`compatible` 怎么读**：它表示本插件的 codec / manifest 契约在该宿主代上核对过（代码层比对 + 单元/契约测试），**不表示**在那个确切宿主构建上跑过端到端探针。这张表是声明，核对方式总结在下面。真实宿主探针目前只跑过 `headless`（2026-10-15）与 `web`（2026-10-16）；`desktop` profile **还没跑过**（见 [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b）。CI 在 Ubuntu 上覆盖 **Node 18.x / 20.x / 24.x**，peer 钉 `0.2.0-rc.1` 一代；macOS 与 Windows 没有 CI 覆盖，desktop 宿主探针也还没有。
+**`compatible` 怎么读**：它表示本插件的 codec / manifest 契约在该宿主代上核对过（代码层比对 + 单元/契约测试），**不表示**在那个确切宿主构建上跑过端到端探针。这张表是声明，核对方式总结在下面。真实宿主探针目前跑过 `headless`（2026-10-15）、`web`（2026-10-16），以及 **0.2.1-rc.3 上的 `web`**（2026-10-27，2.0.0 发布前：客户端激活、冲突面板裁决、注入抑制、回退到 1.9.2，23/23 项通过）；`desktop` profile **还没跑过**（见 [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b）。CI 在 Ubuntu 上覆盖 **Node 18.x / 20.x / 24.x**，peer 钉 `0.2.0-rc.1` 一代；macOS 与 Windows 没有 CI 覆盖，desktop 宿主探针也还没有。
 
 两点值得说明：
 
@@ -557,6 +566,9 @@ npm test          # 全部断言（含三条守卫）
 
 ## 常见问题
 
+**升级到 2.0.0 之后，注入行为变了什么？**
+2.0.0 是**行为变更版**（所以按 MAJOR 发）：① 带 `invalid_at` 且已到点的记忆**不再进正文**；② 有未裁决矛盾的记忆**两方都不进正文**，直到你在「记忆管理 → 冲突」页签里裁决；③ **没有标注的旧记忆行为不变**，不需要迁移，也不会有迁移脚本。**回退到 1.9.x 是安全的**：不会损坏任何数据，但「失效」标记会被旧版本忽略（失效记忆重新注入）、冲突页签消失 —— 那是**功能消失，不是数据损坏**。如果只想关掉这层过滤、保留本版其它修复，用 `SAGE_MEM_VALIDITY=0`（只认 `0` / `false` / `off` 为关闭）。
+
 **记忆没被注入怎么办？**
 先确认记忆目录对不对（`SAGE_MEM_DIR`，默认 `~/.sage-mem/memory`），再看文件有没有 frontmatter（坏掉的 frontmatter **会被宽容解析**：字段回落默认，文件照样读得到）。面板里的「体检」页会报出索引悬空、漏索引、断链这类结构问题。
 
@@ -577,6 +589,9 @@ npm test          # 全部断言（含三条守卫）
 
 **插件市场报「registry 上的最新版比已装还旧，更新会降级」？**
 那是**下载地区镜像的 `/latest` 缓存滞后**，不是包发错了：镜像的全量元数据（pnpm 读的那份）已经是新版，但 `/<包>/latest` 这个快捷入口还缓存着旧值。先等一两分钟重试；仍然不行就把插件市场的「下载地区」临时切到「全球」（直连 registry.npmjs.org）更新，完成后再切回。核对实际发布版本：`npm view sage-mem dist-tags`。
+
+**顶部「月下载量」为什么改成了 endpoint 徽章？**
+npm 官方的 `downloads/point/last-month` 接口从 2026 年 7 月起对所有包都返回 0，`npm/dm` 徽章因此渲染成红色的 `0/month`；现在这个数字由 GitHub Actions 每天从仍然可用的 `downloads/range` 接口求和，发布到 `badges` 分支，再用 [shields.io endpoint badge](https://shields.io/badges/endpoint-badge) 渲染。若它超过约 2 天没变化，通常只是定时任务延迟（或 npm 接口故障，此时会特意保留上一次的正常值）。
 
 ## 卸载
 

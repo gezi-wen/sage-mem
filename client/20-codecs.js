@@ -52,3 +52,116 @@
 			},
 		};
 
+		// ── 冲突队列（2.0.0 矛盾检测）──
+		// 与宿主 manifest 逐字段对齐的 strict 形状。记录字段「只增不改」，但客户端这一份
+		// 必须写全 —— strict 校验缺字段会把整条调用当坏结果拒掉（additive 字段要从这里放行）。
+		//
+		// `invalidatedFile` 不是装饰：invalidate 允许标 `file` 或 `otherFile` 任一方失效，
+		// undo 要知道当时标的是哪一方，只能从记录里读（设计稿 §7.3 只写了「撤销失效」，
+		// 没写落点；D29 补这个字段）。空串 = 还没裁过。
+		const conflictFields = {
+			"id": isStr, "at": isStr, "kind": isStr, "status": isStr,
+			"file": isStr, "otherFile": isStr, "note": isStr, "decision": isStr,
+			"decidedAt": isStr, "appliedVersion": isStr, "invalidatedFile": isStr,
+			"truncated": isBool,
+		};
+		const conflictItemSchema = parseSchema(conflictFields);
+		// read 的 record = item 再带两份正文。正文可能为空串、可能被截断（truncated 为 true
+		// 时 UI 要显示「已截断」）—— 所以正文只校类型，不校长度。
+		const conflictRecordSchema = parseSchema(Object.assign({}, conflictFields, {
+			"incoming": isStr, "onDisk": isStr,
+		}));
+		/**
+		 * 冲突方法的失败分支：`{ok:false, code, error?}`。
+		 * 契约里失败**不抛**、也不走 ok:true —— 所以每个结果 codec 都要先认这一支，
+		 * 否则「stale_version 要给出路」这件事在界面层会被 strict 校验拦成一句泛化错误。
+		 */
+		function conflictFailure(v) {
+			if (v.ok !== false) return false;
+			isStr(v.code);
+			if ("error" in v) isStr(v.error);
+			return true;
+		}
+		const conflictListSchema = {
+			parse(v) {
+				if (v === null || typeof v !== "object" || Array.isArray(v)) throw new Error("sage-mem: invalid conflict list");
+				if (conflictFailure(v)) return v;
+				isBool(v.ok);
+				// items 是列表的主体，成功时必须有；broken / ignored 允许宿主省略（空数组）。
+				if (!Array.isArray(v.items)) throw new Error("sage-mem: invalid conflict list");
+				v.items.forEach(function (x) { conflictItemSchema.parse(x); });
+				if ("broken" in v && !Array.isArray(v.broken)) throw new Error("sage-mem: invalid broken list");
+				if ("ignored" in v && !Array.isArray(v.ignored)) throw new Error("sage-mem: invalid ignored list");
+				if (v.counts === null || typeof v.counts !== "object") throw new Error("sage-mem: missing counts");
+				isNum(v.counts.open);
+				isNum(v.counts.total);
+				return v;
+			},
+		};
+		const conflictReadSchema = {
+			parse(v) {
+				if (v === null || typeof v !== "object" || Array.isArray(v)) throw new Error("sage-mem: invalid conflict record");
+				if (conflictFailure(v)) return v;
+				isBool(v.ok);
+				conflictRecordSchema.parse(v.record);
+				// warnings 的元素形状没冻结（宿主 schema 也允许省略空数组），只校「是数组」。
+				if ("warnings" in v && !Array.isArray(v.warnings)) throw new Error("sage-mem: invalid warnings");
+				return v;
+			},
+		};
+		const conflictInvalidateSchema = {
+			parse(v) {
+				if (v === null || typeof v !== "object" || Array.isArray(v)) throw new Error("sage-mem: invalid conflict result");
+				if (conflictFailure(v)) return v;
+				isBool(v.ok);
+				conflictRecordSchema.parse(v.record);
+				const w = v.wrote;
+				if (w === null || typeof w !== "object") throw new Error("sage-mem: missing wrote");
+				isStr(w.file);
+				isStr(w.invalidAt);
+				// 宿主 manifest 里 version 是 string（写入门返回的版本令牌）。
+				isStr(w.version);
+				return v;
+			},
+		};
+		const conflictDismissSchema = {
+			parse(v) {
+				if (v === null || typeof v !== "object" || Array.isArray(v)) throw new Error("sage-mem: invalid conflict result");
+				if (conflictFailure(v)) return v;
+				isBool(v.ok);
+				conflictRecordSchema.parse(v.record);
+				return v;
+			},
+		};
+		const conflictUndoSchema = {
+			parse(v) {
+				if (v === null || typeof v !== "object" || Array.isArray(v)) throw new Error("sage-mem: invalid conflict result");
+				if (conflictFailure(v)) return v;
+				isBool(v.ok);
+				conflictRecordSchema.parse(v.record);
+				const c = v.cleared;
+				if (c === null || typeof c !== "object") throw new Error("sage-mem: missing cleared");
+				isStr(c.file);
+				return v;
+			},
+		};
+		const conflictRemoveSchema = {
+			parse(v) {
+				if (v === null || typeof v !== "object" || Array.isArray(v)) throw new Error("sage-mem: invalid conflict result");
+				if (conflictFailure(v)) return v;
+				isBool(v.ok);
+				return v;
+			},
+		};
+		// 5 个方法都是「一个对象参数」：{id} / {id,file?,note?}。可选字段传了就必须是字符串，
+		// 没传就交给宿主按空串处理 —— 不在这里编默认值。
+		const conflictOptsSchema = {
+			parse(v) {
+				if (v === null || typeof v !== "object" || Array.isArray(v)) throw new Error("sage-mem: expected object");
+				isStr(v.id);
+				if ("file" in v) isStr(v.file);
+				if ("note" in v) isStr(v.note);
+				return v;
+			},
+		};
+

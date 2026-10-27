@@ -2,6 +2,8 @@
 name: orchard-timeout-old
 description: 果园构建超时的旧排查口径，已被 2026-09 的修订取代
 aliases: [果园超时旧口径, orchard timeout old]
+invalid_at: 2026-09-01T00:00:00+08:00
+superseded_by: project_orchard-timeout.md
 metadata:
   node_type: memory
   type: project

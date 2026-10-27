@@ -432,6 +432,143 @@ function makeStarmapRemote(mem, meta) {
   }
 }
 
+// ── 2.0.0 冲突面：假 conflict remote ────────────────────────────────────────
+// 形状照冻结契约（也是宿主 manifest 的形状）：item 12 个字段，read 的 record 再加
+// 两份正文。`fail` 让每个动作都能按码失败（stale_version / write_denied / unsupported
+// 的「出路」文案要靠它验）；`listPending` 用来钉加载态。
+const CONFLICT_ITEMS = [
+  {
+    id: '20261027-aaaa1111', at: '2026-10-27 11:30', kind: 'contradiction', status: 'open',
+    file: 'project_beta.md', otherFile: 'reference_gamma.md',
+    note: '乙说项目还在跑，丙说已经停了', decision: '', decidedAt: '', appliedVersion: '',
+    invalidatedFile: '', truncated: true,
+  },
+  {
+    id: '20261026-bbbb2222', at: '2026-10-26 09:10', kind: 'stale_version', status: 'open',
+    file: 'user_alpha.md', otherFile: '', note: '写的时候盘上已经是新版',
+    decision: '', decidedAt: '', appliedVersion: '', invalidatedFile: '', truncated: false,
+  },
+  {
+    id: '20261025-cccc3333', at: '2026-10-25 20:00', kind: 'contradiction', status: 'resolved',
+    file: 'feedback_old.md', otherFile: 'project_beta.md', note: '已裁决：旧说法作废',
+    decision: 'invalidate', decidedAt: '2026-10-25 21:00', appliedVersion: 'v7',
+    invalidatedFile: 'feedback_old.md', truncated: false,
+  },
+]
+const CONFLICT_BODIES = {
+  '20261027-aaaa1111': { incoming: '新说法：' + '甲'.repeat(2500), onDisk: '旧说法：' + '乙'.repeat(2500) },
+  '20261026-bbbb2222': { incoming: '待写入的那一版正文（很短）', onDisk: '盘上现行正文（很短）' },
+  '20261025-cccc3333': { incoming: '新说法正文', onDisk: '旧说法正文' },
+}
+
+function makeConflictRemote(cfg) {
+  const c = cfg || {}
+  const st = {
+    calls: [],
+    items: (c.items || []).map((x) => ({ ...x })),
+    broken: c.broken || [],
+    ignored: c.ignored || [],
+    records: Object.assign({}, c.records || {}),
+    warnings: c.warnings || [],
+    // action → 失败码（模拟宿主返回 {ok:false, code} 而不是抛）
+    fail: Object.assign({}, c.fail || {}),
+    // 永不落地的 list（钉加载态）
+    listPending: c.listPending === true,
+  }
+  const itemOf = (id) => st.items.find((x) => x.id === id)
+  const counts = () => ({
+    open: st.items.filter((x) => x.status === 'open').length,
+    total: st.items.length,
+  })
+  // ⚠️ 真宿主的 typert remote 传输层会把返回值包成 `{ok:true, value:<方法返回值>}`。
+  // 假 remote 必须照这个形状返回，否则渲染测试会绕开 `unwrap` —— 2026-10-27 真机就是
+  // 这样漏掉的：面板把信封当 payload 读，队列永远渲染 0 条，而 445 条渲染断言全绿。
+  const env = (v) => Promise.resolve({ ok: true, value: v })
+  const failed = (action) => (st.fail[action]
+    ? env({ ok: false, code: st.fail[action], error: 'fake host: ' + st.fail[action] })
+    : null)
+  return {
+    st,
+    list() {
+      st.calls.push(['list'])
+      if (st.listPending) return new Promise(() => {})
+      const bad = failed('list')
+      if (bad) return bad
+      return env({
+        ok: true,
+        items: st.items.map((x) => ({ ...x })),
+        broken: st.broken.slice(),
+        ignored: st.ignored.slice(),
+        counts: counts(),
+      })
+    },
+    read(opts) {
+      st.calls.push(['read', opts])
+      const bad = failed('read')
+      if (bad) return bad
+      const it = itemOf(opts && opts.id)
+      if (!it) return env({ ok: false, code: 'missing', error: 'no such record' })
+      return env({
+        ok: true,
+        record: Object.assign({}, it, st.records[opts.id] || { incoming: '', onDisk: '' }),
+        warnings: st.warnings.slice(),
+      })
+    },
+    invalidate(opts) {
+      st.calls.push(['invalidate', opts])
+      const bad = failed('invalidate')
+      if (bad) return bad
+      const it = itemOf(opts && opts.id)
+      if (!it) return env({ ok: false, code: 'missing', error: 'no such record' })
+      const file = (opts && opts.file) || it.file
+      it.status = 'resolved'
+      it.decision = 'invalidate'
+      it.decidedAt = '2026-10-27 12:00'
+      it.appliedVersion = 'v5'
+      it.invalidatedFile = file
+      return env({
+        ok: true,
+        record: Object.assign({}, it),
+        wrote: { file, invalidAt: '2026-10-27T12:00:00+08:00', version: 'v5' },
+      })
+    },
+    dismiss(opts) {
+      st.calls.push(['dismiss', opts])
+      const bad = failed('dismiss')
+      if (bad) return bad
+      const it = itemOf(opts && opts.id)
+      if (!it) return env({ ok: false, code: 'missing', error: 'no such record' })
+      it.status = 'dismissed'
+      it.decision = 'dismiss'
+      it.decidedAt = '2026-10-27 12:05'
+      return env({ ok: true, record: Object.assign({}, it) })
+    },
+    undo(opts) {
+      st.calls.push(['undo', opts])
+      const bad = failed('undo')
+      if (bad) return bad
+      const it = itemOf(opts && opts.id)
+      if (!it) return env({ ok: false, code: 'missing', error: 'no such record' })
+      const file = it.invalidatedFile || it.file
+      it.status = 'dismissed'
+      it.decision = ''
+      it.decidedAt = ''
+      it.appliedVersion = ''
+      it.invalidatedFile = ''
+      return env({ ok: true, record: Object.assign({}, it), cleared: { file } })
+    },
+    removeRecord(opts) {
+      st.calls.push(['removeRecord', opts])
+      const bad = failed('remove')
+      if (bad) return bad
+      const i = st.items.findIndex((x) => x.id === (opts && opts.id))
+      if (i < 0) return env({ ok: false, code: 'missing', error: 'no such record' })
+      st.items.splice(i, 1)
+      return env({ ok: true })
+    },
+  }
+}
+
 const fakeDoc = {
   hidden: false,
   _created: [],
@@ -800,9 +937,12 @@ async function emitPreview() {
     const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
     mem.st.audit = AUDIT_WITH_PROBLEMS
     mem.st.settings = LIMITS_FIXTURE
-    const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
+    // 2.0.0：真宿主有 conflict 面 —— 预览也要有「冲突 2 待裁决」徽标与第 6 个页签，
+    // 否则 2.0.0 的界面图还停在 1.9.x 的五页签。
+    const cf = makeConflictRemote({ items: CONFLICT_ITEMS })
+    const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote(), conflict: cf })
     const tree = await rt.settle(C, {})
-    S('files-list', 'docs/images/files-list.png', '文件列表 —— 头部带常显「体检 N 个问题」与「待重启生效」，不用点开就知道该不该处理；灰底条目是已归档，随时可以恢复，也可以彻底删除（要再确认一次）。', '① 文件列表 · 常态（工具抽屉关着，头部带常显「体检 4 个问题」）', serHtml(tree))
+    S('files-list', 'docs/images/files-list.png', '文件列表 —— 头部带常显「体检 N 个问题」「冲突 N 待裁决」与「待重启生效」，不用点开就知道该不该处理；灰底条目是已归档，随时可以恢复，也可以彻底删除（要再确认一次）。', '① 文件列表 · 常态（工具抽屉关着，头部带常显「体检 4 个问题」与「冲突 2 待裁决」）', serHtml(tree))
   }
   // ② 文件列表 · 抽屉打开（两项各带状态）
   {
@@ -821,11 +961,26 @@ async function emitPreview() {
     const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
     mem.st.audit = AUDIT_WITH_PROBLEMS
     mem.st.settings = LIMITS_FIXTURE
-    const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
+    const cf = makeConflictRemote({ items: CONFLICT_ITEMS })
+    const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote(), conflict: cf })
     let tree = await rt.settle(C, {})
     click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '体检')[0])
     tree = await rt.settle(C, {})
     S('audit', 'docs/images/audit.png', '体检 —— 索引悬空、漏索引、断链这类硬问题按类报红；「指向已归档」只作提示、不计入问题，也不提供一键修补按钮（改哪条由你决定）。', '③ 体检（独立页签，排在自动做梦之后；硬问题红、提示灰）', serHtml(tree))
+  }
+  // ③f 「冲突」页签（2.0.0 矛盾检测）：待裁决列表 + 两份正文对照 + 只标不删的裁决动作
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const cf = makeConflictRemote({ items: CONFLICT_ITEMS, records: CONFLICT_BODIES })
+    const { comp: C } = await loadClient(rt, { memory: mem, conflict: cf })
+    let tree = await rt.settle(C, {})
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '冲突')[0])
+    tree = await rt.settle(C, {})
+    // 展开第一条的两份正文：预览要能看到「新说法 / 旧说法」对照与「已截断」标记。
+    click(btn(all(tree, byClass('smem-conf-item')).find((c) => textOf(c).indexOf('aaaa1111') >= 0), '展开两份正文')[0])
+    tree = await rt.settle(C, {})
+    S('conflict', null, '', '⑩ 冲突（2.0.0 矛盾检测）：待裁决列表 + 两份正文对照 + 「只标不删」的裁决动作', serHtml(tree))
   }
   // ③e 自动归档：用处说明 + 三档 + 三个阈值
   {
@@ -894,7 +1049,8 @@ async function emitPreview() {
     mem.st.settings = LIMITS_FIXTURE
     const ad = makeAutodreamRemote()
     ad.st.config.autoArchive = 'auto'
-    const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad })
+    const cf = makeConflictRemote({ items: CONFLICT_ITEMS })
+    const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad, conflict: cf })
     let tree = await rt.settle(C, {})
     click(btn(tree, '自动做梦')[0])
     tree = await rt.settle(C, {})
@@ -1476,9 +1632,13 @@ async function main() {
       `任何 tab 下头部都有「体检 4 个问题」徽标（实际：${badge ? textOf(badge) : '没有'}）`)
 
     // 页签顺序：体检独立成第 4 个，排在「自动做梦」**之后**
+    // （这里故意**不**给 conflict 面：旧宿主只剩五页签，是 2.0.0 的能力降级路径；
+    //  六页签的用例在 8d 与 23a —— 两种宿主两种界面，断言必须分开。）
     const tabLabels = all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n)).map(textOf)
     ok(JSON.stringify(tabLabels) === JSON.stringify(['文件列表', '记忆星图', '自动做梦', '自动归档', '体检']),
-      `体检独立成页签、排在自动做梦与自动归档之后（实际：${tabLabels.join(' / ')}）`)
+      `旧宿主（无 conflict 面）：五页签、体检排在自动做梦与自动归档之后（实际：${tabLabels.join(' / ')}）`)
+    ok(!all(tree, (n) => n.type === 'button' && byClass('smem-tool-badge')(n) && textOf(n).indexOf('冲突') === 0)[0],
+      '旧宿主（无 conflict 面）：凑不出一颗冲突徽标')
 
     // 点徽标就能切过去（徽标是「一直看得见」的那条路）
     click(badge)
@@ -1594,18 +1754,20 @@ async function main() {
   }
 
   // ── 8d. 「自动归档」独立成页签：写明用处 + 三档策略 + 阈值可改 ──────────────
-  group('8d. 自动归档页签：用处 + 三档策略 + 阈值可改')
+  group('8d. 自动归档页签：用处 + 三档策略 + 阈值可改（六页签）')
   {
     const rt = makeReact()
     const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
     const ad = makeAutodreamRemote()
-    const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad })
+    // 2.0.0 的宿主有 conflict 面 → 第 6 个页签「冲突」排在体检之后。有意更改的快照断言。
+    const cf = makeConflictRemote({ items: CONFLICT_ITEMS })
+    const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad, conflict: cf })
     let tree = await rt.settle(C, {})
 
     const tabBtns = (t) => all(t, (n) => n.type === 'button' && byClass('smem-tab')(n))
     const tabs = tabBtns(tree).map(textOf)
-    ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '记忆星图', '自动做梦', '自动归档', '体检']),
-      `五个页签、自动归档排在自动做梦与体检之间（实际：${tabs.join(' / ')}）`)
+    ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '记忆星图', '自动做梦', '自动归档', '体检', '冲突']),
+      `六页签、冲突排在体检之后（实际：${tabs.join(' / ')}）`)
 
     click(tabBtns(tree).find((b) => textOf(b) === '自动归档'))
     tree = await rt.settle(C, {})
@@ -2606,6 +2768,290 @@ async function main() {
     click(btn(t2, '自动做梦')[0])
     t2 = await rt2.settle(C2, {})
     ok(treeText(t2).indexOf('零正文重试 1 次后补齐') >= 0, '重试补齐也写在状态行上', treeText(t2).slice(0, 240))
+  }
+
+  // ── 23. 2.0.0「冲突」页签：六页签 + 徽标 + 两份正文 + 两段式裁决 + 能力降级 ──
+  group('23. 2.0.0 冲突页签：六页签 / 徽标 / 两份正文 / 两段式裁决 / 降级')
+  {
+    const confTab = (t) => all(t, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '冲突')[0]
+    const confBadge = (t) => all(t, (n) => n.type === 'button' && byClass('smem-tool-badge')(n) && textOf(n).indexOf('冲突') === 0)[0]
+    const itemOf = (t, idNeedle) => all(t, byClass('smem-conf-item')).find((c) => textOf(c).indexOf(idNeedle) >= 0)
+    async function openConf(rt, C) {
+      let t = await rt.settle(C, {})
+      click(confTab(t))
+      return rt.settle(C, {})
+    }
+    const mkRuntimes = async (cfg) => {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      const cf = makeConflictRemote(Object.assign({ items: CONFLICT_ITEMS, records: CONFLICT_BODIES }, cfg || {}))
+      const { comp: C } = await loadClient(rt, { memory: mem, conflict: cf })
+      const tree = await openConf(rt, C)
+      return { rt, C, tree, mem, cf }
+    }
+
+    // 23a 六页签 + 徽标常显 + 点徽标切页
+    {
+      const { rt, C, tree: t0, cf } = await mkRuntimes()
+      let tree = t0
+      const tabs = all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n)).map(textOf)
+      ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '记忆星图', '自动做梦', '自动归档', '体检', '冲突']),
+        `六页签、冲突排在体检之后（实际：${tabs.join(' / ')}）`)
+      // 先回文件列表再看徽标（徽标必须每个 tab 下都在，不能只在冲突页上有）
+      click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '文件列表')[0])
+      tree = await rt.settle(C, {})
+      const badge = confBadge(tree)
+      ok(!!badge && textOf(badge).indexOf('2 待裁决') >= 0,
+        `文件列表页头部常显「冲突 2 待裁决」徽标（实际：${badge ? textOf(badge) : '没有'}）`)
+      ok(badge && badge.props.className.indexOf('smem-tool-badge--bad') >= 0, '有待裁决时冲突徽标是红的')
+      ok(cf.st.calls.some((c) => c[0] === 'list'), '挂载时就拉一次队列（徽标要有数据才立得住）')
+      // 点徽标 = 切到冲突页（与体检徽标同一条交互）
+      click(confBadge(tree))
+      tree = await rt.settle(C, {})
+      ok(treeText(tree).indexOf('冲突队列') >= 0, '点徽标切到「冲突」页')
+      ok(confTab(tree).props['aria-selected'] === 'true', '切过去后「冲突」页签是选中态')
+    }
+
+    // 23b 空态 + 加载态 + 错误态（三种状态都要有话说，不能空白）
+    {
+      const emptyRt = makeReact()
+      const emptyMem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      const emptyCf = makeConflictRemote({ items: [] })
+      const { comp: EC } = await loadClient(emptyRt, { memory: emptyMem, conflict: emptyCf })
+      let t = await openConf(emptyRt, EC)
+      ok(treeText(t).indexOf('没有待处理的冲突') >= 0, '空态：写明没有待处理的冲突，并说它会从哪来')
+      ok(textOf(confBadge(t)).indexOf('冲突 · 无') >= 0, '空态：徽标收敛成「冲突 · 无」')
+
+      const loadRt = makeReact()
+      const loadMem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      const loadCf = makeConflictRemote({ items: [], listPending: true })
+      const { comp: LC } = await loadClient(loadRt, { memory: loadMem, conflict: loadCf })
+      t = await openConf(loadRt, LC)
+      ok(treeText(t).indexOf('读取冲突队列…') >= 0, '加载态：给出「读取冲突队列…」')
+      ok(textOf(confBadge(t)).indexOf('未载') >= 0, '加载态：徽标写「未载」，不假装 0 条')
+
+      const errRt = makeReact()
+      const errMem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      const errCf = makeConflictRemote({ items: [], fail: { list: 'io_error' } })
+      const { comp: RC } = await loadClient(errRt, { memory: errMem, conflict: errCf })
+      t = await openConf(errRt, RC)
+      ok(treeText(t).indexOf('读写磁盘失败') >= 0, '错误态：失败码翻成可读文案（io_error）')
+      ok(textOf(confBadge(t)).indexOf('未载') >= 0, '错误态：徽标也写「未载」')
+      ok(!!btnHas(t, '刷新')[0], '错误态：仍有「刷新」可点（不是死路）')
+      const before = errCf.st.calls.filter((c) => c[0] === 'list').length
+      errCf.st.fail = {}
+      click(btnHas(t, '刷新')[0])
+      t = await errRt.settle(RC, {})
+      ok(errCf.st.calls.filter((c) => c[0] === 'list').length === before + 1, '点「刷新」真的再拉一次')
+      ok(textOf(confBadge(t)).indexOf('冲突 · 无') >= 0, '刷新成功后徽标恢复')
+
+      // broken / ignored 是两件事：ignored = 目录里不是 *.json 的文件；broken = 是记录但解析失败。
+      // 两者都必须看得见，否则用户会以为「我明明有记录，怎么一条都不显示」。
+      const junkRt = makeReact()
+      const junkMem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      const junkCf = makeConflictRemote({
+        items: CONFLICT_ITEMS,
+        broken: ['20261020-deadbeef.json'],
+        ignored: ['README.txt', '.tmp-123'],
+      })
+      const { comp: JC } = await loadClient(junkRt, { memory: junkMem, conflict: junkCf })
+      t = await openConf(junkRt, JC)
+      ok(treeText(t).indexOf('2 个文件不是冲突记录，已忽略') >= 0,
+        'ignored：写明「不是冲突记录，已忽略」的数（不是「记录未显示」）')
+      ok(treeText(t).indexOf('1 条记录损坏') >= 0, 'broken：写明损坏记录数')
+      ok(!!itemOf(t, 'aaaa1111'), 'broken / ignored 不影响其余记录照常显示')
+    }
+
+    // 23c 列表 + 两份正文：默认折叠 / 展开取 read / 前 2 KB / 截断标记 / 两种 kind 的语义标签
+    {
+      const { rt, C, tree: t0, cf } = await mkRuntimes({ warnings: ['记录里的 at 格式认不出'] })
+      let tree = t0
+      const pane = all(tree, byClass('smem-conf'))[0]
+      ok(!!pane, '冲突面板出现')
+      ok(treeText(pane).indexOf('矛盾') >= 0 && treeText(pane).indexOf('版本冲突') >= 0,
+        'kind 徽标有中文（矛盾 / 版本冲突）')
+      ok(treeText(pane).indexOf('待裁决') >= 0 && treeText(pane).indexOf('已裁决') >= 0,
+        '状态徽标有中文（待裁决 / 已裁决）')
+      ok(treeText(pane).indexOf('20261027-aaaa1111') >= 0 && treeText(pane).indexOf('2026-10-26 09:10') >= 0,
+        '每条记录显示 id 与记录时间')
+      ok(treeText(pane).indexOf('project_beta.md') >= 0 && treeText(pane).indexOf('reference_gamma.md') >= 0,
+        '矛盾记录的两方文件都可见')
+      // 默认折叠：正文不进 DOM，也不发 read
+      ok(treeText(pane).indexOf('新说法（拟保留）') < 0, '两份正文默认折叠')
+      ok(!cf.st.calls.some((c) => c[0] === 'read'), '折叠状态下不发 read（正文只在展开时取）')
+
+      click(btn(itemOf(tree, 'aaaa1111'), '展开两份正文')[0])
+      tree = await rt.settle(C, {})
+      const readCall = cf.st.calls.find((c) => c[0] === 'read')
+      ok(readCall && readCall[1] && readCall[1].id === '20261027-aaaa1111',
+        `展开时调 conflict.read({id})（${JSON.stringify(readCall && readCall[1])}）`)
+      const pane2 = all(tree, byClass('smem-conf'))[0]
+      ok(treeText(pane2).indexOf('新说法（拟保留）') >= 0 && treeText(pane2).indexOf('旧说法（拟标失效）') >= 0,
+        '矛盾记录的两份正文按「新说法 / 旧说法」标注（不靠字段名自解释）')
+      ok(treeText(pane2).indexOf('只显示前 2 KB') >= 0, '超长正文标「只显示前 2 KB」')
+      const pres = all(pane2, byClass('smem-conf-pre'))
+      ok(pres.length >= 2, `展开后两份正文都在（${pres.length} 块）`)
+      ok(pres.length >= 2 && textOf(pres[0]).length <= 2200 && textOf(pres[0]).indexOf('甲甲甲') >= 0,
+        `第一份正文只渲染前 2 KB（实际 ${pres[0] ? textOf(pres[0]).length : 0} 字）`)
+      ok(treeText(pane2).indexOf('已截断') >= 0, 'truncated 记录显示「已截断」标记')
+      ok(treeText(pane2).indexOf('读取提示：记录里的 at 格式认不出') >= 0,
+        'read 的 warnings 原样带给用户（不吞）')
+
+      // 收起
+      click(btn(itemOf(tree, 'aaaa1111'), '收起两份正文')[0])
+      tree = await rt.settle(C, {})
+      ok(treeText(tree).indexOf('新说法（拟保留）') < 0, '再点一次收起两份正文')
+
+      // 写失败型（stale_version）：两份正文是「待写入 / 盘上现行」，不是新/旧说法
+      click(btn(itemOf(tree, 'bbbb2222'), '展开两份正文')[0])
+      tree = await rt.settle(C, {})
+      ok(treeText(tree).indexOf('待写入的那一版') >= 0 && treeText(tree).indexOf('盘上现行内容') >= 0,
+        '写失败型记录用「待写入 / 盘上现行」的标签')
+      ok(treeText(tree).indexOf('新说法（拟保留）') < 0, '写失败型不会冒充「新说法 / 旧说法」')
+    }
+
+    // 23d 标失效：两段式确认 + 可选哪一方作废 + 收据 + 徽标随队列更新
+    {
+      const { rt, C, tree: t0, cf } = await mkRuntimes()
+      let tree = t0
+      click(btn(itemOf(tree, 'aaaa1111'), '标此条失效')[0])
+      tree = await rt.settle(C, {})
+      ok(!!all(tree, byClass('smem-conf-confirm'))[0], '标失效先出确认条（两段式）')
+      ok(!cf.st.calls.some((c) => c[0] === 'invalidate'), '点第一下不写盘（invalidate 还没调）')
+      ok(treeText(tree).indexOf('确认把「project_beta.md」标为失效') >= 0, '确认条写明默认标哪一方')
+      const chips = all(all(tree, byClass('smem-conf-confirm'))[0],
+        (n) => n.type === 'button' && byClass('smem-chip')(n))
+      const other = chips.find((c) => textOf(c) === 'reference_gamma.md')
+      ok(chips.length === 2 && !!other, `矛盾记录两方都列成可选 chip（${chips.map(textOf).join(' / ')}）`)
+      click(other)
+      tree = await rt.settle(C, {})
+      ok(treeText(all(tree, byClass('smem-conf-confirm'))[0]).indexOf('reference_gamma.md') >= 0,
+        '选了另一方，确认条跟着换')
+      click(btn(all(tree, byClass('smem-conf-confirm'))[0], '确认标失效')[0])
+      tree = await rt.settle(C, {})
+      const call = cf.st.calls.find((c) => c[0] === 'invalidate')
+      ok(call && call[1].id === '20261027-aaaa1111' && call[1].file === 'reference_gamma.md',
+        `invalidate({id, file}) 带上选中的一方（${JSON.stringify(call && call[1])}）`)
+      ok(treeText(tree).indexOf('已把 reference_gamma.md 标为失效') >= 0, '成功后给收据（含实际改的文件名）')
+      ok(textOf(confBadge(tree)).indexOf('1 待裁决') >= 0, '裁决后徽标数字跟着队列更新（2 → 1）')
+      const done = itemOf(tree, 'aaaa1111')
+      ok(treeText(done).indexOf('已裁决') >= 0 && treeText(done).indexOf('已标失效：reference_gamma.md') >= 0,
+        '裁决后卡片显示状态与「已标失效」的落点')
+    }
+
+    // 23e 标记已裁决（无二次确认）/ 撤销失效（两段式）/ 删除记录（两段式）
+    {
+      const { rt, C, tree: t0, cf } = await mkRuntimes()
+      let tree = t0
+      // dismiss：不写记忆文件，按设计表直接执行
+      click(btn(itemOf(tree, 'bbbb2222'), '标记已裁决')[0])
+      tree = await rt.settle(C, {})
+      ok(cf.st.calls.some((c) => c[0] === 'dismiss' && c[1].id === '20261026-bbbb2222'),
+        '「标记已裁决」直接调 dismiss（不写文件、无需二次确认）')
+      ok(treeText(tree).indexOf('已标记为已裁决') >= 0, 'dismiss 成功有反馈，并说明没改记忆文件')
+
+      // undo：只对真的写过文件的记录出现
+      const resolved = itemOf(tree, 'cccc3333')
+      ok(!!btn(resolved, '撤销失效')[0], '已标失效的记录才有「撤销失效」')
+      ok(!btn(itemOf(tree, 'bbbb2222'), '撤销失效')[0], 'dismiss 掉的记录没有「撤销失效」（没东西可撤）')
+      click(btn(resolved, '撤销失效')[0])
+      tree = await rt.settle(C, {})
+      ok(!!all(tree, byClass('smem-conf-confirm'))[0] &&
+        treeText(tree).indexOf('撤销「feedback_old.md」的失效标记') >= 0, '撤销失效走两段式确认')
+      ok(!cf.st.calls.some((c) => c[0] === 'undo'), '确认前不调 undo')
+      click(btn(all(tree, byClass('smem-conf-confirm'))[0], '确认撤销')[0])
+      tree = await rt.settle(C, {})
+      ok(cf.st.calls.some((c) => c[0] === 'undo' && c[1].id === '20261025-cccc3333'), '确认后调 undo({id})')
+      ok(treeText(tree).indexOf('已撤销 feedback_old.md 的失效标记') >= 0, '撤销成功有反馈')
+
+      // removeRecord：不可恢复，两段式
+      // （方法名不叫 `remove`：宿主客户端命名空间保留名，见 client/30-descriptors.js 注释。）
+      const anyCard = all(tree, byClass('smem-conf-item'))[0]
+      click(btn(anyCard, '删除记录')[0])
+      tree = await rt.settle(C, {})
+      ok(treeText(tree).indexOf('删除这条冲突记录') >= 0, '删除记录走两段式确认')
+      ok(!cf.st.calls.some((c) => c[0] === 'removeRecord'), '确认前不调 removeRecord')
+      click(btn(all(tree, byClass('smem-conf-confirm'))[0], '确认删除记录')[0])
+      tree = await rt.settle(C, {})
+      ok(cf.st.calls.some((c) => c[0] === 'removeRecord'), '确认后调 removeRecord({id})')
+      ok(treeText(tree).indexOf('已删除冲突记录') >= 0, '删除成功有反馈（并说明记忆文件没动）')
+    }
+
+    // 23f 失败码：stale_version / write_denied / unsupported 三条必须给出路（不是只说失败）
+    {
+      const CASES = [
+        ['stale_version', '记忆文件在你打开之后被改过', '刷新列表'],
+        ['write_denied', '宿主拒绝了写入', '手工在记忆 frontmatter 里加 invalid_at'],
+        ['unsupported', '没有可用的写入接口', '手工在记忆 frontmatter 里加 invalid_at'],
+      ]
+      for (const [code, needle, wayOut] of CASES) {
+        const { rt, C, tree: t0 } = await mkRuntimes({ fail: { invalidate: code } })
+        let tree = t0
+        click(btn(itemOf(tree, 'aaaa1111'), '标此条失效')[0])
+        tree = await rt.settle(C, {})
+        click(btn(all(tree, byClass('smem-conf-confirm'))[0], '确认标失效')[0])
+        tree = await rt.settle(C, {})
+        const txt = treeText(tree)
+        ok(txt.indexOf(needle) >= 0, `失败码 ${code}：有可读文案（${needle}）`)
+        ok(txt.indexOf(wayOut) >= 0, `失败码 ${code}：写明出路（${wayOut}）`)
+        ok(txt.indexOf('宿主说明') >= 0, `失败码 ${code}：还带上宿主给的一句细节（便于排错）`)
+      }
+    }
+
+    // 23g 能力降级：有 list 没动作 → 按钮禁用 + 屏上写明缺哪个接口；没 read → 正文对照禁用
+    {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      const cf = makeConflictRemote({ items: CONFLICT_ITEMS, records: CONFLICT_BODIES })
+      delete cf.invalidate
+      delete cf.undo
+      const { comp: C } = await loadClient(rt, { memory: mem, conflict: cf })
+      const tree = await openConf(rt, C)
+      // 页签仍在（有 list 就能看），但动作按能力禁用
+      ok(!!confTab(tree), '有 list 没动作：页签仍出现（只读可见）')
+      const invBtn = btn(itemOf(tree, 'aaaa1111'), '标此条失效')[0]
+      ok(!!invBtn && invBtn.props.disabled === true, '缺 conflict.invalidate：按钮禁用（不是点了没反应）')
+      ok(String(invBtn.props.title || '').indexOf('conflict.invalidate') >= 0,
+        `禁用按钮的 title 写明缺哪个接口（${invBtn && invBtn.props.title}）`)
+      ok(treeText(tree).indexOf('缺少 conflict.invalidate') >= 0, '屏上另有一行「缺少哪些接口」的说明')
+      ok(treeText(tree).indexOf('手工编辑记忆 frontmatter') >= 0, '说明里给了手工出路')
+      // 有 list 没 read：正文对照禁用，但裁决按钮不受影响
+      const rt2 = makeReact()
+      const mem2 = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      const cf2 = makeConflictRemote({ items: CONFLICT_ITEMS, records: CONFLICT_BODIES })
+      delete cf2.read
+      const { comp: C2 } = await loadClient(rt2, { memory: mem2, conflict: cf2 })
+      const t2 = await openConf(rt2, C2)
+      const bodyBtn = btn(itemOf(t2, 'aaaa1111'), '展开两份正文')[0]
+      ok(!!bodyBtn && bodyBtn.props.disabled === true, '缺 conflict.read：正文对照按钮禁用')
+      ok(treeText(t2).indexOf('正文对照已禁用') >= 0, '并说明「正文对照已禁用、仍可裁决」')
+      ok(btn(itemOf(t2, 'aaaa1111'), '标此条失效')[0].props.disabled !== true,
+        'read 缺失不影响裁决按钮（能力逐动作检测，不搞连坐）')
+    }
+
+    // 23h 涉及文件可点击 → 回到文件列表并定位到该记忆
+    {
+      const { rt, C, tree: t0 } = await mkRuntimes()
+      let tree = t0
+      const card = itemOf(tree, 'aaaa1111')
+      const fileBtn = all(card, byClass('smem-conf-file')).find((n) => textOf(n) === 'project_beta.md')
+      ok(!!fileBtn, '涉及文件是按钮（可点击查看）')
+      click(fileBtn)
+      tree = await rt.settle(C, {})
+      const search = all(tree, byClass('smem-search'))[0]
+      ok(!!search && search.props.value === 'project_beta.md',
+        `跳到文件列表并把搜索框设成文件名（实际：${search && search.props.value}）`)
+      ok(all(tree, byClass('smem-card')).length === 1, '文件列表筛出那一条记忆')
+    }
+
+    // 23i 反向对照：不是矛盾型的记录也有，但它们不参与抑制 —— 面板必须照列
+    // （抑制只对矛盾型，这是设计稿 §6.3 的核心；面板若把 stale_version 藏掉，
+    //  用户就永远看不到「这次没写进去」的失败。）
+    {
+      const { tree } = await mkRuntimes()
+      ok(!!itemOf(tree, 'bbbb2222'), '写失败型（stale_version）记录照常列出（它不是矛盾，但不该被藏）')
+      ok(treeText(tree).indexOf('版本冲突') >= 0, '写失败型有自己的 kind 文案')
+    }
   }
 
   console.log(`\n结果：${pass} passed, ${fail} failed`)

@@ -3,7 +3,7 @@
 > 中文版见 [README.zh.md](https://github.com/gezi-wen/sage-mem/blob/main/README.zh.md)
 
 [![npm version](https://img.shields.io/npm/v/sage-mem?color=blue)](https://www.npmjs.com/package/sage-mem)
-[![npm downloads](https://img.shields.io/npm/dm/sage-mem)](https://www.npmjs.com/package/sage-mem)
+[![npm downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fgezi-wen%2Fsage-mem%2Fbadges%2Fnpm-downloads.json)](https://www.npmjs.com/package/sage-mem)
 [![tests](https://img.shields.io/github/actions/workflow/status/gezi-wen/sage-mem/test.yml?label=tests)](https://github.com/gezi-wen/sage-mem/actions/workflows/test.yml)
 [![node](https://img.shields.io/badge/node-%E2%89%A5%2018-3c873a)](#compatibility)
 [![DSH](https://img.shields.io/badge/DSH-%E2%89%A5%200.1.2--rc.1-8a2be2)](#compatibility)
@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `1.9.2`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.0.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -254,6 +254,10 @@ Something transparent deserves a clear account of how it selects its material, b
 
 **The gap status card speaks only when there really is a gap**: it appears only when there are candidates that were not read, or candidates omitted by the budget, and it states the scope, the count, the best clue and **one action you can take**; when not a single thing matched, it speaks only if you **asked about your own history**, or this task **has a checkpoint** (otherwise the hint would be ignored as noise). A single card is capped at 512 bytes and deduplicated by content signature.
 
+**"This claim no longer holds" becomes a fact you can check in the file (from 2.0.0).** A memory's frontmatter may carry three optional fields: `valid_at` (when the claim starts to hold), `invalid_at` (when it stops counting), and `superseded_by` (which memory holds the current wording). **The injection side reads them**: a memory whose `invalid_at` has passed is no longer injected as body text (reason `expired_source`); an **unresolved contradiction** (an open record with `kind: contradiction`) keeps **both sides** out of the body (`conflict_pending`) until you resolve it on the 「记忆管理 → 冲突」(Memory management → Conflicts) tab. **Write-failure conflicts are not suppressed** (stale version / the file was changed elsewhere / a half-finished merge) — what is on disk is still the current content, and hiding it too would report "this write did not land" as "this memory is untrustworthy".
+
+**Suppression is never silent.** While contradictions are pending, the status card adds a line — "另有 N 条矛盾待裁决，相关记忆本轮未注入正文" (N contradictions are pending; the related memories were not injected this round) — with the concrete count, so a change in the count can send a fresh card, and the panel header carries a permanent badge. **The tools are unaffected**: `search_memory` / `read_memory` still find and read invalid memories, marking them "已失效" and carrying `invalidAt` / `supersededBy` — when you ask about history, the old wording is evidence, not noise. To go back to the old behaviour temporarily, set `SAGE_MEM_VALIDITY=0` (that disables only this filter; the rest of this release stays).
+
 **There is a relevance threshold on the summary side too.** In Chinese, units like "怎么" and "什么" appear in a great many `description`s, so an unrelated "今天天气怎么样" can hit a dozen memories off a single "怎么". The threshold is normalized against **the corpus's own IDF scale**, which brings the candidate count for unrelated questions down to about one seventh; what gets cleared out is mainly the weak summary candidates that should have lost anyway.
 
 The comparison on the offline evaluation set (before and after the threshold): **Recall@5 84.1% → 87.0%, spurious injection (memories injected that are unrelated to the question) 14.1% → 5.6%**.
@@ -293,7 +297,10 @@ The guard has two paths, with **different** coverage, spelled out:
 | **The plugin itself** writing (autodream consolidation) | The caller passes the version it read at write time | A pending record `<state directory>/conflicts/<id>.json` is written, keeping **the version on disk** and **the version it wanted to write** — with only one side there is nothing to judge |
 
 - **Conflicts are not merged automatically**; which side to keep is your decision (the record is JSON, open it directly when you need to). Silent retry and silent abandonment both decide on your behalf.
-- **The injection side does not read this queue yet**: a memory with an unresolved conflict is still injected as body text. The `conflict_pending` suppression rule arrives with **2.0.0 conflict detection**, together with the panel entry that resolves conflicts — wiring the suppression without that entry would make a memory **permanently non-injectable**, which is worse than the current state. For now, open `conflicts/<id>.json` and set `status` to `resolved` or `dismissed` (or delete the file).
+- **From 2.0.0 the injection side does read this queue**: only the **two sides of a `contradiction`** (status `open`) are suppressed; the three write-failure kinds (`stale_version` / `external_change` / `unresolved_merge`) are still injected — what is on disk there is the current content. The resolution entry and the suppression ship together, so there is no longer a state where "suppression is wired but there is no entry point".
+- **Resolution lives on the 「记忆管理 → 冲突」(Memory management → Conflicts) tab** (the sixth tab, with a permanent badge in the panel header): you look at both bodies one by one, and the actions are "mark this one invalid", "undo invalidation" and "delete record", with two-step confirmation for the dangerous ones. "Mark invalid" only adds one line `invalid_at` to the memory's frontmatter (optionally plus `superseded_by`) — **the file stays in place, the body does not change by a single byte, and `updated` is not touched**; the write is idempotent (clicking twice does not rewrite), it can be undone, and a failure returns an explicit error while the record stays pending.
+- **Conflict records only ever gain fields**: 2.0.0 appends `otherFile` / `decision` / `decidedAt` / `appliedVersion` / `invalidatedFile` at the tail, and the record version stays 1; 1.9.x readers ignore keys they do not know, so no migration is needed in either direction.
+- **Manual edits are outside the guard**: editing the file directly takes effect too (delete `invalid_at` and the memory is injected again); the plugin does not police hand edits — that is the tradeoff of file-based memory, see boundary C11.
 - **The same conflict is not duplicated**: if a failure matches an unresolved record field for field (same file, both bodies, both versions), no extra copy is appended.
 - **The host file sandbox**: autodream runs **outside any session**, so it cannot inherit a session workspace. On a `workspace-write` host the plugin passes a per-call sandbox policy **narrowed to the memory directory** (narrower than the fallback root); on a `read-only` host it passes nothing, the write is still refused, and the run is recorded as a **failure** (not "success, nothing changed").
 - Known boundary: **editing memories in a shell does not go through this path**. The write gate guards "memory writes that go through the tools", not "all modifications to files"; redirection and the like inside `pwsh` are not recognized. If it cannot be sure, it does not claim it — so that "cannot see it" is not mistakenly recorded as fact.
@@ -409,6 +416,7 @@ The two things are moved **differently**, spelled out:
 | `SAGE_MEM_STALE_DAYS` | `1` (0–365) | threshold for marking a heading 「保存于 N 天前」(saved N days ago); 0 = mark every one |
 | `SAGE_MEM_TASK_ID` | empty | scope of task checkpoints; empty falls back to the session id |
 | `SAGE_MEM_DEBUG` | off | debug logging; when on, the panel's **工具 ▾ → 注入调试** shows the last 8 injection attempts (read-only, never written to disk) |
+| `SAGE_MEM_VALIDITY` | on | master switch for invalidity filtering and contradiction suppression. **Only `0` / `false` / `off` turn it off** (empty or misspelled values count as on); off restores the 1.9.x injection behaviour |
 
 Value semantics: **out-of-range values are clamped to the boundary, illegal values (including pure whitespace) fall back to the default.**
 
@@ -421,7 +429,7 @@ The panel can change the five caps above (written to `<state directory>/settings
 | File | Purpose |
 |---|---|
 | `access.json` | access ledger (`injected` / `read` / `use`) |
-| `conflicts/<id>.json` | write conflicts awaiting manual handling |
+| `conflicts/<id>.json` | pending conflicts: a failed write, or a pair of contradictions awaiting resolution |
 | `tasks/<task id>/WORKING.md` | task checkpoints |
 | `settings.json` / `reserved.json` / `locked.json` | settings, reserved names, locks |
 | `autodream.json`, `autodream/` | autodream configuration, snapshots, run records |
@@ -451,7 +459,7 @@ Apart from `access.json`, `conflicts/` and `tasks/`, the rest is internal implem
 | File | Content |
 |---|---|
 | [1.0.0-contract.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md) | public commitments characterized item by item + the assertion each guarantee points to |
-| [1.0.0-boundaries.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-boundaries.md) | 35 capabilities characterized item by item (with basis and means of verification) |
+| [1.0.0-boundaries.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-boundaries.md) | 38 capabilities characterized item by item (with basis and means of verification) |
 | [1.0.0-eval-report.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-eval-report.md) | quantified results for retrieval quality and budget, and what these numbers **cannot** measure |
 | [review-findings.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/review-findings.md) | the permanent ledger of what external review found: each finding, its disposition, and **which assertion watches over it** |
 | [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) | release discipline (the four sanitization checks, evaluation exit codes, probes, the four anchors) |
@@ -500,8 +508,9 @@ Version-by-version compatibility record:
 | 0.2.0-rc.1 | compatible |
 | 0.2.0-rc.2 | compatible |
 | 0.2.1-rc.1 | compatible |
+| 0.2.1-rc.3 | compatible |
 
-**How to read `compatible`.** It means this plugin's codec and manifest contract has been checked against that host generation (code-level comparison plus the unit/contract suite), **not** that an end-to-end probe was run on that exact host build. The table is a declaration; how each claim was checked is summarized here. Real-host probes so far: `headless` (2026-10-15) and `web` (2026-10-16); the `desktop` profile has **not** been probed yet (see [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b). CI runs on Ubuntu against **Node 18.x / 20.x / 24.x** with the `0.2.0-rc.1` peer generation; macOS and Windows are not CI-covered, and there is no desktop-host probe yet.
+**How to read `compatible`.** It means this plugin's codec and manifest contract has been checked against that host generation (code-level comparison plus the unit/contract suite), **not** that an end-to-end probe was run on that exact host build. The table is a declaration; how each claim was checked is summarized here. Real-host probes so far: `headless` (2026-10-15), `web` (2026-10-16), and `web` on **0.2.1-rc.3** for the 2.0.0 release (2026-10-27: client activation, conflict panel arbitration, injection suppression, rollback to 1.9.2 — 23/23 checks); the `desktop` profile has **not** been probed yet (see [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b). CI runs on Ubuntu against **Node 18.x / 20.x / 24.x** with the `0.2.0-rc.1` peer generation; macOS and Windows are not CI-covered, and there is no desktop-host probe yet.
 
 Two points worth spelling out:
 
@@ -554,6 +563,9 @@ npm test          # all assertions (including the three guards)
 
 ## FAQ
 
+**What changes in injection behaviour after upgrading to 2.0.0?**
+2.0.0 is a **behaviour-changing release** (hence MAJOR): ① a memory whose `invalid_at` has passed is **no longer injected as body text**; ② a memory with an unresolved contradiction keeps **both sides out of the body** until you resolve it on the 「记忆管理 → 冲突」(Memory management → Conflicts) tab; ③ **unlabelled old memories behave exactly as before** — no migration is needed, and there is no migration script. **Downgrading to 1.9.x is safe**: no data is damaged, but the old version ignores the invalid markers (invalid memories are injected again) and the conflicts tab disappears — that is **functionality disappearing, not data corruption**. If you only want to turn this filter off while keeping the rest of this release, use `SAGE_MEM_VALIDITY=0` (only `0` / `false` / `off` count as off).
+
 **What do I do if my memories are not being injected?**
 First confirm the memory directory is right (`SAGE_MEM_DIR`, default `~/.sage-mem/memory`), then check whether the files have frontmatter (broken frontmatter is **handled leniently** — the file is still read, with fields falling back to defaults). The 「体检」(audit) page in the panel reports structural problems such as dangling index entries, missing index entries and broken links.
 
@@ -574,6 +586,9 @@ Yes, it is off by default. It and archiving are two different things: archiving 
 
 **The plugin market says "the registry's latest is older than the installed version, updating would downgrade"?**
 That is a **stale `/latest` cache on the download-region mirror**, not a mis-published package: the mirror's full metadata (the document pnpm reads) already has the new version, while the `/<pkg>/latest` shortcut still serves an old one. Retry after a minute or two; if it persists, temporarily switch the market's download region to "Global" (the origin registry, registry.npmjs.org), update, then switch back. To check what is actually published: `npm view sage-mem dist-tags`.
+
+**Why is the downloads badge an endpoint badge instead of `npm/dm`?**
+npm's own `downloads/point/last-month` API has returned 0 for every package since July 2026, which made `npm/dm` render a red `0/month`. The badge is now computed from the still-working `downloads/range` API by a daily GitHub Actions job and published to the `badges` branch as a [shields.io endpoint badge](https://shields.io/badges/endpoint-badge). If the number has not moved for more than ~2 days, it is usually a delayed scheduled run (or an npm API outage, in which case the last good value is kept on purpose).
 
 ## Uninstall
 

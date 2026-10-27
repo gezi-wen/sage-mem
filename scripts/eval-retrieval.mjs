@@ -36,11 +36,26 @@ import {
   chunksOf,
   retrieve,
 } from '../lib/memory/search.js'
+// 2.0.0：注入侧会按 `invalid_at` 抑制失效记忆。评测要量的是**注入结果**，
+// 所以判据必须复用生产代码那一份（`buildExpirySet`），不在这里另写一套「什么时候算失效」。
+import { buildExpirySet, parseValidityTime } from '../lib/memory/validity.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
 const DEFAULT_CORPUS = join(ROOT, 'test', 'eval', 'corpus')
 const DEFAULT_QUESTIONS = join(ROOT, 'test', 'eval', 'questions.jsonl')
+
+/**
+ * 评测时钟（固定值，不读 `Date.now()`）。
+ *
+ * 理由与语料 `mtimeMs = 0` 同一条：**基线要可重放**。失效判定的边界依赖「现在」，
+ * 读一次真实时钟就等于让同一份语料在不同日子产出不同结论（`invalid_at` 写的是哪天，
+ * 跑评测那天是不是已经过了它）。固定成这个值之后：
+ *   - 语料里所有带 `invalid_at` 的旧条目（2026-09）必然「已到点」；
+ *   - 未来时间语料的语义也有确定解释（相对这个时钟是未来，就永远不失效）。
+ * 要加「未来才失效」的语料时，先改这个常量并在语料里注明，不要让它跟着跑的那天漂。
+ */
+const EVAL_NOW_MS = Date.parse('2026-11-01T00:00:00+08:00')
 
 /** `note` 里带这个记号 = 已知的词法失败边界：语义上有答案，但 query 与原文没有词面重合。 */
 const LEXFAIL = '[lexfail]'
@@ -174,6 +189,11 @@ function loadCorpus(dir) {
       baseline: parseBaseline(content),
       baselinePriority: meta.baselinePriority || 0,
       updated: meta.updated || '',
+      // 2.0.0：有效性三字段原样带出来（解析口径复用 frontmatter.js，判定复用 validity.js）。
+      // 坏格式也照样带出——判它是「未标注」是 validity.js 的事（R2：认不出就不猜）。
+      validAt: meta.validAt || '',
+      invalidAt: meta.invalidAt || '',
+      supersededBy: meta.supersededBy || '',
       mtimeMs: 0,
     }
   })
@@ -247,6 +267,24 @@ function auditAnnotations(questions, corpus) {
   const preferNotInNeeded = []
   const sharedTokenPairs = new Set()
   const sharedTokenSamples = []
+  // 2.0.0：有效性标注自检。**坏标注会让分母悄悄变小**（比如「已失效」题的黑名单其实
+  // 没有任何失效标记，于是它永远是 0/6），所以坏标注必须非零退出，不能只当提示。
+  const badValidity = []
+  const badSupersededBy = []
+  const staleNotMarked = []
+  const neededSuppressed = []
+  const preferOlderNotExpired = []
+  // 评测时钟固定（见 EVAL_NOW_MS）：失效判定与注入侧复用同一个纯函数。
+  const expirySet = buildExpirySet(corpus, EVAL_NOW_MS)
+  for (const f of corpus) {
+    for (const field of ['valid_at', 'invalid_at']) {
+      const value = field === 'valid_at' ? f.validAt : f.invalidAt
+      if (value && !parseValidityTime(value).ok) badValidity.push(`${f.file} ${field}=${JSON.stringify(value)}（认不出）`)
+    }
+    if (f.supersededBy && !byFile.has(f.supersededBy)) {
+      badSupersededBy.push(`${f.file} → ${f.supersededBy}（目标不存在）`)
+    }
+  }
 
   for (const q of questions) {
     const qTerms = new Set(tokenize(q.query))
@@ -267,6 +305,10 @@ function auditAnnotations(questions, corpus) {
         if (!(Number.isFinite(a) && Number.isFinite(b) && a >= 1 && b <= total && a <= b)) {
           badSpans.push(`${q.id} → ${need.file} span=${a}-${b}（该文件共 ${total} 行）`)
         }
+      }
+      // 2.0.0：needed 自己带已到点的 invalid_at = 标注自相矛盾（注入侧会把它挡掉，召回必然掉）。
+      if (expirySet.has(need.file)) {
+        neededSuppressed.push(`${q.id} → ${need.file}（这份是 needed，却被标了已到点的 invalid_at）`)
       }
     }
     for (const file of q.mustNotInject) {
@@ -293,6 +335,15 @@ function auditAnnotations(questions, corpus) {
     // ── 难负例标注的合法性 ──
     // 这些字段是给「按为什么难分组」用的量具标注，写错了会让分母悄悄变空，
     // 所以和 needed/黑名单一样进「标注自检」、非零即退出码 1。
+    if (q.hardNegative === 'stale-content') {
+      // 「已失效内容」这一类的黑名单**必须真的被失效标记覆盖**。否则这一类的
+      // 误注入率永远测的是「检索会不会命中它」，而不是「注入侧有没有挡住它」。
+      for (const file of q.mustNotInject) {
+        if (byFile.has(file) && !expirySet.has(file)) {
+          staleNotMarked.push(`${q.id} → ${file}（stale-content 的黑名单文件没有已到点的 invalid_at，不会被抑制）`)
+        }
+      }
+    }
     if (q.hardNegative !== undefined) {
       if (!HARD_NEGATIVE_SET.has(q.hardNegative)) {
         badHardNegative.push(`${q.id} → 未知取值 ${JSON.stringify(q.hardNegative)}`)
@@ -307,6 +358,10 @@ function auditAnnotations(questions, corpus) {
           }
           if (!q.needed.some(n => n.file === prefer.newer)) {
             preferNotInNeeded.push(`${q.id} → preferNewer.newer（${prefer.newer}）不在 needed 里，排序断言没有落点`)
+          }
+          // 2.0.0：旧版必须带**已到点**的 invalid_at，否则「旧版压新版」的归零没有原因。
+          if (byFile.has(prefer.older) && !expirySet.has(prefer.older)) {
+            preferOlderNotExpired.push(`${q.id} → preferNewer.older（${prefer.older}）没有已到点的 invalid_at，不会被抑制`)
           }
         }
       } else if (q.preferNewer !== undefined) {
@@ -335,6 +390,13 @@ function auditAnnotations(questions, corpus) {
     badHardNegative,
     missingPreferNewer,
     preferNotInNeeded,
+    badValidity,
+    badSupersededBy,
+    staleNotMarked,
+    neededSuppressed,
+    preferOlderNotExpired,
+    expirySet,
+    expiredFiles: [...expirySet].sort(),
     sharedTokenPairs,
     sharedTokenSamples,
     blacklistChecks,
@@ -345,7 +407,7 @@ function auditAnnotations(questions, corpus) {
 
 // ─────────────────────────── 逐题求值 ───────────────────────────
 
-function evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs) {
+function evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs, expirySet) {
   const started = performance.now()
   let result = null
   let error = ''
@@ -356,7 +418,7 @@ function evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs) {
   }
   const ms = performance.now() - started
 
-  const hits = result && Array.isArray(result.hits) ? result.hits.map(h => ({
+  const allHits = result && Array.isArray(result.hits) ? result.hits.map(h => ({
     id: String(h.id ?? ''),
     file: String(h.file),
     title: String(h.title ?? ''),
@@ -373,6 +435,13 @@ function evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs) {
     evidenceRarestDf: Number.isFinite(h.evidenceRarestDf) ? h.evidenceRarestDf : null,
     evidenceRun: Number.isFinite(h.evidenceRun) ? h.evidenceRun : null,
   })) : []
+  // 2.0.0 的注入语义：先检索、再在**投递层**判失效（`composeDelivery` 的 `expired` 集合）。
+  // 被抑制的命中**仍然占据检索候选位**（真实链路里它到显示层才判 `unresolved`），所以这里
+  // 是「从同一批 top-k 里划掉」，而不是「先过滤语料再检索」—— 后者会凭空多出候选位、
+  // 把别的文件抬进 top-k，量的就不是同一个东西了。
+  const suppressedHits = expirySet ? allHits.filter(h => expirySet.has(h.file)) : []
+  const hits = expirySet ? allHits.filter(h => !expirySet.has(h.file)) : allHits
+  const suppressed = suppressedHits.map(h => ({ file: h.file, reason: 'expired_source', excerptBytes: h.excerptBytes }))
   const firstAt = new Map()
   hits.forEach((h, i) => {
     if (!firstAt.has(h.file)) firstAt.set(h.file, i)
@@ -412,6 +481,10 @@ function evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs) {
           olderRank,
           newerRecalled: newerRank > 0,
           olderRecalled: olderRank > 0,
+          // 旧版是不是被「失效」这一层挡掉了 —— 这是 2.0.0 后 `olderOverNewer` 归零的
+          // **原因字段**。不单列出来，看板会显示「旧版不压新版了」，却看不出是因为被抑制
+          // 还是因为排序真的变了。
+          olderSuppressed: Boolean(expirySet && expirySet.has(q.preferNewer.older)),
           olderOverNewer: olderRank > 0 && (newerRank === 0 || olderRank < newerRank),
         }
       })()
@@ -434,10 +507,11 @@ function evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs) {
   const injectedBytes = hits.reduce((s, h) => s + h.excerptBytes, 0)
 
   // 同一文件在同一次结果里重复出现 = 候选位被同一份证据重复占用。
+  // 这里看**检索输出**（含被抑制的），因为它量的是检索层结构，不是投递层结果。
   const seen = new Set()
   let dupExtra = 0
   let dupExtraBytes = 0
-  for (const h of hits) {
+  for (const h of allHits) {
     if (seen.has(h.file)) {
       dupExtra++
       dupExtraBytes += h.excerptBytes
@@ -460,6 +534,11 @@ function evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs) {
     ok: result?.ok === true,
     ms,
     hits,
+    // 2.0.0：被失效标记抑制的命中（仍在 allHits 里、只是不进正文）。
+    // 单列出来是为了让「误注入归零」有可核对的原因，而不是一个变好的数字。
+    suppressed,
+    suppressedFiles: suppressed.map(s => s.file),
+    allCandidates: allHits.length,
     needed,
     foundCount,
     allFound,
@@ -481,8 +560,8 @@ function evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs) {
 }
 
 /** 同一题集跑一遍某个 scope —— 用于「all 是否真的比 summary 好」这条对照。 */
-function runAll(questions, corpus, scope, limit, perFile, sharedTokenPairs) {
-  return questions.map(q => evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs))
+function runAll(questions, corpus, scope, limit, perFile, sharedTokenPairs, expirySet) {
+  return questions.map(q => evaluateQuestion(q, scope, corpus, limit, perFile, sharedTokenPairs, expirySet))
 }
 
 // ─────────────────────────── 指标 ───────────────────────────
@@ -526,6 +605,10 @@ function summarize(rows) {
     incompleteCoverageQuestions: 0,
     skippedFiles: 0,
     candidatesSum: 0,
+    // 2.0.0：失效抑制的原始计数（被抑制的命中条数、涉及题数、被抑制的候选片段字节）。
+    suppressedHits: 0,
+    suppressionQuestions: 0,
+    suppressedBytes: 0,
     latencies: [],
   }
   for (const row of rows) {
@@ -535,6 +618,11 @@ function summarize(rows) {
     m.skippedFiles += row.coverage.skipped
     if (!row.coverage.complete) m.incompleteCoverageQuestions++
     if (row.error) m.retrieveErrors++
+    if (row.suppressed.length) {
+      m.suppressionQuestions++
+      m.suppressedHits += row.suppressed.length
+      m.suppressedBytes += row.suppressed.reduce((s, x) => s + x.excerptBytes, 0)
+    }
     if (row.dupExtra > 0) {
       m.dupQuestions++
       m.dupExtra += row.dupExtra
@@ -617,6 +705,13 @@ function summarizeHard(rows) {
       preferQuestions: preferRows.length,
       newerRecalled: preferRows.filter(row => row.prefer.newerRecalled).length,
       olderOverNewer: preferRows.filter(row => row.prefer.olderOverNewer).length,
+      // 2.0.0：这两项是把「旧版压新版」归零**归因**到失效抑制的原始计数。
+      // 没有它们，`olderOverNewer = 0/4` 与「排序真的修好了」看起来一模一样。
+      olderSuppressed: preferRows.filter(row => row.prefer.olderSuppressed).length,
+      suppressedBlacklistChecks: groupRows.reduce(
+        (n, row) => n + row.suppressedFiles.filter(f => row.question.mustNotInject.includes(f)).length,
+        0,
+      ),
     }
   }
   return out
@@ -625,13 +720,18 @@ function summarizeHard(rows) {
 /** 把难负例分组转成能进 `metrics.rates` 的比率，基线对比因此能盯住它们。 */
 function hardRates(hard) {
   const div = (n, d) => (d > 0 ? n / d : 0)
-  const k = kind => hard[kind] ?? { violationQuestions: 0, blacklistQuestions: 0, preferQuestions: 0, newerRecalled: 0, olderOverNewer: 0 }
+  const k = kind => hard[kind] ?? {
+    violationQuestions: 0, blacklistQuestions: 0, preferQuestions: 0,
+    newerRecalled: 0, olderOverNewer: 0, olderSuppressed: 0, suppressedBlacklistChecks: 0,
+  }
   return {
     hardSharedWordInjectRate: div(k('shared-common-word').violationQuestions, k('shared-common-word').blacklistQuestions),
     hardSameNameInjectRate: div(k('same-name-different-project').violationQuestions, k('same-name-different-project').blacklistQuestions),
     hardNewerRecallRate: div(k('same-entity-different-time').newerRecalled, k('same-entity-different-time').preferQuestions),
     hardOlderOverNewerRate: div(k('same-entity-different-time').olderOverNewer, k('same-entity-different-time').preferQuestions),
+    hardOlderSuppressedRate: div(k('same-entity-different-time').olderSuppressed, k('same-entity-different-time').preferQuestions),
     hardStaleInjectRate: div(k('stale-content').violationQuestions, k('stale-content').blacklistQuestions),
+    hardStaleSuppressedRate: div(k('stale-content').suppressedBlacklistChecks, k('stale-content').blacklistChecks),
   }
 }
 
@@ -702,6 +802,7 @@ function detailLines(row) {
   const flags = []
   if (row.error) flags.push(`抛错：${row.error}`)
   if (row.dupExtra > 0) flags.push(`重复文件×${row.dupExtra}（${row.dupExtraBytes} 字节）`)
+  if (row.suppressed.length) flags.push(`已抑制[${row.suppressed.map(s => s.file).join(', ')}]（expired_source）`)
   if (row.blacklistHit.length) flags.push(`命中黑名单[${row.blacklistHit.join(', ')}]`)
   if (row.whitelistHit.length) flags.push(`白名单外[${row.whitelistHit.join(', ')}]`)
   if (!row.coverage.complete) flags.push('切分不全')
@@ -727,6 +828,8 @@ function printMetrics(title, rows, m, r) {
   console.log('      ⚠️ 切片只是诊断：共享词元 ≠ 语义无关，切片排掉的恰恰是词法检索最容易犯错的难负例；')
   console.log('         不能由「无共享词元子集 = 0」推出「真实误注入为零」。')
   line('白名单外误注入', frac(m.whitelistViolationQuestions, m.whitelistQuestions))
+  line('被失效抑制的命中', `${m.suppressedHits} 条 / ${m.suppressionQuestions} 题，${m.suppressedBytes} 字节未进正文`)
+  console.log('      ↑ 这些命中仍在检索候选里（占据位次），只是投递层判了 expired_source；不是「检索没命中」。')
   line('重复文件（题数／多余条）', `${m.dupQuestions} / ${m.dupExtra}   [重复字节 ${m.dupExtraBytes}]`)
   line('无答案题仍注入', `${frac(m.overInjectQuestions, m.unresolvedQuestions)}   [只说「继续」这类题]`)
   line('无答案题拒绝率', frac(m.noAnswerRefused, m.unresolvedQuestions))
@@ -752,12 +855,15 @@ function printHardNegatives(hard) {
       continue
     }
     if (kind === 'same-entity-different-time') {
-      line(label, `新版召回 ${frac(h.newerRecalled, h.preferQuestions)} | 旧版压新版 ${frac(h.olderOverNewer, h.preferQuestions)} | 题数 ${h.questions}`)
+      line(label, `新版召回 ${frac(h.newerRecalled, h.preferQuestions)} | 旧版压新版 ${frac(h.olderOverNewer, h.preferQuestions)} | 旧版被抑制 ${frac(h.olderSuppressed, h.preferQuestions)} | 题数 ${h.questions}`)
+    } else if (kind === 'stale-content') {
+      line(label, `误注入 ${frac(h.violationQuestions, h.blacklistQuestions)} | 检查项 ${h.blacklistChecks}（命中 ${h.violations}）| 被抑制 ${frac(h.suppressedBlacklistChecks, h.blacklistChecks)} | 题数 ${h.questions}`)
     } else {
       line(label, `误注入 ${frac(h.violationQuestions, h.blacklistQuestions)} | 检查项 ${h.blacklistChecks}（命中 ${h.violations}）| 题数 ${h.questions}`)
     }
   }
   console.log('      四类各自独立分母；不要拿「无共享词元子集」代替它们 —— 那个切片刻意排除了这四类。')
+  console.log('      「被抑制」是归因字段：误注入归零若来自失效抑制，这里会如实显示，不会冒充排序修好了。')
 }
 
 // ─────────────────────────── 诊断报告 ───────────────────────────
@@ -804,6 +910,7 @@ function renderDiagnostics({ opts, corpus, rows, m, r, audit, corpusHash, questi
   push(`| MRR | ${r.mrr.toFixed(4)}（Σ1/rank = ${m.mrrSum.toFixed(4)} / ${m.neededQuestions}） |`)
   push(`| 误注入率（主指标） | ${m.blacklistViolationQuestions}/${m.blacklistQuestions} = ${pctOf(m.blacklistViolationQuestions, m.blacklistQuestions)} |`)
   push(`| 白名单外误注入 | ${m.whitelistViolationQuestions}/${m.whitelistQuestions} = ${pctOf(m.whitelistViolationQuestions, m.whitelistQuestions)} |`)
+  push(`| 被失效抑制的命中 | ${m.suppressedHits} 条 / ${m.suppressionQuestions} 题（${m.suppressedBytes} 字节未进正文） |`)
   push(`| 无答案题拒绝率 | ${m.noAnswerRefused}/${m.unresolvedQuestions} = ${pctOf(m.noAnswerRefused, m.unresolvedQuestions)} |`)
   push(`| Precision@k（标注相关集·下界） | ${m.precisionHits}/${m.precisionDen} = ${pctOf(m.precisionHits, m.precisionDen)}（可评题 ${m.precisionQuestions}） |`)
   push(`| 注入字节（候选片段代理） | ${m.injectedBytes} 总 / ${r.injectedBytesAvg.toFixed(1)} 平均每题 |`)
@@ -817,8 +924,9 @@ function renderDiagnostics({ opts, corpus, rows, m, r, audit, corpusHash, questi
       if (!h.questions) continue
       const reading =
         kind === 'same-entity-different-time'
-          ? `新版召回 ${h.newerRecalled}/${h.preferQuestions}；旧版压新版 ${h.olderOverNewer}/${h.preferQuestions}`
-          : `误注入 ${h.violationQuestions}/${h.blacklistQuestions}（检查项 ${h.blacklistChecks}，命中 ${h.violations}）`
+          ? `新版召回 ${h.newerRecalled}/${h.preferQuestions}；旧版压新版 ${h.olderOverNewer}/${h.preferQuestions}；旧版被抑制 ${h.olderSuppressed}/${h.preferQuestions}`
+          : `误注入 ${h.violationQuestions}/${h.blacklistQuestions}（检查项 ${h.blacklistChecks}，命中 ${h.violations}）` +
+            (kind === 'stale-content' ? `；被抑制 ${h.suppressedBlacklistChecks}/${h.blacklistChecks}` : '')
       push(`| ${label} | ${h.questions} | ${reading} |`)
     }
     push('')
@@ -834,6 +942,7 @@ function renderDiagnostics({ opts, corpus, rows, m, r, audit, corpusHash, questi
     push(`- 备注：${q.note || '—'}`)
     push(`- needed：${row.needed.length ? row.needed.map((n) => `${n.file}${n.span ? ` [${n.span[0]}-${n.span[1]}]` : ''} ${n.found ? `✓@${n.rank}` : '✗'}`).join('；') : '—'}`)
     const flags = []
+    if (row.suppressed.length) flags.push(`已抑制（expired_source）：${row.suppressed.map((s) => s.file).join(', ')}`)
     if (row.blacklistHit.length) flags.push(`黑名单命中：${row.blacklistHit.join(', ')}`)
     if (row.whitelistHit.length) flags.push(`白名单外：${row.whitelistHit.join(', ')}`)
     if (q.unresolved && row.hits.length) flags.push('无答案题仍注入')
@@ -893,6 +1002,7 @@ function renderDiagnostics({ opts, corpus, rows, m, r, audit, corpusHash, questi
   push('## 口径说明', '')
   push('- **Precision@k 是下界**：相关集取「标注 needed ∪ allowFiles」；合成语料里未标注但相关的文件不会计入分子。')
   push('- **注入字节**用候选片段字节代理；真实注入还受单场会话预算裁切（契约 2.5，软上限）。')
+  push(`- **失效抑制**：注入前先按 \`invalid_at\`（评测时钟固定为 ${new Date(EVAL_NOW_MS).toISOString()}）判 \`expired_source\`；被抑制的命中仍占检索候选位次，但不计入注入、也不计入误注入。误注入归零时请对照难负例表里的「被抑制 / 旧版被抑制」列，别把抑制当成检索变好了。`)
   push(`- **黑名单主指标**按「有黑名单检查的题」计，不按检查项计；本版是 ${m.blacklistViolationQuestions}/${m.blacklistQuestions} 题、检查项 ${m.blacklistChecks} 个。`)
   push('- **摘要层没有 evidence 门槛**是有意设计（摘要只有一句话，词面重合已经是较强信号）；代价是共享常用词的记忆会被误注入，这正是 1.7.2 难负例扩容要压的。')
   push('')
@@ -951,9 +1061,18 @@ function main(argv) {
   line('黑名单检查项', `${audit.blacklistChecks} 项，其中无共享词元 ${audit.noSharedTokenChecks} 项，涉及题数 ${audit.noSharedTokenQuestions}`)
   line('切片排除的检查项', `${audit.blacklistChecks - audit.noSharedTokenChecks} 项（query 词元与文件重合 —— 难负例候选）`)
   for (const s of audit.sharedTokenSamples) console.log(`      ${s}`)
+  // 2.0.0：有效性标注自检（每条都要能红；坏标注会让「已失效内容」的分母悄悄变小）
+  line('有效性标注坏格式', String(audit.badValidity.length))
+  line('superseded_by 悬空', String(audit.badSupersededBy.length))
+  line('stale-content 未标失效', String(audit.staleNotMarked.length))
+  line('needed 被标记失效', String(audit.neededSuppressed.length))
+  line('preferNewer 旧版未标失效', String(audit.preferOlderNotExpired.length))
+  line('评测时钟 / 已失效语料', `${new Date(EVAL_NOW_MS).toISOString()} · ${audit.expiredFiles.length} 份：${audit.expiredFiles.join(', ') || '—'}`)
 
+  // 注入侧语义：命中先过一遍失效集合（与 `composeDelivery` 的 `expired` 集合同一个判据）。
+  const expirySet = audit.expirySet
   const rows = questions.map(q =>
-    evaluateQuestion(q, opts.mode === 'mixed' ? q.scope : opts.mode, corpus, limit, perFile, audit.sharedTokenPairs))
+    evaluateQuestion(q, opts.mode === 'mixed' ? q.scope : opts.mode, corpus, limit, perFile, audit.sharedTokenPairs, expirySet))
 
   console.log('\n== 逐题明细 ==')
   for (const row of rows) for (const l of detailLines(row)) console.log(l)
@@ -969,7 +1088,7 @@ function main(argv) {
   // 不依赖任何历史基线，所以第一次跑就能看出问题。
   let reference = null
   if (opts.mode !== 'summary') {
-    const refRows = runAll(questions, corpus, 'summary', limit, perFile, audit.sharedTokenPairs)
+    const refRows = runAll(questions, corpus, 'summary', limit, perFile, audit.sharedTokenPairs, expirySet)
     const refM = summarize(refRows)
     const refR = rates(refM)
     reference = { mode: 'summary', raw: refM, rates: refR }
@@ -1017,6 +1136,11 @@ function main(argv) {
     ...audit.badHardNegative.map(x => `难负例分类非法：${x}`),
     ...audit.missingPreferNewer.map(x => `preferNewer 标注不全：${x}`),
     ...audit.preferNotInNeeded.map(x => `preferNewer 与 needed 不一致：${x}`),
+    ...audit.badValidity.map(x => `有效性标注坏格式：${x}`),
+    ...audit.badSupersededBy.map(x => `superseded_by 悬空：${x}`),
+    ...audit.staleNotMarked.map(x => `stale-content 未标失效：${x}`),
+    ...audit.neededSuppressed.map(x => `needed 被标记失效：${x}`),
+    ...audit.preferOlderNotExpired.map(x => `preferNewer 旧版未标失效：${x}`),
   ]
   const structural = []
   for (const row of rows) {
@@ -1095,10 +1219,26 @@ function main(argv) {
         badHardNegative: audit.badHardNegative,
         missingPreferNewer: audit.missingPreferNewer,
         preferNotInNeeded: audit.preferNotInNeeded,
+        badValidity: audit.badValidity,
+        badSupersededBy: audit.badSupersededBy,
+        staleNotMarked: audit.staleNotMarked,
+        neededSuppressed: audit.neededSuppressed,
+        preferOlderNotExpired: audit.preferOlderNotExpired,
         blacklistChecks: audit.blacklistChecks,
         noSharedTokenChecks: audit.noSharedTokenChecks,
         noSharedTokenQuestions: audit.noSharedTokenQuestions,
         sharedTokenSamples: audit.sharedTokenSamples,
+      },
+      // 2.0.0：评测所依据的「现在」与失效语料名单。写进产物是为了让「为什么这 6 份
+      // 被抑制」在离开这次运行之后仍然可核对（固定时钟，不读 Date.now()）。
+      validity: {
+        clockMs: EVAL_NOW_MS,
+        clockISO: new Date(EVAL_NOW_MS).toISOString(),
+        expiredFiles: audit.expiredFiles,
+        suppressedHits: m.suppressedHits,
+        suppressionQuestions: m.suppressionQuestions,
+        suppressedBytes: m.suppressedBytes,
+        semantics: '命中先检索、后在投递层按 invalid_at 判 expired_source；被抑制的命中仍占候选位次。',
       },
       // 指标口径写给结构化消费方：主指标是哪一个、切片叫什么、切片为什么不能当结论。
       // 放在 JSON 里而不是只写在输出里，是因为 CI/看板往往只读这个文件。
@@ -1109,6 +1249,10 @@ function main(argv) {
           '共享词元 ≠ 语义无关。切片只保留「query 与文件一个词元都不共享」的检查项，' +
           '因而系统性排除了词法检索最容易犯错的难负例（共享常用词、同名不同项目、同实体不同时间、已失效内容）；' +
           '不能由切片为 0 推出真实误注入为零。',
+        suppression:
+          '2.0.0 起命中先过投递层的失效集合（`invalid_at` 已到点 → expired_source）；' +
+          '被抑制的命中仍占检索候选位次，不计入「注入」也不计入「误注入」。' +
+          '难负例看板的「旧版被抑制 / 被抑制」两项是归因字段，用来区分「排序修好了」与「被失效挡掉了」。',
       },
       metrics: { raw: m, rates: r },
       // 难负例四类的原始计数（题数/检查项/命中），比 rates 更能看出分母。
@@ -1141,6 +1285,8 @@ function main(argv) {
           evidenceRun: h.evidenceRun,
         })),
         needed: row.needed,
+        suppressed: row.suppressed,
+        allCandidates: row.allCandidates,
         blacklistHit: row.blacklistHit,
         whitelistHit: row.whitelistHit,
         dupExtra: row.dupExtra,
@@ -1190,7 +1336,11 @@ const COMPARED = [
   ['hardSameNameInjectRate', 'down'],
   ['hardNewerRecallRate', 'up'],
   ['hardOlderOverNewerRate', 'down'],
+  ['hardOlderSuppressedRate', 'up'],
   ['hardStaleInjectRate', 'down'],
+  // 2.0.0：把「归零」归因到失效抑制（越高越好 = 该被挡的都被挡了）。
+  // ⚠️ 这一项高不代表检索变好；它只说明「误注入归零」不是幻觉。
+  ['hardStaleSuppressedRate', 'up'],
 ]
 
 /**

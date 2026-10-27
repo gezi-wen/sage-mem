@@ -663,6 +663,317 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 			]);
 		}
 
+		// ── 「冲突」页签（2.0.0 矛盾检测）────────────────────────────────────
+		// 只做三件事：看（两份正文对照）、裁（标失效 / 标记已裁决 / 撤销 / 删除记录）、
+		// 说清后果（写哪个文件、能不能撤销、失败时的出路在哪）。
+		//
+		// 状态全部由 Section 持有（与文件列表 / 体检同一套「组件只吃 props」的规矩）：
+		// 头部徽标与这一屏数的是同一批记录，两边各存一份就会不同步。
+		//
+		// 文案里反复写「只标不删」：这是 2.0.0 最容易被误解的一条 —— 标失效不删文件、
+		// 不移动、不进 archive/，只是 frontmatter 多一行 invalid_at，随时可撤销。
+		const CONFLICT_KIND_KEY = {
+			contradiction: "conflict.kind.contradiction",
+			stale_version: "conflict.kind.staleVersion",
+			external_change: "conflict.kind.externalChange",
+			unresolved_merge: "conflict.kind.unresolvedMerge",
+		};
+		const CONFLICT_STATUS_KEY = {
+			open: "conflict.status.open",
+			resolved: "conflict.status.resolved",
+			dismissed: "conflict.status.dismissed",
+		};
+		const CONFLICT_DECISION_KEY = {
+			invalidate: "conflict.decision.invalidate",
+			dismiss: "conflict.decision.dismiss",
+			keep_both: "conflict.decision.keepBoth",
+		};
+		// 失败码 → 出路。**每一条都必须说清下一步**：只写「失败了」等于让用户再点一次
+		// 同一颗按钮（D25 修过的正是「点了没反应」这类事故）。
+		const CONFLICT_CODE_KEY = {
+			invalid: "conflict.code.invalid",
+			missing: "conflict.code.missing",
+			malformed: "conflict.code.malformed",
+			invalid_transition: "conflict.code.invalidTransition",
+			stale_version: "conflict.code.staleVersion",
+			write_denied: "conflict.code.writeDenied",
+			unsupported: "conflict.code.unsupported",
+			io_error: "conflict.code.ioError",
+		};
+		/**
+		 * 每份正文默认只显示开头一段。
+		 *
+		 * 按**字符**截 2048（≈「2 KB」的同量级）：按字节算的话中文只剩六百多字，
+		 * 对照两份说法时反而不够看；卡片本身还有 max-height 滚动，不会撑破布局。
+		 */
+		const CONFLICT_BODY_MAX = 2048;
+
+		function conflictKindLabel(kind) {
+			const key = CONFLICT_KIND_KEY[String(kind)];
+			return key ? t(key) : String(kind == null ? "" : kind);
+		}
+		function conflictStatusLabel(status) {
+			const key = CONFLICT_STATUS_KEY[String(status)];
+			return key ? t(key) : String(status == null ? "" : status);
+		}
+		function conflictDecisionLabel(decision) {
+			const key = CONFLICT_DECISION_KEY[String(decision)];
+			return key ? t(key) : String(decision == null ? "" : decision);
+		}
+
+		/**
+		 * 「冲突」面板（只读列表 + 裁决动作）。
+		 *
+		 * 能力降级是**逐动作**的：宿主有 list 没 invalidate（版本错配）时，对应按钮必须
+		 * 禁用并在同一屏里写明缺哪个接口 —— 不能让用户点了没反应。
+		 */
+		function ConflictPanel(props) {
+			const data = props.data;
+			const items = data && Array.isArray(data.items) ? data.items : [];
+			const broken = data && Array.isArray(data.broken) ? data.broken : [];
+			const ignored = data && Array.isArray(data.ignored) ? data.ignored : [];
+			const counts = (data && data.counts) || {};
+			const openN = typeof counts.open === "number"
+				? counts.open
+				: items.filter(function (x) { return x.status === "open"; }).length;
+			const totalN = typeof counts.total === "number" ? counts.total : items.length;
+			const tools = props.tools || {};
+			const bodies = props.bodies || {};
+			const expanded = props.expanded || {};
+			const confirm = props.confirm || null;
+			const busyId = props.busyId || null;
+			// `removeRecord` 而不是 `remove`：后者是宿主 RemoteNamespaceService 的保留方法名
+			// （声明即让整个 client 插件 activate 失败）。按钮文案的 i18n 键仍是 conflict.action.remove。
+			const ACTIONS = ["invalidate", "dismiss", "undo", "removeRecord"];
+			const missing = ACTIONS.filter(function (m) { return tools[m] !== true; })
+				.map(function (m) { return "conflict." + m; });
+
+			/** 动作按钮：方法不存在时禁用 + title 写明缺什么，绝不留「点了没反应」。 */
+			function actBtn(item, action, label, extraClass) {
+				const ok = tools[action] === true;
+				return h("button", {
+					type: "button", key: action,
+					className: "smem-btn" + (extraClass || ""),
+					disabled: !ok || busyId === item.id,
+					title: ok ? undefined : t("conflict.actionMissing", { method: action }),
+					onClick: ok ? function () { props.onAsk(item, action); } : undefined,
+				}, label);
+			}
+
+			function bodyPre(text) {
+				const s = typeof text === "string" ? text : "";
+				const shown = s.slice(0, CONFLICT_BODY_MAX);
+				const more = s.length > CONFLICT_BODY_MAX;
+				return h("pre", { className: "smem-conf-pre", key: "pre" }, [
+					shown || t("conflict.bodyEmpty"),
+					more ? "\n… " + t("conflict.bodyLimit") : null,
+				]);
+			}
+
+			function renderBodies(item, body) {
+				if (!body || body.loading) {
+					return [h("div", { className: "smem-status", key: "l" }, t("conflict.bodyLoading"))];
+				}
+				if (body.error) {
+					return [h("div", { className: "smem-err", key: "e" }, "⚠ " + body.error)];
+				}
+				const rec = body.record || {};
+				const contra = item.kind === "contradiction";
+				const parts = [
+					h("div", { className: "smem-conf-body", key: "in" }, [
+						h("div", { className: "smem-conf-label", key: "l" },
+							contra ? t("conflict.bodyIncomingContradiction") : t("conflict.bodyIncoming")),
+						bodyPre(rec.incoming),
+						Array.isArray(body.warnings) && body.warnings.length
+							? h("div", { className: "smem-ar-hint", key: "w" },
+									t("conflict.warnings", { list: body.warnings.map(String).join("；") }))
+							: null,
+					]),
+					h("div", { className: "smem-conf-body", key: "on" }, [
+						h("div", { className: "smem-conf-label", key: "l" },
+							contra ? t("conflict.bodyOnDiskContradiction") : t("conflict.bodyOnDisk")),
+						bodyPre(rec.onDisk),
+					]),
+				];
+				if (rec.truncated || item.truncated) {
+					parts.push(h("div", { className: "smem-conf-warn", key: "tr" }, t("conflict.truncatedHint")));
+				}
+				return parts;
+			}
+
+			/** 危险动作的两段式确认条（照「彻底归档删除」先例：先问，再动手）。 */
+			function confirmBlock(item) {
+				if (!confirm || confirm.id !== item.id) return null;
+				const act = confirm.action;
+				const file = confirm.file || item.file;
+				if (act === "invalidate") {
+					return h("div", { className: "smem-conf-confirm", key: "cf" }, [
+						h("div", { key: "what" }, t("conflict.confirmInvalidate", { file: file })),
+						item.otherFile
+							? h("div", { className: "smem-chips", key: "pick" }, [
+									h(Chip, {
+										key: "f", label: item.file, on: file === item.file,
+										onClick: function () { props.onPickFile(item.file); },
+									}),
+									h(Chip, {
+										key: "o", label: item.otherFile, on: file === item.otherFile,
+										onClick: function () { props.onPickFile(item.otherFile); },
+									}),
+								])
+							: null,
+						h("div", { className: "smem-ar-hint", key: "hint" }, t("conflict.confirmInvalidateHint")),
+						h("div", { className: "smem-row", key: "btns" }, [
+							h("button", {
+								type: "button", className: "smem-btn smem-btn-danger", key: "yes",
+								disabled: busyId === item.id,
+								onClick: props.onRun,
+							}, busyId === item.id ? t("conflict.busy") : t("conflict.confirmYesInvalidate")),
+							h("button", {
+								type: "button", className: "smem-btn", key: "no",
+								disabled: busyId === item.id, onClick: props.onCancelConfirm,
+							}, t("conflict.cancel")),
+						]),
+					]);
+				}
+				if (act === "undo") {
+					return h("div", { className: "smem-conf-confirm", key: "cf" }, [
+						h("div", { key: "what" }, t("conflict.confirmUndo", { file: item.invalidatedFile || item.file })),
+						h("div", { className: "smem-ar-hint", key: "hint" }, t("conflict.confirmUndoHint")),
+						h("div", { className: "smem-row", key: "btns" }, [
+							h("button", {
+								type: "button", className: "smem-btn smem-btn-primary", key: "yes",
+								disabled: busyId === item.id, onClick: props.onRun,
+							}, busyId === item.id ? t("conflict.busy") : t("conflict.confirmYesUndo")),
+							h("button", {
+								type: "button", className: "smem-btn", key: "no",
+								disabled: busyId === item.id, onClick: props.onCancelConfirm,
+							}, t("conflict.cancel")),
+						]),
+					]);
+				}
+				if (act === "removeRecord") {
+					return h("div", { className: "smem-conf-confirm", key: "cf" }, [
+						h("div", { key: "what" }, t("conflict.confirmRemove")),
+						h("div", { className: "smem-ar-hint", key: "hint" }, t("conflict.confirmRemoveHint")),
+						h("div", { className: "smem-row", key: "btns" }, [
+							h("button", {
+								type: "button", className: "smem-btn smem-btn-danger", key: "yes",
+								disabled: busyId === item.id, onClick: props.onRun,
+							}, busyId === item.id ? t("conflict.busy") : t("conflict.confirmYesRemove")),
+							h("button", {
+								type: "button", className: "smem-btn", key: "no",
+								disabled: busyId === item.id, onClick: props.onCancelConfirm,
+							}, t("conflict.cancel")),
+						]),
+					]);
+				}
+				return null;
+			}
+
+			function renderItem(item) {
+				const bodyOpen = expanded[item.id] === true;
+				const body = bodies[item.id] || null;
+				const openRec = item.status === "open";
+				// 撤销只对「当时真的写过文件」的记录有意义：dismiss / keep_both 没写盘，
+				// 给一颗「撤销」只会让人以为要撤掉什么，其实没有。
+				const canUndo = !openRec && (item.decision === "invalidate" || !!item.invalidatedFile);
+				return h("div", { className: "smem-conf-item", key: item.id }, [
+					h("div", { className: "smem-conf-head", key: "head" }, [
+						h("span", { className: "smem-badge", key: "kind" }, conflictKindLabel(item.kind)),
+						h("span", {
+							className: "smem-badge" + (openRec ? " smem-conf-status--open" : ""),
+							key: "st",
+						}, conflictStatusLabel(item.status)),
+						h("span", { className: "smem-muted", key: "at" },
+							item.at ? t("conflict.time", { at: item.at }) : t("conflict.noTime")),
+						item.truncated ? h("span", { className: "smem-conf-warn", key: "tr" }, t("conflict.truncated")) : null,
+						h("span", { className: "smem-conf-id", key: "id" }, String(item.id)),
+					]),
+					h("div", { className: "smem-conf-files", key: "files" }, [
+						h("button", {
+							type: "button", className: "smem-btn smem-conf-file", key: "f",
+							title: t("conflict.openFileTitle"),
+							onClick: function () { props.onOpenFile(item.file); },
+						}, String(item.file)),
+						item.otherFile ? h("span", { className: "smem-conf-arrow", key: "ar" }, "↔") : null,
+						item.otherFile
+							? h("button", {
+									type: "button", className: "smem-btn smem-conf-file", key: "o",
+									title: t("conflict.openFileTitle"),
+									onClick: function () { props.onOpenFile(item.otherFile); },
+								}, String(item.otherFile))
+							: null,
+					]),
+					item.otherFile ? h("div", { className: "smem-ar-hint", key: "pair" }, t("conflict.pairHint")) : null,
+					item.note ? h("div", { className: "smem-ar-hint", key: "note" }, t("conflict.note", { note: item.note })) : null,
+					item.decision
+						? h("div", { className: "smem-ar-hint", key: "dec" },
+								t("conflict.decisionLine", { decision: conflictDecisionLabel(item.decision), at: item.decidedAt || "—" }))
+						: null,
+					item.invalidatedFile
+						? h("div", { className: "smem-ar-hint", key: "inv" },
+								t("conflict.invalidatedFile", { file: item.invalidatedFile }))
+						: null,
+					h("div", { className: "smem-conf-acts", key: "bodybar" }, [
+						h("button", {
+							type: "button", className: "smem-btn", key: "body",
+							disabled: tools.read !== true,
+							title: tools.read === true ? undefined : t("conflict.actionMissing", { method: "read" }),
+							onClick: tools.read === true ? function () { props.onToggleBodies(item); } : undefined,
+						}, bodyOpen ? t("conflict.bodiesHide") : t("conflict.bodiesToggle")),
+					]),
+					bodyOpen ? h("div", { className: "smem-conf-bodies", key: "bodies" }, renderBodies(item, body)) : null,
+					confirmBlock(item),
+					h("div", { className: "smem-conf-acts", key: "acts" }, [
+						openRec ? actBtn(item, "invalidate", t("conflict.action.invalidate"), " smem-btn-danger-ghost") : null,
+						openRec ? actBtn(item, "dismiss", t("conflict.action.dismiss")) : null,
+						canUndo ? actBtn(item, "undo", t("conflict.action.undo")) : null,
+						actBtn(item, "removeRecord", t("conflict.action.remove"), " smem-btn-danger-ghost"),
+					]),
+				]);
+			}
+
+			return h("div", { className: "smem-tool-panel smem-tool-panel--full smem-conf", key: "conflict" }, [
+				h("div", { className: "smem-tool-head", key: "head" }, [
+					h("span", { className: "smem-tool-title", key: "t" }, t("conflict.title")),
+					// 数字只在**真的取到队列**之后才出现：加载中 / 失败时写「0 条」等于撒谎。
+					data ? h("span", {
+						className: "smem-tool-badge" + (openN > 0 ? " smem-tool-badge--bad" : ""), key: "n",
+					}, t("conflict.openCount", { count: openN })) : null,
+					data ? h("span", { className: "smem-muted", key: "total" }, t("conflict.totalCount", { count: totalN })) : null,
+					h("button", {
+						type: "button", className: "smem-btn", key: "re",
+						disabled: props.loading || !!busyId, onClick: props.onReload,
+					}, props.loading ? t("conflict.refreshing") : t("conflict.refresh")),
+				]),
+				h("div", { className: "smem-ar-hint", key: "intro" }, t("conflict.intro")),
+				props.error ? h("div", { className: "smem-err", key: "err", role: "alert" }, "⚠ " + props.error) : null,
+				missing.length
+					? h("div", { className: "smem-ar-hint smem-conf-warn", key: "cap" },
+							t("conflict.actionMissingHint", { methods: missing.join(" / ") }))
+					: null,
+				tools.read !== true
+					? h("div", { className: "smem-ar-hint smem-conf-warn", key: "readcap" }, t("conflict.readMissingHint"))
+					: null,
+				props.loading && !data
+					? h("div", { className: "smem-empty", key: "loading" }, t("conflict.loading"))
+					: null,
+				data && items.length === 0
+					? h("div", { className: "smem-empty smem-empty--ok", key: "empty" }, t("conflict.empty"))
+					: null,
+				data && items.length > 0
+					? h("div", { className: "smem-conf-list", key: "list" }, items.map(renderItem))
+					: null,
+				ignored.length
+					? h("div", { className: "smem-ar-hint", key: "ign" }, t("conflict.ignored", { count: ignored.length }))
+					: null,
+				broken.length
+					? h("div", { className: "smem-ar-hint smem-conf-warn", key: "brk" }, t("conflict.broken", { count: broken.length }))
+					: null,
+				h("div", { className: "smem-ar-hint", key: "foot" }, t("conflict.noApply")),
+			]);
+		}
+
 		/**
 		 * 「归档候选」面板。
 		 *

@@ -1,0 +1,102 @@
+name: npm downloads badge
+
+# 更新 README 顶部「npm 月下载量」徽章（shields.io endpoint badge）。
+#
+# 为什么要自己算：
+#   npm 官方的 point 接口（downloads/point/last-month、last-week、last-year）自 2026-07 起
+#   对所有包都返回 0（express / lodash 也一样），所以 shields.io 的 `npm/dm` 会渲染成红色
+#   `0/month`；而 `downloads/range` 接口仍然返回逐日真实数据。这个 workflow 用 range 接口
+#   自己求和，把结果写成 endpoint badge JSON 推到独立的 `badges` 分支。
+#
+# 韧性规则：
+#   接口失败 / 非 200 / 返回不完整 / 合计为 0 时，计算脚本会原样保留上一份徽章 JSON，
+#   于是「没有变化」→ 不推送任何提交；徽章停在旧数字，而不是被 npm 故障打回 0。
+#
+# 不碰 main：badges 分支只有 npm-downloads.json 一个文件，且本 workflow 不监听 push，
+# 不会自我递归触发。
+#
+# 注意：GitHub 在仓库连续 60 天没有活动后会停用 schedule（会有邮件提醒）。真停了就在
+# Actions 页面手动 Run workflow，或者随便有一次提交，定时任务即恢复。
+
+on:
+  schedule:
+    # 每天一次，UTC 03:17（北京时间 11:17）——刻意避开整点，减少 GitHub 定时任务排队延迟。
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+# 只需写 badges 分支，不碰源码。
+permissions:
+  contents: write
+
+# 串行：两次运行同时 force push 同一个分支会互相覆盖。
+concurrency:
+  group: npm-downloads-badge
+  cancel-in-progress: false
+
+jobs:
+  update-badge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch previous badge value from the badges branch
+        run: |
+          set -euo pipefail
+          mkdir -p .badge-work
+          # badges 分支是「只有一份生成物」的分支，首次运行时还不存在 —— 那时没有旧值可保留。
+          if git fetch --depth=1 origin refs/heads/badges:refs/remotes/origin/badges; then
+            if git show refs/remotes/origin/badges:npm-downloads.json > .badge-work/previous.json; then
+              echo "已取到上一份徽章:"
+              cat .badge-work/previous.json
+            else
+              echo "::warning::badges 分支存在但没有 npm-downloads.json，按首次生成处理"
+            fi
+          else
+            echo "::notice::badges 分支还不存在，本次运行会创建它"
+          fi
+
+      - name: Compute badge JSON from the npm range API
+        run: |
+          set -euo pipefail
+          node .github/scripts/npm-downloads-badge.mjs \
+            --package sage-mem \
+            --days 30 \
+            --previous .badge-work/previous.json \
+            --out .badge-work/npm-downloads.json
+          echo "--- 生成结果 ---"
+          cat .badge-work/npm-downloads.json
+
+      - name: Publish npm-downloads.json to the badges branch
+        run: |
+          set -euo pipefail
+          OUT=.badge-work/npm-downloads.json
+          PREV=.badge-work/previous.json
+
+          # 内容没变（例如接口故障时保留了旧值）就不推送，避免每天制造空提交。
+          if [ -f "$PREV" ] && cmp -s "$PREV" "$OUT"; then
+            echo "::notice::徽章内容没有变化，跳过推送"
+            exit 0
+          fi
+
+          # 用 plumbing 命令拼一个「根提交，且只含一个文件」：
+          #   - 不建本地分支、不碰工作区（避免污染 main 的 checkout）
+          #   - 直接 force push 到 badges，分支永远只承载这一份生成物
+          #   - 复用 checkout 已配好的凭据，不需要第二份 token
+          blob=$(git hash-object -w "$OUT")
+          tree=$(printf '100644 blob %s\tnpm-downloads.json\n' "$blob" | git mktree)
+          commit=$(
+            GIT_AUTHOR_NAME="github-actions[bot]" \
+            GIT_AUTHOR_EMAIL="41898282+github-actions[bot]@users.noreply.github.com" \
+            GIT_COMMITTER_NAME="github-actions[bot]" \
+            GIT_COMMITTER_EMAIL="41898282+github-actions[bot]@users.noreply.github.com" \
+            git commit-tree "$tree" -m "chore: update npm downloads badge"
+          )
+          git push --force origin "$commit:refs/heads/badges"
+          echo "::notice::已更新 badges 分支（commit $commit）"

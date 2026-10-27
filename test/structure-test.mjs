@@ -39,21 +39,24 @@ const all = walk(LIB).map((p) => ({ rel: relative(LIB, p).replace(/\\/g, '/'), s
 const importsOf = (src) => [...src.matchAll(/^import[^\n]*from\s+'([^']+)'/gm)].map((m) => m[1])
 
 // ── 1. 组合根体积 ───────────────────────────────────────────────
-group('1. 组合根体积（1.2.0 验收线）')
+group('1. 组合根体积（1.2.0 验收线；2.0.0 按 D21 的契约位置调整）')
 {
   const n = linesOf('index.js')
-  ok(n <= 800, `lib/index.js ≤ 800 行（实际 ${n}；1.1.0 是 1431）`)
+  // 800 → 1000（2.0.0）：第四块 Gateway（ConflictGateway）按 D21 **必须**定义在组合根里
+  // （typert 的 `sourceLocation` 全表硬编码 lib/index.js:1:1，搬走就是契约漂移）。
+  // 它带来的是「一个类 + 6 个 remote 的薄方法」，不是注入链逻辑 —— 下面构造函数 ≤60 行、
+  // 「注入状态不在组合根」两条仍在，防的是后者。组合根真正的逻辑增长仍会让别的套件变红。
+  ok(n <= 1000, `lib/index.js ≤ 1000 行（实际 ${n}；1.1.0 是 1431）`)
   const src = read('index.js')
   const start = src.indexOf('  constructor(ctx) {')
   const end = src.indexOf('\n  }\n', start)
   const ctorLines = start >= 0 && end > start ? src.slice(start, end).split('\n').length : Infinity
   ok(ctorLines <= 60, `MemoryGateway 构造函数 ≤ 60 行（实际 ${ctorLines}；1.1.0 是 540）`, `start=${start} end=${end}`)
   const maxFile = all.filter((f) => f.rel !== 'client.js').reduce((a, b) => (a.lines >= b.lines ? a : b))
-  // 1.7.0 把这条从 900 抬到 950：`memory/recallDebug` 的 strict schema 是**传输契约**，
-  // 必须与它镜像的 payload 放在同一个 manifest 文件里；861 → 909 是一次性增长
-  // （一条只读 remote 的字段声明），不是逻辑膨胀。别的阈值（组合根 ≤800 / 构造 ≤60）
-  // 一个都没动 —— 这条护栏防的是「往 lib 里塞逻辑」，不是防 schema 行数。
-  ok(maxFile.lines <= 950, `lib/ 下单文件 ≤ 950 行（最大 ${maxFile.rel} ${maxFile.lines} 行；client.js 是构建产物不计）`)
+  // 900 → 950（1.7.0）→ 1100（2.0.0）：`memory/recallDebug` 与 6 条 `conflict.*` 的 strict
+  // schema 都是**传输契约**，必须与它镜像的 payload 放在同一个 manifest 文件里。
+  // 这条护栏防的是「往 lib 里塞逻辑」，不是防 schema 行数（39 条 invocation 的字段声明本来就会长）。
+  ok(maxFile.lines <= 1100, `lib/ 下单文件 ≤ 1100 行（最大 ${maxFile.rel} ${maxFile.lines} 行；client.js 是构建产物不计）`)
   ok(!/function createSessionInjectState\s*\(/.test(src), '注入状态不再定义在组合根里（已搬到 recall/state.js）')
 }
 
@@ -97,29 +100,45 @@ group('3. 组合根接线：barrel + 直调 mountWriteGate')
   ok(imps.includes('./recall/index.js'), '组合根经 lib/recall/index.js 认识注入链')
   ok(imps.includes('./assembly/index.js'), '组合根经 lib/assembly/index.js 认识四块挂载')
   const localImps = imps.filter((i) => i.startsWith('./') || i.startsWith('../'))
-  ok(localImps.length <= 18, `组合根的本地 import 条数 ≤ 18（实际 ${localImps.length}）`, localImps.join(','))
+  // 18 → 20（2.0.0）：冲突裁决这一域新增两个真实依赖（memory/conflicts.js 的记录层与
+  // memory/arbitrate.js 的写路径）。条数护栏防的是「随手 import、依赖面发散」，
+  // 这里两条都是新能力的直接落点，不是给组合根找捷径。
+  ok(localImps.length <= 20, `组合根的本地 import 条数 ≤ 20（实际 ${localImps.length}）`, localImps.join(','))
   ok(/ctx\.on\('system-prompt\/assemble', createRecallInjector\(/.test(src), '注入监听器由 createRecallInjector 注册')
   ok(!/ctx\.inject\(/.test(src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')),
     '组合根里没有 ctx.inject（写门的注册窗口约束）')
 }
 
 // ── 4. typert 契约位置没动 ──────────────────────────────────────
-group('4. typert 契约：33 条 invocation 仍指 lib/index.js')
+group('4. typert 契约：39 条 invocation 仍指 lib/index.js')
 {
   const { TYPERT } = await import(new URL('../lib/typert.host.js', import.meta.url).href)
-  // 33 = 1.6.5 的 32 + 1.7.0 的 memory/recallDebug。数字变了要**同时**改
-  // client-exec-test 里的对表计数 —— 两处一起红才是「漏了一边」的正确定位信号。
-  ok(TYPERT.invocations.length === 33, `33 条 invocation（实际 ${TYPERT.invocations.length}）`)
+  // 39 = 1.9.2 的 33 + 2.0.0 的 6 条 conflict.*（list/read/invalidate/dismiss/undo/remove）。
+  // 数字变了要**同时**改 client-exec-test 里的对表计数 —— 两处一起红才是「漏了一边」的正确定位信号。
+  ok(TYPERT.invocations.length === 39, `39 条 invocation（实际 ${TYPERT.invocations.length}）`)
   const bad = TYPERT.invocations.filter((i) => !(i.sourceLocation?.file === 'lib/index.js' && i.sourceLocation?.line === 1 && i.sourceLocation?.column === 1))
   ok(bad.length === 0, '每条 sourceLocation 仍是 lib/index.js:1:1（搬 Gateway 类就必须同步改这里）', bad.slice(0, 3).map((i) => i.id).join(','))
   const src = read('index.js')
-  for (const cls of ['MemoryGateway', 'StarmapGateway', 'AutodreamGateway']) {
+  for (const cls of ['MemoryGateway', 'StarmapGateway', 'AutodreamGateway', 'ConflictGateway']) {
     ok(new RegExp(`export class ${cls} extends TypertRemoteService`).test(src), `${cls} 仍定义在 lib/index.js（契约位置）`)
   }
-  ok((src.match(/^markRemote\(/gm) || []).length === 33, '33 条 markRemote 仍在组合根里')
+  ok((src.match(/^markRemote\(/gm) || []).length === 39, '39 条 markRemote 仍在组合根里')
   // 1.7.0：调试账必须是**只读**（无入参）—— 面板只许看，不许改账。
   const dbg = TYPERT.invocations.find((i) => i.id === 'sage-mem#memory/recallDebug')
   ok(!!dbg && dbg.parameters.length === 0, 'memory/recallDebug 存在且无入参（只读）')
+  // 2.0.0：冲突面 6 条，全部挂在 conflict namespace 下，且都指向组合根。
+  const conflictInvs = TYPERT.invocations.filter((i) => i.service === 'conflict')
+  ok(conflictInvs.length === 6, `conflict.* 6 条（实际 ${conflictInvs.length}）`)
+  ok(conflictInvs.every((i) => i.namespace === 'conflict'), 'conflict.* 的 namespace 都是 conflict')
+
+  // ⚠️ 0.2.x 宿主的客户端 RemoteNamespaceService（继承 Cordis Service）原型上已占用的方法名。
+  // 客户端声明同名方法 → `ctx.remote.$mount` 的 `assertMethodAvailable` 抛错 →
+  // **整个 client 插件 activate 失败**（不是单个按钮失效）。2026-10-27 真机踩过
+  // `conflict/remove`（`client api: method "conflict/remove" conflicts with its namespace service`）。
+  // 这份名单只列**已确认**的（来源是宿主异常原文）；以后新加 remote 再撞同类错时补进来。
+  const CLIENT_RESERVED_METHODS = new Set(['remove'])
+  const clash = TYPERT.invocations.filter((i) => CLIENT_RESERVED_METHODS.has(i.method)).map((i) => i.id)
+  ok(clash.length === 0, '没有任何 remote 方法名撞上宿主客户端命名空间的保留名', clash.join(','))
 }
 
 console.log(`\n结果：${pass} passed, ${fail} failed`)

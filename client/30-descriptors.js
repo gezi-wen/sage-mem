@@ -404,6 +404,89 @@
 					result: { mode: "strict", typeSymbol: "sage-mem/types#AutodreamModelList", schema: objCodec, create: () => objCodec },
 					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
 				},
+				// ── 冲突裁决（2.0.0 矛盾检测）──
+				// 第四个 namespace。与 autodream 那批同一个坑：namespace **不会自动出现**
+				// （宿主 remote 清单是构建期产物），不在这里声明 `ctx.get("remote.conflict")`
+				// 就永远是 undefined —— 界面表现为「一整个页签消失」。
+				// 6 条都在同一个 `conflict` 面上：列表 / 读正文 / 标失效 / 标记已裁决 / 撤销 / 删记录。
+				{
+					id: "sage-mem#conflict/list",
+					service: "conflict",
+					namespace: "conflict",
+					method: "list",
+					invocation: { kind: "direct" },
+					parameters: [],
+					result: { mode: "strict", typeSymbol: "sage-mem/types#ConflictList", schema: conflictListSchema, create: () => conflictListSchema },
+					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
+				},
+				{
+					// 只读：拿一条记录的两份正文（record = item + incoming/onDisk）。
+					id: "sage-mem#conflict/read",
+					service: "conflict",
+					namespace: "conflict",
+					method: "read",
+					invocation: { kind: "direct" },
+					parameters: [
+						{ name: "opts", wire: "opts", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#ConflictOpts", schema: conflictOptsSchema, create: () => conflictOptsSchema } },
+					],
+					result: { mode: "strict", typeSymbol: "sage-mem/types#ConflictReadResult", schema: conflictReadSchema, create: () => conflictReadSchema },
+					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
+				},
+				{
+					// 唯一会写记忆文件的动作（标 invalid_at）；file 允许是记录的 file 或 otherFile。
+					id: "sage-mem#conflict/invalidate",
+					service: "conflict",
+					namespace: "conflict",
+					method: "invalidate",
+					invocation: { kind: "direct" },
+					parameters: [
+						{ name: "opts", wire: "opts", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#ConflictOpts", schema: conflictOptsSchema, create: () => conflictOptsSchema } },
+					],
+					result: { mode: "strict", typeSymbol: "sage-mem/types#ConflictInvalidateResult", schema: conflictInvalidateSchema, create: () => conflictInvalidateSchema },
+					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
+				},
+				{
+					// 只改记录状态，不碰记忆文件。
+					id: "sage-mem#conflict/dismiss",
+					service: "conflict",
+					namespace: "conflict",
+					method: "dismiss",
+					invocation: { kind: "direct" },
+					parameters: [
+						{ name: "opts", wire: "opts", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#ConflictOpts", schema: conflictOptsSchema, create: () => conflictOptsSchema } },
+					],
+					result: { mode: "strict", typeSymbol: "sage-mem/types#ConflictDismissResult", schema: conflictDismissSchema, create: () => conflictDismissSchema },
+					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
+				},
+				{
+					// 撤销失效：删掉 invalidate 写进记忆 frontmatter 的那两行。
+					id: "sage-mem#conflict/undo",
+					service: "conflict",
+					namespace: "conflict",
+					method: "undo",
+					invocation: { kind: "direct" },
+					parameters: [
+						{ name: "opts", wire: "opts", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#ConflictOpts", schema: conflictOptsSchema, create: () => conflictOptsSchema } },
+					],
+					result: { mode: "strict", typeSymbol: "sage-mem/types#ConflictUndoResult", schema: conflictUndoSchema, create: () => conflictUndoSchema },
+					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
+				},
+				{
+					// 删除记录：不可恢复，但记忆文件一个字节都不动。
+					// ⚠️ 方法名不能叫 `remove`：DSH 客户端 RemoteNamespaceService 的原型上有这个名字，
+					// 客户端声明同名方法会在 $mount 的 assertMethodAvailable 抛错 —— **整个 client
+					// 插件 activate 失败**（2026-10-27 真机复现）。两端统一用 `removeRecord`。
+					id: "sage-mem#conflict/removeRecord",
+					service: "conflict",
+					namespace: "conflict",
+					method: "removeRecord",
+					invocation: { kind: "direct" },
+					parameters: [
+						{ name: "opts", wire: "opts", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#ConflictOpts", schema: conflictOptsSchema, create: () => conflictOptsSchema } },
+					],
+					result: { mode: "strict", typeSymbol: "sage-mem/types#ConflictRemoveResult", schema: conflictRemoveSchema, create: () => conflictRemoveSchema },
+					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
+				},
 			],
 		};
 

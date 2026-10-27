@@ -1,14 +1,14 @@
 # 检索诊断报告
 
 > 由 `scripts/eval-retrieval.mjs --report` 生成，**不要手改**。
-> 生成时间：2026-10-26T04:50:52.332Z；mode=all，limit=5，per-file=2。
+> 生成时间：2026-10-27T04:23:24.613Z；mode=all，limit=5，per-file=2。
 
 ## 运行信息
 
-- 语料：38 份；问题集：103 题；语料指纹 `ad241c11a360`，题号指纹 `c8bbd0174850`。
-- 误注入（主指标）：21/91 道有黑名单检查的题；检查项共 268 个。
-- 白名单外：4/4 道有白名单检查的题。
-- 无答案题：仍注入 13/21，拒绝率 38.1%。
+- 语料：38 份；问题集：103 题；语料指纹 `f484bb8c1f59`，题号指纹 `436ae39878e5`。
+- 误注入（主指标）：17/91 道有黑名单检查的题；检查项共 268 个。
+- 白名单外：3/4 道有白名单检查的题。
+- 无答案题：仍注入 12/21，拒绝率 42.9%。
 - 基线比较：compared
 
 ## 指标（含诊断口径）
@@ -19,13 +19,14 @@
 | 全中率（全部 needed） | 71/82 = 86.6% |
 | 条目级召回 | 80/94 = 85.1% |
 | 段落命中（严格） | 41/60 = 68.3% |
-| MRR | 0.7612（Σ1/rank = 62.4167 / 82） |
-| 误注入率（主指标） | 21/91 = 23.1% |
-| 白名单外误注入 | 4/4 = 100.0% |
-| 无答案题拒绝率 | 8/21 = 38.1% |
-| Precision@k（标注相关集·下界） | 88/267 = 33.0%（可评题 80） |
-| 注入字节（候选片段代理） | 15418 总 / 149.7 平均每题 |
-| 延迟 p50 / p95 | 1.170 ms / 1.808 ms |
+| MRR | 0.8059（Σ1/rank = 66.0833 / 82） |
+| 误注入率（主指标） | 17/91 = 18.7% |
+| 白名单外误注入 | 3/4 = 75.0% |
+| 被失效抑制的命中 | 33 条 / 23 题（1361 字节未进正文） |
+| 无答案题拒绝率 | 9/21 = 42.9% |
+| Precision@k（标注相关集·下界） | 88/237 = 37.1%（可评题 80） |
+| 注入字节（候选片段代理） | 14057 总 / 136.5 平均每题 |
+| 延迟 p50 / p95 | 1.015 ms / 1.465 ms |
 
 ## 难负例（按为什么难单列）
 
@@ -33,14 +34,14 @@
 |---|---|---|
 | 共享常用词 | 8 | 误注入 7/8（检查项 24，命中 11） |
 | 同名不同项目 | 6 | 误注入 6/6（检查项 9，命中 9） |
-| 相同实体不同时间 | 4 | 新版召回 4/4；旧版压新版 4/4 |
-| 已失效内容 | 6 | 误注入 4/6（检查项 6，命中 4） |
+| 相同实体不同时间 | 4 | 新版召回 4/4；旧版压新版 0/4；旧版被抑制 4/4 |
+| 已失效内容 | 6 | 误注入 0/6（检查项 6，命中 0）；被抑制 4/6 |
 
 这四类各自独立分母；**不要**拿「无共享词元子集」代替它们（那个切片会把这四类排除掉）。
 
 ## 逐案例
 
-触发诊断的题：40 道（误注入 / 白名单外 / 无答案注入 / 词法边界 / MISS）。
+触发诊断的题：30 道（误注入 / 白名单外 / 无答案注入 / 词法边界 / MISS）。
 
 ### a08 · ALL · scope=all
 
@@ -254,33 +255,15 @@
 - 问题：「分块大小的上限是怎么定的」
 - 备注：[lexfail] 词法失败边界：正文说的是「片长定在一段话说得完的量级」
 - needed：project_ember-chunking.md [19-19] ✗
-- 标记：已知词法边界（query 与原文没有词面重合）
+- 标记：已抑制（expired_source）：project_cobalt-quota.md, project_harbor-backpressure-superseded.md；已知词法边界（query 与原文没有词面重合）
 
 | # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |
 |---|---|---|---|---|---|
 | 1 | project_cobalt-quota-revised.md | — | 0.0909 | description | —（摘要层无门槛） |
-| 2 | project_cobalt-quota.md | — | 0.0909 | description | —（摘要层无门槛） |
-| 3 | project_harbor-backpressure-superseded.md | — | 0.0909 | description | —（摘要层无门槛） |
 
 **诊断**：
 
 - 未命中线索：needed 不在 top-5；本次候选 3 条，正文门槛滤掉 31 条。
-
-### g01 · INJ · scope=all
-
-- 问题：「明天会不会下雨」
-- 备注：无关新问题：语料里没有天气，不该注入
-- needed：—
-- 标记：无答案题仍注入
-
-| # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |
-|---|---|---|---|---|---|
-| 1 | project_orchard-timeout-superseded.md | 15-16 | 8.3061 | body | 0.6105 / 7.0537 / 1 / 2 |
-
-**诊断**：
-
-- `project_orchard-timeout-superseded.md` 正文门槛：✓ ratio 0.6105 ≥ 0.35；✓ sum 7.0537 ≥ 1.5；✓ rarestDf 1 / 0.0075 满足冷门判据；✓ run 2 ≥ 2（通过）
-  - 词元贡献（前 2）：`会下` idf=4.50 tf=1 → 5.26；`不会` idf=2.55 tf=1 → 2.98
 
 ### g02 · INJ · scope=all
 
@@ -326,46 +309,23 @@
 - 问题：「果园构建的缓存目录是哪个」
 - 备注：白名单：只有这三份果园构建笔记算在范围内
 - needed：project_orchard-cache.md [13-13] ✓@1
-- 标记：白名单外：project_orchard-timeout-superseded.md, project_orchard-noise-log.md, reference_orchard-flags.md
+- 标记：已抑制（expired_source）：project_orchard-timeout-superseded.md；白名单外：project_orchard-noise-log.md, reference_orchard-flags.md
 
 | # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |
 |---|---|---|---|---|---|
 | 1 | project_orchard-cache.md | 18-22 | 18.3458 | description+alias+body | 0.4757 / 14.2925 / 5 / 3 |
-| 2 | project_orchard-timeout-superseded.md | 21-25 | 17.8906 | description+alias+body | 0.5677 / 17.0577 / 5 / 4 |
-| 3 | project_orchard-timeout.md | 21-24 | 17.4802 | description+alias+body | 0.5677 / 17.0577 / 5 / 4 |
-| 4 | project_orchard-noise-log.md | — | 0.2727 | description+alias | —（摘要层无门槛） |
-| 5 | reference_orchard-flags.md | 21-25 | 13.4019 | body | 0.3692 / 11.092 / 6 / 3 |
+| 2 | project_orchard-timeout.md | 22-25 | 17.4802 | description+alias+body | 0.5677 / 17.0577 / 5 / 4 |
+| 3 | project_orchard-noise-log.md | — | 0.2727 | description+alias | —（摘要层无门槛） |
+| 4 | reference_orchard-flags.md | 21-25 | 13.4019 | body | 0.3692 / 11.092 / 6 / 3 |
 
 **诊断**：
 
 - `project_orchard-cache.md` 正文门槛：✓ ratio 0.4757 ≥ 0.35；✓ sum 14.2925 ≥ 1.5；✓ rarestDf 5 / 0.0373 满足冷门判据；✓ run 3 ≥ 2（通过）
   - 词元贡献（前 6）：`建的` idf=3.20 tf=2 → 3.87；`缓存` idf=2.30 tf=5 → 3.81；`目录` idf=2.38 tf=4 → 3.71；`存目` idf=3.03 tf=2 → 3.67；`构建` idf=1.75 tf=1 → 1.46；`果园` idf=1.63 tf=1 → 1.36
-- `project_orchard-timeout-superseded.md` 正文门槛：✓ ratio 0.5677 ≥ 0.35；✓ sum 17.0577 ≥ 1.5；✓ rarestDf 5 / 0.0373 满足冷门判据；✓ run 4 ≥ 2（通过）
-  - 词元贡献（前 6）：`缓存` idf=2.30 tf=2 → 2.98；`建的` idf=3.20 tf=1 → 2.93；`存目` idf=3.03 tf=1 → 2.77；`构建` idf=1.75 tf=3 → 2.62；`园构` idf=2.77 tf=1 → 2.53；`目录` idf=2.38 tf=1 → 2.18
 - `project_orchard-timeout.md` 正文门槛：✓ ratio 0.5677 ≥ 0.35；✓ sum 17.0577 ≥ 1.5；✓ rarestDf 5 / 0.0373 满足冷门判据；✓ run 4 ≥ 2（通过）
   - 词元贡献（前 6）：`缓存` idf=2.30 tf=3 → 3.33；`建的` idf=3.20 tf=1 → 2.74；`存目` idf=3.03 tf=1 → 2.60；`构建` idf=1.75 tf=3 → 2.53；`园构` idf=2.77 tf=1 → 2.37；`目录` idf=2.38 tf=1 → 2.04
 - `reference_orchard-flags.md` 正文门槛：✓ ratio 0.3692 ≥ 0.35；✓ sum 11.092 ≥ 1.5；✓ rarestDf 6 / 0.0448 满足冷门判据；✓ run 3 ≥ 2（通过）
   - 词元贡献（前 5）：`缓存` idf=2.30 tf=5 → 3.84；`存目` idf=3.03 tf=2 → 3.71；`目录` idf=2.38 tf=2 → 2.91；`构建` idf=1.75 tf=1 → 1.48；`果园` idf=1.63 tf=1 → 1.38
-
-### i03 · ALL · scope=all
-
-- 问题：「港口调度的失败任务落在哪」
-- 备注：白名单：允许跨到潮汐的失败处理，因为它同名
-- needed：reference_harbor-config.md [18-18] ✓@1
-- 标记：白名单外：project_harbor-backpressure-superseded.md
-
-| # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |
-|---|---|---|---|---|---|
-| 1 | reference_harbor-config.md | 15-18 | 14.0102 | description+alias+body | 0.591 / 9.4677 / 2 / 4 |
-| 2 | project_harbor-backpressure-superseded.md | — | 0.2727 | description+alias | —（摘要层无门槛） |
-| 3 | project_harbor-backpressure.md | — | 0.2727 | description+alias | —（摘要层无门槛） |
-| 4 | project_harbor-noise-notes.md | — | 0.2727 | description+alias | —（摘要层无门槛） |
-| 5 | project_tide-failures.md | — | 0.2727 | description+alias | —（摘要层无门槛） |
-
-**诊断**：
-
-- `reference_harbor-config.md` 正文门槛：✓ ratio 0.591 ≥ 0.35；✓ sum 9.4677 ≥ 1.5；✓ rarestDf 2 / 0.0149 满足冷门判据；✓ run 4 ≥ 2（通过）
-  - 词元贡献（前 4）：`度的` idf=3.99 tf=1 → 5.53；`调度` idf=1.71 tf=2 → 2.90；`口调` idf=1.93 tf=1 → 2.68；`港口` idf=1.84 tf=1 → 2.55
 
 ### i04 · ALL · scope=all
 
@@ -446,15 +406,14 @@
 - 问题：「一次完整的构建要跑多久」
 - 备注：共享常用词：「一次完整的（全量）构建」在三份果园文件里都有，但没有一处写过构建耗时
 - needed：—
-- 标记：黑名单命中：project_orchard-cache.md, project_orchard-timeout.md, reference_orchard-flags.md；无答案题仍注入
+- 标记：已抑制（expired_source）：project_orchard-timeout-superseded.md；黑名单命中：project_orchard-cache.md, project_orchard-timeout.md, reference_orchard-flags.md；无答案题仍注入
 
 | # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |
 |---|---|---|---|---|---|
 | 1 | project_orchard-cache.md | 18-22 | 12.6796 | description+body | 0.7828 / 14.378 / 2 / 4 |
-| 2 | project_orchard-timeout.md | 21-24 | 10.8902 | description+alias+body | 0.5656 / 10.389 / 3 / 3 |
-| 3 | project_orchard-timeout-superseded.md | 21-25 | 7.6493 | description+body | 0.3851 / 7.073 / 2 / 2 |
-| 4 | project_orchard-noise-log.md | — | 0.1 | description+alias | —（摘要层无门槛） |
-| 5 | reference_orchard-flags.md | 21-25 | 12.769 | body | 0.7828 / 14.378 / 2 / 4 |
+| 2 | project_orchard-timeout.md | 22-25 | 10.8902 | description+alias+body | 0.5656 / 10.389 / 3 / 3 |
+| 3 | project_orchard-noise-log.md | — | 0.1 | description+alias | —（摘要层无门槛） |
+| 4 | reference_orchard-flags.md | 21-25 | 12.769 | body | 0.7828 / 14.378 / 2 / 4 |
 
 **诊断**：
 
@@ -463,8 +422,6 @@
   - 词元贡献（前 5）：`整的` idf=3.99 tf=1 → 3.32；`次完` idf=3.65 tf=1 → 3.04；`完整` idf=3.65 tf=1 → 3.04；`一次` idf=1.34 tf=2 → 1.61；`构建` idf=1.75 tf=1 → 1.46
 - `project_orchard-timeout.md` 正文门槛：✓ ratio 0.5656 ≥ 0.35；✓ sum 10.389 ≥ 1.5；✓ rarestDf 3 / 0.0224 满足冷门判据；✓ run 3 ≥ 2（通过）
   - 词元贡献（前 4）：`次完` idf=3.65 tf=1 → 3.13；`完整` idf=3.65 tf=1 → 3.13；`构建` idf=1.75 tf=3 → 2.53；`一次` idf=1.34 tf=3 → 1.93
-- `project_orchard-timeout-superseded.md` 正文门槛：✓ ratio 0.3851 ≥ 0.35；✓ sum 7.073 ≥ 1.5；✓ rarestDf 2 / 0.0149 满足冷门判据；✓ run 2 ≥ 2（通过）
-  - 词元贡献（前 3）：`的构` idf=3.99 tf=1 → 3.65；`构建` idf=1.75 tf=3 → 2.62；`一次` idf=1.34 tf=1 → 1.22
 - `reference_orchard-flags.md` 正文门槛：✓ ratio 0.7828 ≥ 0.35；✓ sum 14.378 ≥ 1.5；✓ rarestDf 2 / 0.0149 满足冷门判据；✓ run 4 ≥ 2（通过）
   - 词元贡献（前 5）：`整的` idf=3.99 tf=1 → 3.38；`次完` idf=3.65 tf=1 → 3.09；`完整` idf=3.65 tf=1 → 3.09；`一次` idf=1.34 tf=2 → 1.63；`构建` idf=1.75 tf=1 → 1.48
 
@@ -582,14 +539,13 @@
 - 问题：「Atlas 摄取侧的硬限制有哪些」
 - 备注：同名不同项目：两份都有「限制」段落且都写「硬限制」，A 是单批条数、B 是每秒请求数
 - needed：project_atlas-ingest.md [26-26] ✓@1
-- 标记：黑名单命中：project_atlas-gateway.md
+- 标记：已抑制（expired_source）：project_cobalt-quota.md；黑名单命中：project_atlas-gateway.md
 
 | # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |
 |---|---|---|---|---|---|
 | 1 | project_atlas-ingest.md | 23-30 | 24.0582 | description+alias+filename+body | 1 / 20.6779 / 2 / 4 |
 | 2 | project_atlas-gateway.md | 23-30 | 12.6963 | description+alias+filename+body | 0.6305 / 13.0364 / 4 / 2 |
-| 3 | project_cobalt-quota-revised.md | 25-26 | 11.6188 | body | 0.4837 / 10.0029 / 4 / 2 |
-| 4 | project_cobalt-quota.md | 23-24 | 11.6188 | body | 0.4837 / 10.0029 / 4 / 2 |
+| 3 | project_cobalt-quota-revised.md | 26-27 | 11.6188 | body | 0.4837 / 10.0029 / 4 / 2 |
 
 **诊断**：
 
@@ -599,8 +555,6 @@
 - `project_atlas-gateway.md` 正文门槛：✓ ratio 0.6305 ≥ 0.35；✓ sum 13.0364 ≥ 1.5；✓ rarestDf 4 / 0.0299 满足冷门判据；✓ run 2 ≥ 2（通过）
   - 词元贡献（前 4）：`限制` idf=3.20 tf=3 → 4.42；`侧的` idf=3.40 tf=1 → 2.69；`硬限` idf=3.40 tf=1 → 2.69；`atlas` idf=3.03 tf=1 → 2.40
 - `project_cobalt-quota-revised.md` 正文门槛：✓ ratio 0.4837 ≥ 0.35；✓ sum 10.0029 ≥ 1.5；✓ rarestDf 4 / 0.0299 满足冷门判据；✓ run 2 ≥ 2（通过）
-  - 词元贡献（前 3）：`侧的` idf=3.40 tf=1 → 3.93；`硬限` idf=3.40 tf=1 → 3.93；`限制` idf=3.20 tf=1 → 3.70
-- `project_cobalt-quota.md` 正文门槛：✓ ratio 0.4837 ≥ 0.35；✓ sum 10.0029 ≥ 1.5；✓ rarestDf 4 / 0.0299 满足冷门判据；✓ run 2 ≥ 2（通过）
   - 词元贡献（前 3）：`侧的` idf=3.40 tf=1 → 3.93；`硬限` idf=3.40 tf=1 → 3.93；`限制` idf=3.20 tf=1 → 3.70
 
 ### k04 · INJ · scope=all
@@ -624,7 +578,7 @@
 - 问题：「Atlas 项目的预算是多少」
 - 备注：同名不同项目 + 无答案：两份都只写技术口径，没有预算数字
 - needed：—
-- 标记：黑名单命中：project_atlas-ingest.md, project_atlas-gateway.md；无答案题仍注入
+- 标记：已抑制（expired_source）：project_cobalt-quota.md；黑名单命中：project_atlas-ingest.md, project_atlas-gateway.md；无答案题仍注入
 
 | # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |
 |---|---|---|---|---|---|
@@ -632,7 +586,6 @@
 | 2 | project_atlas-gateway.md | — | 0.3333 | description+alias+filename | —（摘要层无门槛） |
 | 3 | project_ember-nightpass.md | — | 0.25 | description+filename | —（摘要层无门槛） |
 | 4 | project_cobalt-quota-revised.md | — | 0.1667 | description | —（摘要层无门槛） |
-| 5 | project_cobalt-quota.md | — | 0.1667 | description | —（摘要层无门槛） |
 
 **诊断**：
 
@@ -660,194 +613,12 @@
 - `feedback_deploy-frozen.md` 正文门槛：✓ ratio 0.3844 ≥ 0.35；✓ sum 10.0029 ≥ 1.5；✓ rarestDf 1 / 0.0075 满足冷门判据；✓ run 3 ≥ 2（通过）
   - 词元贡献（前 3）：`么时` idf=4.50 tf=1 → 3.42；`时候` idf=3.20 tf=1 → 2.43；`什么` idf=2.30 tf=1 → 1.75
 
-### l01 · ALL · scope=all
-
-- 问题：「Cobalt 每月调用上限现在是多少」
-- 备注：相同实体不同时间：两份正文几乎相同，只有每月上限（200 万 vs 120 万）与 metadata.updated 不同；检索侧无时间信号，断言新版该压过旧版
-- needed：project_cobalt-quota-revised.md [15-15] ✓@2
-- 标记：旧版压新版（project_cobalt-quota.md @1 压过 project_cobalt-quota-revised.md @2）
-
-| # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |
-|---|---|---|---|---|---|
-| 1 | project_cobalt-quota.md | 11-14 | 24.2896 | description+alias+filename+body | 0.6922 / 17.7692 / 2 / 6 |
-| 2 | project_cobalt-quota-revised.md | 15-16 | 23.5033 | description+alias+filename+body | 0.6922 / 17.7692 / 2 / 6 |
-| 3 | project_cobalt-retention-revised.md | — | 0.3125 | description+alias+filename | —（摘要层无门槛） |
-| 4 | project_cobalt-retention.md | — | 0.3125 | description+alias+filename | —（摘要层无门槛） |
-| 5 | project_harbor-backpressure-superseded.md | — | 0.125 | description+alias+filename | —（摘要层无门槛） |
-
-**诊断**：
-
-- `project_cobalt-quota.md` 正文门槛：✓ ratio 0.6922 ≥ 0.35；✓ sum 17.7692 ≥ 1.5；✓ rarestDf 2 / 0.0149 满足冷门判据；✓ run 6 ≥ 2（通过）
-  - 词元贡献（前 6）：`月调` idf=3.99 tf=1 → 4.58；`用上` idf=3.99 tf=1 → 4.58；`调用` idf=2.55 tf=3 → 4.31；`上限` idf=2.10 tf=3 → 3.54；`每月` idf=3.03 tf=1 → 3.49；`cobalt` idf=2.10 tf=2 → 3.17
-- `project_cobalt-quota-revised.md` 正文门槛：✓ ratio 0.6922 ≥ 0.35；✓ sum 17.7692 ≥ 1.5；✓ rarestDf 2 / 0.0149 满足冷门判据；✓ run 6 ≥ 2（通过）
-  - 词元贡献（前 6）：`月调` idf=3.99 tf=1 → 4.68；`用上` idf=3.99 tf=1 → 4.68；`调用` idf=2.55 tf=2 → 3.91；`上限` idf=2.10 tf=3 → 3.58；`每月` idf=3.03 tf=1 → 3.56；`cobalt` idf=2.10 tf=1 → 2.47
-
-### l02 · ALL · scope=all
-
-- 问题：「Cobalt 的突发上限现在是多少」
-- 备注：相同实体不同时间：同一对文件的第二个指标（9000 vs 6000），验证不是只对一个数值有效
-- needed：project_cobalt-quota-revised.md [16-16] ✓@2
-- 标记：旧版压新版（project_cobalt-quota.md @1 压过 project_cobalt-quota-revised.md @2）
-
-| # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |
-|---|---|---|---|---|---|
-| 1 | project_cobalt-quota.md | 11-14 | 18.4897 | description+alias+filename+body | 0.5947 / 11.594 / 2 / 3 |
-| 2 | project_cobalt-quota-revised.md | 15-16 | 17.9811 | description+alias+filename+body | 0.5947 / 11.594 / 2 / 3 |
-| 3 | project_cobalt-retention-revised.md | — | 0.3333 | description+alias+filename | —（摘要层无门槛） |
-| 4 | project_cobalt-retention.md | — | 0.3333 | description+alias+filename | —（摘要层无门槛） |
-| 5 | project_harbor-backpressure-superseded.md | — | 0.1333 | description+alias+filename | —（摘要层无门槛） |
-
-**诊断**：
-
-- `project_cobalt-quota.md` 正文门槛：✓ ratio 0.5947 ≥ 0.35；✓ sum 11.594 ≥ 1.5；✓ rarestDf 2 / 0.0149 满足冷门判据；✓ run 3 ≥ 2（通过）
-  - 词元贡献（前 4）：`突发` idf=3.99 tf=2 → 6.02；`发上` idf=3.40 tf=2 → 5.14；`上限` idf=2.10 tf=3 → 3.54；`cobalt` idf=2.10 tf=2 → 3.17
-- `project_cobalt-quota-revised.md` 正文门槛：✓ ratio 0.5947 ≥ 0.35；✓ sum 11.594 ≥ 1.5；✓ rarestDf 2 / 0.0149 满足冷门判据；✓ run 3 ≥ 2（通过）
-  - 词元贡献（前 4）：`突发` idf=3.99 tf=2 → 6.11；`发上` idf=3.40 tf=2 → 5.21；`上限` idf=2.10 tf=3 → 3.58；`cobalt` idf=2.10 tf=1 → 2.47
-
-### l03 · ALL · scope=all
-
-- 问题：「Cobalt 的原始日志现在保留多久」
-- 备注：相同实体不同时间：修订版 45 天 / 旧版 30 天；旧版正文保留旧值，修订版写明覆盖
-- needed：project_cobalt-retention-revised.md [15-15] ✓@2
-- 标记：旧版压新版（project_cobalt-retention.md @1 压过 project_cobalt-retention-revised.md @2）
-
-| # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |
-|---|---|---|---|---|---|
-| 1 | project_cobalt-retention.md | 11-17 | 16.5947 | description+alias+filename+body | 0.6713 / 12.8464 / 2 / 3 |
-| 2 | project_cobalt-retention-revised.md | 15-19 | 15.5711 | description+alias+filename+body | 0.6713 / 12.8464 / 2 / 3 |
-| 3 | project_cobalt-quota-revised.md | — | 0.3125 | description+alias+filename | —（摘要层无门槛） |
-| 4 | project_cobalt-quota.md | — | 0.3125 | description+alias+filename | —（摘要层无门槛） |
-| 5 | project_lumen-sync.md | 21-25 | 8.0756 | body | 0.408 / 7.8087 / 6 / 2 |
-
-**诊断**：
-
-- `project_cobalt-retention.md` 正文门槛：✓ ratio 0.6713 ≥ 0.35；✓ sum 12.8464 ≥ 1.5；✓ rarestDf 2 / 0.0149 满足冷门判据；✓ run 3 ≥ 2（通过）
-  - 词元贡献（前 5）：`始日` idf=3.99 tf=1 → 3.83；`保留` idf=1.88 tf=8 → 3.57；`原始` idf=3.03 tf=1 → 2.91；`日志` idf=1.84 tf=3 → 2.82；`cobalt` idf=2.10 tf=2 → 2.81
-- `project_cobalt-retention-revised.md` 正文门槛：✓ ratio 0.6713 ≥ 0.35；✓ sum 12.8464 ≥ 1.5；✓ rarestDf 2 / 0.0149 满足冷门判据；✓ run 3 ≥ 2（通过）
-  - 词元贡献（前 5）：`始日` idf=3.99 tf=1 → 3.90；`保留` idf=1.88 tf=7 → 3.52；`原始` idf=3.03 tf=1 → 2.96；`日志` idf=1.84 tf=2 → 2.49；`cobalt` idf=2.10 tf=1 → 2.05
-- `project_lumen-sync.md` 正文门槛：✓ ratio 0.408 ≥ 0.35；✓ sum 7.8087 ≥ 1.5；✓ rarestDf 6 / 0.0448 满足冷门判据；✓ run 2 ≥ 2（通过）
-  - 词元贡献（前 3）：`的原` idf=2.89 tf=2 → 3.23；`保留` idf=1.88 tf=3 → 2.52；`原始` idf=3.03 tf=1 → 2.27
-
-### l04 · ALL · scope=all
-
-- 问题：「Cobalt 的聚合指标现在保留多久」
-- 备注：相同实体不同时间：同一对文件的第二个指标（730 天 vs 400 天）
-- needed：project_cobalt-retention-revised.md [16-16] ✓@2
-- 标记：旧版压新版（project_cobalt-retention.md @1 压过 project_cobalt-retention-revised.md @2）
-
-| # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |
-|---|---|---|---|---|---|
-| 1 | project_cobalt-retention.md | 11-17 | 16.0833 | description+alias+filename+body | 0.7978 / 13.42 / 3 / 3 |
-| 2 | project_cobalt-retention-revised.md | 15-19 | 15.4405 | description+alias+filename+body | 0.7978 / 13.42 / 3 / 3 |
-| 3 | project_cobalt-quota-revised.md | — | 0.3125 | description+alias+filename | —（摘要层无门槛） |
-| 4 | project_cobalt-quota.md | — | 0.3125 | description+alias+filename | —（摘要层无门槛） |
-| 5 | reference_harbor-metrics.md | — | 0.0625 | description+alias | —（摘要层无门槛） |
-
-**诊断**：
-
-- `project_cobalt-retention.md` 正文门槛：✓ ratio 0.7978 ≥ 0.35；✓ sum 13.42 ≥ 1.5；✓ rarestDf 3 / 0.0224 满足冷门判据；✓ run 3 ≥ 2（通过）
-  - 词元贡献（前 5）：`保留` idf=1.88 tf=8 → 3.57；`合指` idf=3.65 tf=1 → 3.50；`聚合` idf=3.40 tf=1 → 3.26；`cobalt` idf=2.10 tf=2 → 2.81；`指标` idf=2.38 tf=1 → 2.28
-- `project_cobalt-retention-revised.md` 正文门槛：✓ ratio 0.7978 ≥ 0.35；✓ sum 13.42 ≥ 1.5；✓ rarestDf 3 / 0.0224 满足冷门判据；✓ run 3 ≥ 2（通过）
-  - 词元贡献（前 5）：`合指` idf=3.65 tf=1 → 3.57；`保留` idf=1.88 tf=7 → 3.52；`聚合` idf=3.40 tf=1 → 3.32；`指标` idf=2.38 tf=1 → 2.32；`cobalt` idf=2.10 tf=1 → 2.05
-
-### m01 · ALL · scope=all
-
-- 问题：「果园构建超时应该先查什么」
-- 备注：已失效内容：作废件词面与题目高度重合，但结论已被正文作废声明推翻（旧：先并行度；现行：先缓存）
-- needed：project_orchard-timeout.md [15-15] ✓@1
-- 标记：黑名单命中：project_orchard-timeout-superseded.md
-
-| # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |
-|---|---|---|---|---|---|
-| 1 | project_orchard-timeout.md | 11-13 | 20.5034 | description+alias+body | 0.6194 / 11.0713 / 8 / 5 |
-| 2 | project_orchard-timeout-superseded.md | 11-13 | 18.8007 | description+alias+body | 0.6194 / 11.0713 / 8 / 5 |
-| 3 | project_orchard-cache.md | — | 0.2727 | description+alias | —（摘要层无门槛） |
-| 4 | project_orchard-noise-log.md | — | 0.2727 | description+alias | —（摘要层无门槛） |
-
-**诊断**：
-
-- 误注入中有**摘要层**命中：`summary` 路径（description / alias / filename）**没有 evidence 门槛**，词面重合就入选 —— 这是「共享常用词」误注入的直接原因。
-- `project_orchard-timeout.md` 正文门槛：✓ ratio 0.6194 ≥ 0.35；✓ sum 11.0713 ≥ 1.5；✓ rarestDf 8 / 0.0597 满足冷门判据；✓ run 5 ≥ 2（通过）
-  - 词元贡献（前 5）：`建超` idf=2.77 tf=3 → 5.13；`园构` idf=2.77 tf=2 → 4.76；`超时` idf=2.16 tf=3 → 4.02；`构建` idf=1.75 tf=3 → 3.24；`果园` idf=1.63 tf=2 → 2.80
-- `project_orchard-timeout-superseded.md` 正文门槛：✓ ratio 0.6194 ≥ 0.35；✓ sum 11.0713 ≥ 1.5；✓ rarestDf 8 / 0.0597 满足冷门判据；✓ run 5 ≥ 2（通过）
-  - 词元贡献（前 5）：`园构` idf=2.77 tf=2 → 4.56；`建超` idf=2.77 tf=2 → 4.56；`超时` idf=2.16 tf=2 → 3.57；`构建` idf=1.75 tf=2 → 2.88；`果园` idf=1.63 tf=2 → 2.68
-
-### m04 · ALL · scope=all
-
-- 问题：「港口调度器的积压上限实际生效的是多少」
-- 备注：已失效内容：作废件的 5000 与题目词面高度重合，现行文件的 4096 才是有效值
-- needed：project_harbor-backpressure.md [13-13] ✓@2
-- 标记：黑名单命中：project_harbor-backpressure-superseded.md
-
-| # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |
-|---|---|---|---|---|---|
-| 1 | project_harbor-backpressure-superseded.md | 15-16 | 31.7919 | description+alias+body | 0.573 / 22.3586 / 1 / 4 |
-| 2 | project_harbor-backpressure.md | 11-16 | 22.692 | description+alias+body | 0.5709 / 22.2768 / 1 / 3 |
-| 3 | reference_harbor-config.md | 15-18 | 22.2614 | description+alias+body | 0.3946 / 15.3958 / 6 / 4 |
-| 4 | project_harbor-noise-notes.md | — | 0.2941 | description+alias | —（摘要层无门槛） |
-| 5 | reference_harbor-metrics.md | — | 0.2941 | description+alias | —（摘要层无门槛） |
-
-**诊断**：
-
-- 误注入中有**摘要层**命中：`summary` 路径（description / alias / filename）**没有 evidence 门槛**，词面重合就入选 —— 这是「共享常用词」误注入的直接原因。
-- `project_harbor-backpressure-superseded.md` 正文门槛：✓ ratio 0.573 ≥ 0.35；✓ sum 22.3586 ≥ 1.5；✓ rarestDf 1 / 0.0075 满足冷门判据；✓ run 4 ≥ 2（通过）
-  - 词元贡献（前 6）：`多少` idf=4.50 tf=2 → 6.92；`积压` idf=3.03 tf=2 → 4.66；`压上` idf=3.03 tf=2 → 4.66；`上限` idf=2.10 tf=3 → 3.59；`生效` idf=2.46 tf=1 → 2.91；`口调` idf=1.93 tf=1 → 2.28
-- `project_harbor-backpressure.md` 正文门槛：✓ ratio 0.5709 ≥ 0.35；✓ sum 22.2768 ≥ 1.5；✓ rarestDf 1 / 0.0075 满足冷门判据；✓ run 3 ≥ 2（通过）
-  - 词元贡献（前 6）：`际生` idf=4.50 tf=1 → 4.21；`积压` idf=3.03 tf=1 → 2.83；`压上` idf=3.03 tf=1 → 2.83；`上限` idf=2.10 tf=2 → 2.76；`实际` idf=2.65 tf=1 → 2.48；`的是` idf=2.65 tf=1 → 2.48
-- `reference_harbor-config.md` 正文门槛：✓ ratio 0.3946 ≥ 0.35；✓ sum 15.3958 ≥ 1.5；✓ rarestDf 6 / 0.0448 满足冷门判据；✓ run 4 ≥ 2（通过）
-  - 词元贡献（前 6）：`积压` idf=3.03 tf=1 → 4.21；`压上` idf=3.03 tf=1 → 4.21；`上限` idf=2.10 tf=1 → 2.91；`调度` idf=1.71 tf=2 → 2.90；`口调` idf=1.93 tf=1 → 2.68；`港口` idf=1.84 tf=1 → 2.55
-
-### m05 · ALL · scope=all
-
-- 问题：「超过积压上限之后任务是被拒绝还是排队」
-- 备注：已失效内容：作废件说「进入排队」，现行文件说「不是排队而是拒绝」，两者结论相反
-- needed：project_harbor-backpressure.md [14-14] ✓@2
-- 标记：黑名单命中：project_harbor-backpressure-superseded.md
-
-| # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |
-|---|---|---|---|---|---|
-| 1 | project_harbor-backpressure-superseded.md | 15-16 | 33.1362 | description+alias+body | 0.5118 / 24.1812 / 1 / 7 |
-| 2 | project_harbor-backpressure.md | 11-16 | 27.3479 | body | 0.5621 / 26.5608 / 2 / 5 |
-| 3 | project_cobalt-quota-revised.md | — | 0.0588 | description | —（摘要层无门槛） |
-| 4 | project_cobalt-quota.md | — | 0.0588 | description | —（摘要层无门槛） |
-| 5 | project_lumen-sync.md | — | 0.0588 | description | —（摘要层无门槛） |
-
-**诊断**：
-
-- 误注入中有**摘要层**命中：`summary` 路径（description / alias / filename）**没有 evidence 门槛**，词面重合就入选 —— 这是「共享常用词」误注入的直接原因。
-- `project_harbor-backpressure-superseded.md` 正文门槛：✓ ratio 0.5118 ≥ 0.35；✓ sum 24.1812 ≥ 1.5；✓ rarestDf 1 / 0.0075 满足冷门判据；✓ run 7 ≥ 2（通过）
-  - 词元贡献（前 6）：`后任` idf=4.50 tf=1 → 5.31；`积压` idf=3.03 tf=2 → 4.66；`压上` idf=3.03 tf=2 → 4.66；`排队` idf=2.89 tf=2 → 4.44；`限之` idf=3.40 tf=1 → 4.02；`上限` idf=2.10 tf=3 → 3.59
-- `project_harbor-backpressure.md` 正文门槛：✓ ratio 0.5621 ≥ 0.35；✓ sum 26.5608 ≥ 1.5；✓ rarestDf 2 / 0.0149 满足冷门判据；✓ run 5 ≥ 2（通过）
-  - 词元贡献（前 6）：`拒绝` idf=2.89 tf=2 → 3.79；`是排` idf=3.99 tf=1 → 3.73；`限之` idf=3.40 tf=1 → 3.18；`积压` idf=3.03 tf=1 → 2.83；`压上` idf=3.03 tf=1 → 2.83；`上限` idf=2.10 tf=2 → 2.76
-
-### m06 · ALL · scope=all
-
-- 问题：「被拒绝的任务落在哪个目录」
-- 备注：已失效内容：作废件说被拒是极端情况、不必关注死信目录，现行文件写明落在死信目录
-- needed：project_harbor-backpressure.md [15-15] ✓@1
-- 标记：黑名单命中：project_harbor-backpressure-superseded.md
-
-| # | 文件 | 行 | 分数 | 命中层 | evidence（ratio / sum / rarestDf / run） |
-|---|---|---|---|---|---|
-| 1 | project_harbor-backpressure.md | 11-16 | 17.0753 | body | 0.6881 / 16.9886 / 1 / 4 |
-| 2 | project_harbor-backpressure-superseded.md | 18-19 | 11.1047 | body | 0.3888 / 9.5984 / 5 / 2 |
-| 3 | project_tide-failures.md | — | 0.0909 | description | —（摘要层无门槛） |
-| 4 | project_tide-scheduler.md | — | 0.0909 | description | —（摘要层无门槛） |
-| 5 | project_tide-window.md | — | 0.0909 | description | —（摘要层无门槛） |
-
-**诊断**：
-
-- 误注入来自**正文路径**：下面是它通过证据门槛的现场数值。
-- `project_harbor-backpressure.md` 正文门槛：✓ ratio 0.6881 ≥ 0.35；✓ sum 16.9886 ≥ 1.5；✓ rarestDf 1 / 0.0075 满足冷门判据；✓ run 4 ≥ 2（通过）
-  - 词元贡献（前 6）：`绝的` idf=4.50 tf=1 → 4.21；`拒绝` idf=2.89 tf=2 → 3.79；`落在` idf=3.20 tf=1 → 2.99；`的任` idf=2.65 tf=1 → 2.48；`目录` idf=2.38 tf=1 → 2.22；`任务` idf=1.36 tf=1 → 1.27
-- `project_harbor-backpressure-superseded.md` 正文门槛：✓ ratio 0.3888 ≥ 0.35；✓ sum 9.5984 ≥ 1.5；✓ rarestDf 5 / 0.0373 满足冷门判据；✓ run 2 ≥ 2（通过）
-  - 词元贡献（前 4）：`被拒` idf=3.20 tf=1 → 3.68；`的任` idf=2.65 tf=1 → 3.05；`目录` idf=2.38 tf=1 → 2.73；`任务` idf=1.36 tf=1 → 1.57
-
 ## 口径说明
 
 - **Precision@k 是下界**：相关集取「标注 needed ∪ allowFiles」；合成语料里未标注但相关的文件不会计入分子。
 - **注入字节**用候选片段字节代理；真实注入还受单场会话预算裁切（契约 2.5，软上限）。
-- **黑名单主指标**按「有黑名单检查的题」计，不按检查项计；本版是 21/91 题、检查项 268 个。
+- **失效抑制**：注入前先按 `invalid_at`（评测时钟固定为 2026-10-31T16:00:00.000Z）判 `expired_source`；被抑制的命中仍占检索候选位次，但不计入注入、也不计入误注入。误注入归零时请对照难负例表里的「被抑制 / 旧版被抑制」列，别把抑制当成检索变好了。
+- **黑名单主指标**按「有黑名单检查的题」计，不按检查项计；本版是 17/91 题、检查项 268 个。
 - **摘要层没有 evidence 门槛**是有意设计（摘要只有一句话，词面重合已经是较强信号）；代价是共享常用词的记忆会被误注入，这正是 1.7.2 难负例扩容要压的。
 
 ## 复现

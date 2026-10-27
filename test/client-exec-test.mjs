@@ -340,12 +340,43 @@ if (clientInv) {
   const clientAuto = clientInv.filter((i) => (i.service || i.namespace) === 'autodream')
   ok(clientAuto.length === 11, `客户端声明了 11 条 autodream 描述符（实际 ${clientAuto.length}）`)
 
+  // 2.0.0：第 4 个 namespace（conflict）—— 列表 / 读正文 / 标失效 / 标记已裁决 / 撤销 / 删记录。
+  // namespace 不声明就永远 undefined（宿主 remote 清单是构建期产物），所以这 6 条是
+  // 「冲突页签到底出不出现」的唯一开关。
+  const clientConflict = clientInv.filter((i) => (i.service || i.namespace) === 'conflict')
+  ok(clientConflict.length === 6, `客户端声明了 6 条 conflict 描述符（实际 ${clientConflict.length}）`)
+  ok(
+    JSON.stringify(clientConflict.map((i) => i.method).sort()) ===
+      JSON.stringify(['dismiss', 'invalidate', 'list', 'read', 'removeRecord', 'undo']),
+    `conflict 的 6 个方法齐全：${clientConflict.map((i) => i.method).sort().join(', ')}`,
+  )
+  // 形状：list 无入参；其余 5 个都是单对象参数 `opts`（与 autodream 的 opts 同形）。
+  const listDesc = clientConflict.find((i) => i.method === 'list')
+  ok(listDesc && listDesc.parameters.length === 0, 'conflict/list 无入参')
+  const optsBads = clientConflict
+    .filter((i) => i.method !== 'list')
+    .filter((i) => {
+      const p = i.parameters
+      return !(p.length === 1 && p[0].name === 'opts' && p[0].wire === 'opts' && p[0].codec.typeSymbol === 'sage-mem/types#ConflictOpts')
+    })
+    .map((i) => i.method)
+  ok(optsBads.length === 0, '其余 5 个方法都是单个 opts 参数（typeSymbol 一致）', optsBads.join(', '))
+  // 失败形态 `{ok:false, code}` 也是结果契约的一部分：每个 codec 都必须先认这一支，
+  // 否则「stale_version 要给出路」会在 strict 校验这一层被拦成一句泛化错误。
+  const conflictSchemas = clientConflict.filter((i) => i.result && i.result.schema)
+  ok(conflictSchemas.length === 6, `6 条 conflict 描述符都带 result schema（${conflictSchemas.length}）`)
+  const failProbe = conflictSchemas.filter((i) => {
+    try { i.result.schema.parse({ ok: false, code: 'stale_version', error: 'x' }); return false } catch (e) { return true }
+  }).map((i) => i.method)
+  ok(failProbe.length === 0, '每条 conflict 结果 codec 接受 {ok:false, code} 失败形态', failProbe.join(', '))
+
   // 契约总数：memory 20（原 9 + audit / archiveCandidates / checkUpdate / getSettings /
   // setLocked / setSettings / readRaw / writeRaw + deleteArchived + openMemoryDir
-  // + 1.7.0 的 recallDebug）+ starmap 2 + autodream 11 = 33。
-  // v1.1.0 加 deleteArchived 之前是 30；下面每一条比对仍然是逐条严格比对。
-  ok(clientInv.length === 33, `客户端声明了 33 条描述符（实际 ${clientInv.length}）`)
-  ok(hostInv.length === 33, `宿主 manifest 也是 33 条 invocation（实际 ${hostInv.length}）`)
+  // + 1.7.0 的 recallDebug）+ starmap 2 + autodream 11 = 33；2.0.0 再加 conflict 6 = 39。
+  // 数字变了要**同时**改 test/structure-test.mjs（那份由 Lead 维护）——
+  // 两处一起红才是「漏了一边」的正确定位信号。
+  ok(clientInv.length === 39, `客户端声明了 39 条描述符（实际 ${clientInv.length}）`)
+  ok(hostInv.length === 39, `宿主 manifest 也是 39 条 invocation（实际 ${hostInv.length}）`)
 
   const missing = [...hostMap.keys()].filter((k) => !clientMap.has(k))
   const extra = [...clientMap.keys()].filter((k) => !hostMap.has(k))

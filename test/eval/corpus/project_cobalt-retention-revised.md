@@ -2,6 +2,7 @@
 name: cobalt-retention
 description: Cobalt 项目的日志保留口径（2026-09 修订），含原始日志与聚合指标的期限
 aliases: [Cobalt 保留, cobalt retention, 日志保留]
+valid_at: 2026-09-18T00:00:00+08:00
 metadata:
   node_type: memory
   type: project

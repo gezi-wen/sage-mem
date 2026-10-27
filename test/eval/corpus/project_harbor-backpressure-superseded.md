@@ -2,6 +2,8 @@
 name: harbor-backpressure-old
 description: 港口调度器积压上限的旧口径，已被 2026-09 的修订取代
 aliases: [港口积压旧口径, harbor backpressure old]
+invalid_at: 2026-09-01T00:00:00+08:00
+superseded_by: project_harbor-backpressure.md
 metadata:
   node_type: memory
   type: project
