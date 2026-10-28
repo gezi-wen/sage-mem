@@ -70,7 +70,7 @@ Most memory schemes take the "SQLite + a long-running worker" route: once memori
 | Feature | Description |
 |---|---|
 | **File-based storage** | One `.md` per memory: frontmatter holds metadata, the body holds content. No database, no hidden format |
-| **Automatic injection** | Every turn automatically scans the memory directory and picks the most relevant few by relevance to inject into context. The model "recalls" on the first turn, without having to go and read files itself |
+| **Automatic injection** | Every new question rescans the memory directory and re-picks the most relevant few for that question, injecting them into context before the model speaks — no file reading needed |
 | **The model can look things up too** | Two retrieval tools are also given to the model (`search_memory` / `read_memory`), so it can go through memories on its own and read the original text by line |
 | **Writes are not overwritten** | While you are editing and the model is changing things at the same time, the later write does not silently clobber the earlier one; the conflict is left as a pending record for you to decide which side to keep |
 | **Zero extra services** | No worker, no SQLite, no port, no long-running process, and no extra API key or cloud service (the only runtime dependency is the ordinary npm library `zod`) |
@@ -116,7 +116,7 @@ Then **open a new session** and try three steps:
 
 1. Tell the model "remember: my cat is called Zhima, and it likes sunbathing" — it writes this into the memory directory by its rules
 2. Open another **new session** and ask "what is my cat called"
-3. It should answer "Zhima" on the first turn — the memory was retrieved and injected automatically by the plugin; the model did not go and read files itself
+3. Its first reply should answer "Zhima" — the memory was retrieved and injected automatically by the plugin; the model did not go and read files itself
 
 <details>
 <summary>Manual install (if you do not want the CLI, or want to install a local development build)</summary>
