@@ -47,6 +47,16 @@ function mem(name, { desc = '无描述', body = '正文。' } = {}) {
   writeFileSync(join(memDir, name), lines.join('\n'), 'utf8')
 }
 
+/** 带额外顶层 frontmatter 行（如 `invalid_at`）的记忆；2.0.1 的有效性抑制用例要用。 */
+function memWith(name, { desc = '无描述', extra = [], body = '正文。' } = {}) {
+  const lines = [
+    '---', `name: ${name.replace(/\.md$/, '')}`, `description: ${desc}`,
+    'metadata:', '  node_type: memory', '  type: reference',
+    ...extra, '---', '', body,
+  ]
+  writeFileSync(join(memDir, name), lines.join('\n'), 'utf8')
+}
+
 /** 假 ctx：cordis Service 构造要 ctx.reflect.*，未知成员给可调用的桩（与 _recall-scenarios 同形）。 */
 function makeCtx() {
   const handlers = new Map()
@@ -246,6 +256,56 @@ group('8. 零命中同样记一条账（空账本身也是信息）')
   const r = res.records[0]
   ok(r.outcome === 'empty' && r.injected.length === 0, 'outcome=empty 且 injected 为空')
   ok(r.hits === 0, '摘要命中 0 条如实记录')
+  delete process.env.SAGE_MEM_DEBUG
+}
+
+// ── 9. 2.0.1：有效性抑制明细（失效 / 待裁决矛盾）进调试账 ──────────
+group('9. 2.0.1 调试账显示有效性抑制：文件名 + 理由 + 冲突 id')
+{
+  const { buildConflict, writeConflict } = await import(new URL('memory/conflicts.js', LIB).href)
+  process.env.SAGE_MEM_DEBUG = '1'
+  debugMod.resetRecallDebug()
+
+  memWith('project_gamma_old.md', { desc: '伽马项目旧口径', extra: ['invalid_at: 2020-01-01T00:00:00Z'], body: '伽马项目的旧说法。' })
+  memWith('project_delta_a.md', { desc: '德尔塔项目 A 说法', body: '德尔塔项目的 A 版说法。' })
+  memWith('project_delta_b.md', { desc: '德尔塔项目 B 说法', body: '德尔塔项目的 B 版说法。' })
+  const record = buildConflict({
+    kind: 'contradiction',
+    file: 'project_delta_a.md',
+    otherFile: 'project_delta_b.md',
+    incoming: 'A 版',
+    onDisk: 'B 版',
+    at: '2026-10-29T00:00:00Z',
+  })
+  const written = await writeConflict(record, { stateRoot: stateDir })
+  ok(written.ok === true, `待裁决矛盾记录落盘成功（${written.ok ? written.path : written.code}）`)
+
+  await runCapturing(handler, 'dbg-validity', '伽马 德尔塔')
+  const res = await gw.recallDebug()
+  const r = res.records[0]
+  const vs = Array.isArray(r.validitySuppressed) ? r.validitySuppressed : null
+  ok(!!vs, '记录带 validitySuppressed 数组')
+  ok(vs && vs.some((x) => x.file === 'project_gamma_old.md' && x.reason === 'expired_source'),
+    `已失效的进账（${JSON.stringify(vs)}）`)
+  ok(vs && vs.some((x) => x.file === 'project_delta_a.md' && x.reason === 'conflict_pending'),
+    '未裁决矛盾的一方进账')
+  ok(vs && vs.some((x) => x.file === 'project_delta_b.md' && x.reason === 'conflict_pending'),
+    '矛盾的另一方也进账（两边都抑制）')
+  const row = vs && vs.find((x) => x.file === 'project_delta_a.md')
+  ok(!!row && row.conflictId === record.id, `矛盾条目带冲突 id（${row && row.conflictId} vs ${record.id}）`)
+  ok(vs && vs.every((x) => typeof x.label === 'string' && x.label !== ''), '每条带人话 label')
+  ok(vs && !vs.some((x) => x.reason === 'below_floor' || x.reason === 'budget_omitted' || x.reason === 'evidence_missing'),
+    '只收有效性两类 —— 门槛 / 预算 / 证据不足不混进来')
+  ok(r.validitySuppressed.every((x) => typeof x.file === 'string' && x.file !== ''), '每条的 file 都是非空字符串')
+
+  // 关掉有效性开关：不抑制，账里应为空数组（而不是字段消失）
+  process.env.SAGE_MEM_VALIDITY = '0'
+  debugMod.resetRecallDebug()
+  await runCapturing(handler, 'dbg-validity-off', '伽马 德尔塔')
+  const off = await gw.recallDebug()
+  ok(Array.isArray(off.records[0].validitySuppressed) && off.records[0].validitySuppressed.length === 0,
+    'SAGE_MEM_VALIDITY=0：validitySuppressed 是空数组')
+  delete process.env.SAGE_MEM_VALIDITY
   delete process.env.SAGE_MEM_DEBUG
 }
 

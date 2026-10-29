@@ -459,14 +459,18 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 			: null);
 
 		/**
-		 * 「注入调试」面板（1.7.0）。
+		 * 「注入调试」面板（1.7.0；2.0.1 起显示有效性抑制明细）。
 		 *
 		 * 只读：没有「清空 / 重跑」按钮 —— 账是注入链在 `SAGE_MEM_DEBUG=1` 时自动记的，
 		 * 人能做的是看，以及点「刷新」再取一次。入口只在开关打开时出现（宿主告诉我们）。
 		 *
-		 * 每一条记录的口径写在 `lib/recall/debug.js` 的 makeDebug 注释里；这里只负责把
+		 * 每一条记录的口径写在 `lib/recall/injector.js` 的 makeDebug 注释里；这里只负责把
 		 * 「为什么这一步没注入」翻译成人话 —— 那是这个面板存在的唯一理由。**尤其是
 		 * `empty + deduped`**：每轮多步里它占大多数，不解释就会被当成「插件坏了」。
+		 *
+		 * 2.0.0 让失效 / 未裁决矛盾的记忆不再进正文。2.0.1 把这两类的**文件名、理由与
+		 * 冲突 id** 单列一行：否则「这条记忆不见了」在面板上只能看到它不在 injected 里，
+		 * 分不清是没检索到还是被新规则挡住 —— 而那正是 2.0.0 之后最需要解释的一种消失。
 		 */
 		function RecallDebugPanel(props) {
 			const data = props.data || {};
@@ -501,6 +505,9 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 				}));
 			}
 			const injected = latest && Array.isArray(latest.injected) ? latest.injected : [];
+			// 2.0.1：被有效性挡掉的条目。旧记录没有这个字段 → 空数组（面板显示「无」），
+			// 不因为多一个可选字段就把老账读崩。
+			const validitySuppressed = latest && Array.isArray(latest.validitySuppressed) ? latest.validitySuppressed : [];
 			const histogram = recs.slice(1).map(function (r, i) {
 				return h("div", { className: "smem-dbg-hist-row", key: "h" + i }, [
 					h("span", { className: "smem-dbg-time", key: "t" }, clock(r.at)),
@@ -544,6 +551,23 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 								"正文字节 " + String(latest.chars || 0) + "（本代累计 " + String(latest.sessionChars || 0) + "）" +
 								" · 状态卡 " + (latest.cardChars ? String(latest.cardChars) + " 字节" : "未发") +
 								" · 预算挡掉 " + String(latest.skippedByBudget || 0) + " 条"),
+							h("div", { className: "smem-dbg-row", key: "vs" }, [
+								h("span", { className: "smem-label", key: "l" }, "有效性抑制"),
+								validitySuppressed.length
+									? h("span", { className: "smem-dbg-scores", key: "v" }, validitySuppressed.map(function (x, i) {
+										const reason = String((x && x.label) || (x && x.reason) || "未知理由");
+										const cid = x && x.conflictId ? " · " + String(x.conflictId) : "";
+										return h("span", { className: "smem-dbg-score", key: String((x && x.file) || i) + "-" + i }, [
+											h("span", { className: "smem-dbg-file", key: "f" }, String((x && x.file) || "?")),
+											h("span", { className: "smem-dbg-num", key: "r" }, reason + cid),
+										]);
+									}))
+									: h("span", { className: "smem-muted", key: "v" }, "无"),
+							]),
+							validitySuppressed.length
+								? h("div", { className: "smem-ar-hint", key: "vshint" },
+									"被标失效或待裁决矛盾挡掉的记忆不会进正文 —— 这不是检索没命中，是 2.0.0 的有效性规则生效；去「冲突」页签可裁决。")
+								: null,
 							h("div", { className: "smem-ar-hint", key: "hint" },
 								"注入每走一步都会尝试一次；同题同命中集不会重复注入 —— 所以「空」多半是去重生效，不是坏了。"),
 							histogram.length

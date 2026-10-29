@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.0.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.0.1`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -415,7 +415,7 @@ The two things are moved **differently**, spelled out:
 | `SAGE_MEM_MAX_BASELINE` | `8` (1–50) | number of `baseline` slots |
 | `SAGE_MEM_STALE_DAYS` | `1` (0–365) | threshold for marking a heading 「保存于 N 天前」(saved N days ago); 0 = mark every one |
 | `SAGE_MEM_TASK_ID` | empty | scope of task checkpoints; empty falls back to the session id |
-| `SAGE_MEM_DEBUG` | off | debug logging; when on, the panel's **工具 ▾ → 注入调试** shows the last 8 injection attempts (read-only, never written to disk) |
+| `SAGE_MEM_DEBUG` | off | debug logging; when on, the panel's **工具 ▾ → 注入调试** shows the last 8 injection attempts (read-only, never written to disk; it also lists any memory kept out of the body by an expired `invalid_at` or an unresolved contradiction, with the reason and the conflict id) |
 | `SAGE_MEM_VALIDITY` | on | master switch for invalidity filtering and contradiction suppression. **Only `0` / `false` / `off` turn it off** (empty or misspelled values count as on); off restores the 1.9.x injection behaviour |
 
 Value semantics: **out-of-range values are clamped to the boundary, illegal values (including pure whitespace) fall back to the default.**

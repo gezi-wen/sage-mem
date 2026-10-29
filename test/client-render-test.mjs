@@ -2462,6 +2462,11 @@ async function main() {
       picked: ['user_base.md', 'project_alpha.md'],
       injected: ['user_base.md', 'project_alpha.md'],
       chars: 4820, sessionChars: 4820, cardChars: 0, skippedByBudget: 1, card: 'none',
+      // 2.0.1：有效性抑制明细 —— 一条已失效、一条待裁决矛盾（带冲突 id）
+      validitySuppressed: [
+        { file: 'project_stale.md', reason: 'expired_source', label: '已失效' },
+        { file: 'project_alpha.md', reason: 'conflict_pending', label: '待裁决矛盾', conflictId: '20261029-abcd1234' },
+      ],
     }
     const DUP = Object.assign({}, REC, {
       at: FIXED_NOW + 1000, outcome: 'empty', deduped: true, injected: [], chars: 0, cardChars: 0,
@@ -2495,6 +2500,11 @@ async function main() {
     ok(txt.indexOf('project_alpha.md') >= 0 && txt.indexOf('12.34') >= 0, '能看到命中文件与得分')
     ok(txt.indexOf('4820') >= 0, '能看到注入正文字节')
     ok(txt.indexOf('预算挡掉 1 条') >= 0, '能看到被预算挡掉几条')
+    ok(txt.indexOf('有效性抑制') >= 0, '2.0.1：能看到有效性抑制这一行')
+    ok(txt.indexOf('project_stale.md') >= 0 && txt.indexOf('已失效') >= 0, '能看到被标失效的文件与理由')
+    ok(txt.indexOf('待裁决矛盾') >= 0 && txt.indexOf('20261029-abcd1234') >= 0,
+      '能看到待裁决矛盾与冲突 id（便于去「冲突」页签定位）')
+    ok(txt.indexOf('不是检索没命中') >= 0, '有抑制时给出解释：不是检索没命中，是有效性规则生效')
     ok(txt.indexOf('同题已注入过') >= 0, '历史里的去重步骤被翻译成人话（不是一行空白）')
     const callsBefore = memOn.st.calls.filter((c) => c[0] === 'recallDebug').length
     click(btnHas(panel, '刷新')[0])
@@ -2522,6 +2532,21 @@ async function main() {
     const oldItems = all(tOld, (n) => n.type === 'button' && byClass('smem-drawer-item')(n)).map(textOf)
     ok(oldItems.length === 2, `旧宿主：抽屉仍是两项（${oldItems.join(' | ')}）`)
     ok(treeText(tOld).indexOf('宿主侧还没有') < 0, '旧宿主：不冒「接口不存在」的红字')
+
+    // 19e 旧账（1.7.0–2.0.0 记录，没有 validitySuppressed 字段）：显示「无」，不崩、不多嘴
+    const LEGACY = Object.assign({}, REC)
+    delete LEGACY.validitySuppressed
+    const rtLegacy = makeReact()
+    const memLegacy = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    memLegacy.st.recallDebug = { enabled: true, records: [LEGACY] }
+    const legacy = await loadClient(rtLegacy, { memory: memLegacy })
+    let tLegacy = await rtLegacy.settle(legacy.comp, {})
+    tLegacy = await openDrawer(rtLegacy, legacy.comp, tLegacy)
+    click(drawerItem(tLegacy, '注入调试'))
+    tLegacy = await rtLegacy.settle(legacy.comp, {})
+    const legacyTxt = treeText(all(tLegacy, byClass('smem-tool-panel'))[0] || {})
+    ok(legacyTxt.indexOf('有效性抑制') >= 0 && legacyTxt.indexOf('无') >= 0, '旧账缺字段：该行显示「无」而不是崩掉')
+    ok(legacyTxt.indexOf('不是检索没命中') < 0, '旧账没有抑制时不显示解释（不制造噪音）')
   }
 
   // ── 20. 1.8.0 侧栏「记忆管理」入口（可开关，additive）────────────────────

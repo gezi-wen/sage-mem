@@ -679,3 +679,14 @@ B 台账」—— **A 里不存在的名字在 B 台账里全被判成死键删�
 1. **remote 方法名不能叫 `remove`**：DSH 的客户端 `RemoteNamespaceService`（Cordis Service 子类）原型上已有这个名字，客户端在 `ctx.remote.$mount()` 的 `assertMethodAvailable` 直接抛错 —— 结果不是「按钮失效」，而是**整个 client 插件 activate 失败**（`web boot: 1 entry did not activate`）。修法：两端统一改名 `removeRecord`，id 一起改（契约不承诺 remote 方法名）。`test/structure-test.mjs` 加了 `CLIENT_RESERVED_METHODS` 守卫，以后再加 remote 撞同类错就把名字补进集合。
 2. **冲突面板的 remote 结果必须过 `unwrap`**：typert 通用传输层把返回值包成 `{ok:true, value:<方法返回值>}`，而方法返回值里**自己也有一个 `ok`**，两个 `ok` 不是同一个东西。直接把信封当 payload 读 → `items` 永远 undefined → 界面显示「0 条待裁决」，而网络层明明有记录。修法：三处消费点 `unwrap(res)`，并把 `client-render-test` 的假 remote 改成**照传输层形状返回信封** —— 否则渲染测试永远绕开这一层（445 条全绿也漏掉了它）。
 3. 结论写进 CHANGELOG 的实测段：**单测绿 ≠ 真机可用**，这两个 bug 在 VM 渲染断言里都不可见；真机八步不是形式。
+
+## D30 · 2.0.1 调试视图补有效性抑制明细：只解释、不改行为
+
+**背景**：2.0.0 让「已失效」与「未裁决矛盾」的记忆不再进正文。这是**静默的消失**——状态卡只在有矛盾时说话，面板只显示「预算挡掉 N 条」。用户在注入调试视图里看到某条记忆不在 `injected` 里时，分不清是「检索没命中 / 分数不够 / 被新规则挡住」三种里的哪一种，而第三种是 2.0.0 才出现的。
+
+- **为什么这是 PATCH 而不是 MINOR**：没有新入口 / 新 remote / 新设置项，注入行为一行未改；新增的只是既有只读 remote 返回值里的一个字段与既有面板里的一行。判据按 `release-standards`「用户用法不变」，不是按改了几行。
+- **为什么只收 `expired_source` / `conflict_pending`**：`below_floor` / `budget_omitted` / `evidence_missing` 这些老理由在得分列表与「预算挡掉」里已经能对上；把全部 reason 都铺上去会让这一行变成第二份得分表，反而淹没 2.0.0 新引入的两种「消失」。
+- **为什么带冲突 id**：抑制与裁决是两个页签的事（调试在「工具」，裁决在「冲突」）。不带 id 的话，用户看到「待裁决矛盾」还得自己翻冲突列表猜是哪一条。
+- **为什么不改 `composeDelivery` 的返回形状**：`delivery.items` 本来就带 `{file, reason}`（`deliver.js` 的稳定契约），调试账只需要在 injector 里筛一遍。改 compositor 的返回值会把「调试可选字段」变成注入链的契约面，代价与收益不成比例。
+- **旧账兼容**：字段缺失时面板显示「无」并跳过解释。调试缓冲在进程内存里、重启即空，所以「同一个缓冲里混着旧版记录」只可能发生在热升级的极端情况，但显示层的兜底仍然要有。
+- **待补**：web profile 真机看一眼排版（复用 `smem-dbg-row`，未新增 CSS）；`desktop` 从 2.0.0 起就没有真机探针，这一版不改变该结论。
