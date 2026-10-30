@@ -63,7 +63,7 @@
 			const sidebarEntryOn = !(memSet && memSet.ui && memSet.ui.sidebarEntry === false);
 
 			react.useEffect(function () {
-				if (!remote) { setErr("remote.autodream 不可用 —— 插件的 宿主侧可能没加载成功，看 DSH 启动日志"); return undefined; }
+				if (!remote) { setErr(t("ad.err.remoteUnavailable")); return undefined; }
 				let alive = true;
 				function pull() {
 					callRemote("status", [], function (d) {
@@ -103,7 +103,7 @@
 			 */
 			function callRemote(name, args, onOk, onErr) {
 				const fn = remote ? remote[name] : null;
-				if (typeof fn !== "function") { if (onErr) onErr("宿主侧没有 " + name + " 接口（版本较旧？）"); return; }
+				if (typeof fn !== "function") { if (onErr) onErr(t("ad.err.noInterface", { name: name })); return; }
 				let p;
 				try { p = fn.apply(remote, args || []); }
 				catch (e) { if (onErr) onErr(detail(e)); return; }
@@ -121,12 +121,14 @@
 			// ── 注入设置：5 项上限 + 保留名名单 ─────────────────────────────
 			// 边界与 host 的 LIMIT_SPECS 一一对应（那边是权威，这里只是提前拦明显笔误）。
 			const LIMIT_FIELDS = [
-				{ key: "maxResults", label: "一次注入条数", lo: 1, hi: 30, unit: "条" },
-				{ key: "maxChars", label: "单条字符上限", lo: 200, hi: 20000, unit: "字符" },
-				{ key: "maxBaseline", label: "baseline 名额", lo: 1, hi: 50, unit: "条" },
-				{ key: "maxSessionBytes", label: "单会话字节预算", lo: 4096, hi: 524288, unit: "字节" },
-				{ key: "staleDays", label: "新鲜度门槛", lo: 0, hi: 365, unit: "天" },
+				{ key: "maxResults", labelKey: "ad.limit.maxResults", lo: 1, hi: 30, unitKey: "ad.unit.items" },
+				{ key: "maxChars", labelKey: "ad.limit.maxChars", lo: 200, hi: 20000, unitKey: "ad.unit.chars" },
+				{ key: "maxBaseline", labelKey: "ad.limit.maxBaseline", lo: 1, hi: 50, unitKey: "ad.unit.items" },
+				{ key: "maxSessionBytes", labelKey: "ad.limit.maxSessionBytes", lo: 4096, hi: 524288, unitKey: "ad.unit.bytes" },
+				{ key: "staleDays", labelKey: "ad.limit.staleDays", lo: 0, hi: 365, unitKey: "ad.unit.days" },
 			];
+			const limitLabel = function (f) { return t(f.labelKey); };
+			const limitUnit = function (f) { return t(f.unitKey); };
 
 			/** 把一份 limits 对象摊成输入框用的字符串草稿（输入期间允许非法，保存时再校验）。 */
 			function limitsDraftOf(src) {
@@ -147,27 +149,27 @@
 
 			/** 保存 5 项上限。越界/非整数**本地先拦**（host 也是直接拒绝），别让它白跑一趟。 */
 			function saveLimits() {
-				if (!memRemote || typeof memRemote.setSettings !== "function") { setErr("宿主侧还没有 setSettings 接口（插件版本较旧）"); return; }
+				if (!memRemote || typeof memRemote.setSettings !== "function") { setErr(t("ad.err.noSetSettings")); return; }
 				const draft = limitsDraft || {};
 				const limits = {};
 				const bad = [];
 				for (const f of LIMIT_FIELDS) {
 					const raw = String(draft[f.key] == null ? "" : draft[f.key]).trim();
 					const n = Number(raw);
-					if (raw === "" || !Number.isFinite(n) || !Number.isInteger(n)) { bad.push(f.label + "要整数"); continue; }
-					if (n < f.lo || n > f.hi) { bad.push(f.label + " 要在 " + f.lo + "–" + f.hi + " 之间"); continue; }
+					if (raw === "" || !Number.isFinite(n) || !Number.isInteger(n)) { bad.push(t("ad.err.limitInteger", { label: limitLabel(f) })); continue; }
+					if (n < f.lo || n > f.hi) { bad.push(t("ad.err.limitRange", { label: limitLabel(f), lo: f.lo, hi: f.hi })); continue; }
 					limits[f.key] = n;
 				}
-				if (bad.length) { setErr("没保存 —— " + bad.join("；")); return; }
+				if (bad.length) { setErr(t("ad.err.notSaved", { detail: bad.join(t("ad.errSep")) })); return; }
 				setSaveBusy(true); setErr(null); setNotice("");
 				Promise.resolve(memRemote.setSettings({ limits: limits })).then(function (out) {
 					setSaveBusy(false);
 					// setSettings 是 {ok:true, settings, restartRequired} 形状：不要过 unwrap
 					// （unwrap 只认 {ok, value}，这里会把 settings 吃掉）。
-					if (out && out.ok === false) { setErr(out.error || "保存被拒绝"); return; }
+					if (out && out.ok === false) { setErr(out.error || t("ad.err.saveRejected")); return; }
 					if (out && out.settings) { setMemSet(out.settings); setLimitsDraft(limitsDraftOf(out.settings.pendingLimits)); }
 					else loadMemSettings();
-					setNotice("已保存 —— 需重启 DSH 才生效");
+					setNotice(t("ad.notice.limitsSaved"));
 				}, function (e) { setSaveBusy(false); setErr(detail(e)); });
 			}
 
@@ -180,7 +182,7 @@
 			 */
 			function saveSidebarEntry(next) {
 				if (!memRemote || typeof memRemote.setSettings !== "function") {
-					setSidebarErr("宿主侧还没有 setSettings 接口（插件版本较旧）");
+					setSidebarErr(t("ad.err.noSetSettings"));
 					return;
 				}
 				if (sidebarBusy) return;
@@ -188,11 +190,11 @@
 				Promise.resolve(memRemote.setSettings({ ui: { sidebarEntry: !!next } })).then(function (out) {
 					setSidebarBusy(false);
 					// 与 saveLimits 同款：setSettings 是 {ok, settings, restartRequired} 形状，不要过 unwrap。
-					if (out && out.ok === false) { setSidebarErr(out.error || "保存被拒绝"); return; }
+					if (out && out.ok === false) { setSidebarErr(out.error || t("ad.err.saveRejected")); return; }
 					if (out && out.settings) setMemSet(out.settings);
 					else loadMemSettings();
 					setSidebarEntry(!!next);
-					setNotice(!!next ? "侧栏入口已开启（立即生效）" : "侧栏入口已关闭（设置页入口仍在）");
+					setNotice(!!next ? t("ad.notice.sidebarOn") : t("ad.notice.sidebarOff"));
 				}, function (e) { setSidebarBusy(false); setSidebarErr(detail(e)); });
 			}
 
@@ -203,28 +205,28 @@
 			 * 那是生效清单里固定的两个，删不掉。这里管的只是用户自己加的那些。
 			 */
 			function saveReserved(list) {
-				if (!memRemote || typeof memRemote.setSettings !== "function") { setErr("宿主侧还没有 setSettings 接口（插件版本较旧）"); return; }
+				if (!memRemote || typeof memRemote.setSettings !== "function") { setErr(t("ad.err.noSetSettings")); return; }
 				setSaveBusy(true); setErr(null); setNotice("");
 				Promise.resolve(memRemote.setSettings({ reserved: list })).then(function (out) {
 					setSaveBusy(false);
-					if (out && out.ok === false) { setErr(out.error || "名单被拒绝"); return; }
+					if (out && out.ok === false) { setErr(out.error || t("ad.err.reservedRejected")); return; }
 					if (out && out.settings) setMemSet(out.settings);
 					else loadMemSettings();
-					setNotice("保留名名单已保存 —— 需重启 DSH 才生效");
+					setNotice(t("ad.notice.reservedSaved"));
 				}, function (e) { setSaveBusy(false); setErr(detail(e)); });
 			}
 
 			function addReserved() {
 				const name = String(reservedNew || "").trim();
 				const extra = Array.isArray(memSet && memSet.reservedExtra) ? memSet.reservedExtra : [];
-				if (!name) { setErr("先写一个文件名，例如 project_notes.md"); return; }
+				if (!name) { setErr(t("ad.err.reservedNeedName")); return; }
 				// 与 host 的校验同一套：单个 .md 文件名、不许带路径
 				if (!name.endsWith(".md") || name.includes("/") || name.includes("\\") || name.startsWith("..")) {
-					setErr("保留名要是一个 .md 文件名（不能带路径）：" + name);
+					setErr(t("ad.err.reservedBadName", { name: name }));
 					return;
 				}
 				if (extra.some(function (x) { return String(x).toLowerCase() === name.toLowerCase(); })) {
-					setErr("名单里已经有 " + name + " 了");
+					setErr(t("ad.err.reservedDup", { name: name }));
 					return;
 				}
 				setReservedNew("");
@@ -253,7 +255,7 @@
 				callRemote("listModels", [], function (d) {
 					setModels(d && typeof d === "object" && !Array.isArray(d) ? d : { catalogAvailable: false, routes: [], note: "" });
 				}, function (m) {
-					setModels({ catalogAvailable: false, routes: [], note: "模型目录不可用（" + m + "）—— 请在下面手填 provider 与 model。" });
+					setModels({ catalogAvailable: false, routes: [], note: t("ad.note.modelCatalogUnavailable", { error: m }) });
 				});
 			}
 
@@ -262,27 +264,27 @@
 				// 契约：runNow({ reason })。reason 只落进 manifest 给人看；门控的豁免
 				// 由 宿主侧负责（手动点了按钮就不该被「还没到 N 小时」挡回来）。
 				callRemote("runNow", [{ reason: "设置页手动触发" }], function (d) {
-					if (d && d.ok === false) setErr(d.error || "启动失败");
-					else { setNotice("已开始整理 —— 进度每 2 秒刷新一次"); refreshLists(); }
+					if (d && d.ok === false) setErr(d.error || t("ad.err.startFailed"));
+					else { setNotice(t("ad.notice.started")); refreshLists(); }
 					setBusy(false);
 				}, function (m) { setErr(m); setBusy(false); });
 			}
 
 			function openReport(name) {
 				if (name === null) { setOpen(null); setBody(""); return; }
-				setOpen(name); setBody("载入中…");
+				setOpen(name); setBody(t("ad.loading"));
 				callRemote("readReport", [name], function (d) {
-					setBody((d && d.content) || "(空)");
-				}, function (m) { setBody("读取失败：" + m); });
+					setBody((d && d.content) || t("ad.empty"));
+				}, function (m) { setBody(t("ad.err.readFailed", { error: m })); });
 			}
 
 			/** 整理声明：点开才拉，拉回来的是 Markdown 原文，直接用 pre 呈现。 */
 			function openDecl(runId) {
 				if (declOpen === runId) { setDeclOpen(null); setDeclBody(""); return; }
-				setDeclOpen(runId); setDeclBody("载入中…");
+				setDeclOpen(runId); setDeclBody(t("ad.loading"));
 				callRemote("readDeclaration", [{ runId: runId }], function (d) {
-					setDeclBody((d && d.markdown) || "(这一趟没有留下声明正文)");
-				}, function (m) { setDeclBody("读取失败：" + m); });
+					setDeclBody((d && d.markdown) || t("ad.emptyDeclaration"));
+				}, function (m) { setDeclBody(t("ad.err.readFailed", { error: m })); });
 			}
 
 			/**
@@ -295,26 +297,31 @@
 				callRemote("rollback", [{ snapshotId: sp.name, scope: scope }], function (d) {
 					const x = d || {};
 					if (x.ok === false) {
-						setRbMsg({ bad: true, text: "回滚失败：" + (x.error || "未知原因") });
+						setRbMsg({ bad: true, text: t("ad.err.rollbackFailed", { error: x.error || t("ad.unknownReason") }) });
 					} else {
-						setRbMsg({ bad: false, text: "已回滚到 " + String(sp.atHuman || "") + "：恢复 " +
-							(x.restored == null ? "?" : x.restored) + " 个文件，移走 " + (x.parked == null ? "?" : x.parked) + " 个" +
+						setRbMsg({ bad: false, text: t("ad.rb.rolledBack", {
+							at: String(sp.atHuman || ""),
+							restored: (x.restored == null ? "?" : x.restored),
+							parked: (x.parked == null ? "?" : x.parked),
+						}) +
 							// skipped = 想动但没动的（archive/ 已有同名、或回滚点里没那一版）。
 							// 不显示它等于「部分成功」被说成「成功」——回滚这种事不能含糊。
-							(x.skipped ? "，跳过 " + x.skipped + " 个（详见回滚报告）" : "") +
-							(x.protection ? " · 保护快照 " + x.protection : "") + (x.report ? " · 报告 " + x.report : "") });
+							(x.skipped ? t("ad.rb.skipped", { count: x.skipped }) : "") +
+							(x.protection ? t("ad.rb.protection", { id: x.protection }) : "") +
+							(x.report ? t("ad.rb.report", { name: x.report }) : "") });
 						setConfirmSnap(null);
 					}
 					setRbBusy(null);
 					refreshLists();
-				}, function (m) { setRbMsg({ bad: true, text: "回滚失败：" + m }); setRbBusy(null); });
+				}, function (m) { setRbMsg({ bad: true, text: t("ad.err.rollbackFailed", { error: m }) }); setRbBusy(null); });
 			}
 
 			// 实际生效路线（契约：route 可能为 null；source==='none' 时 error 里是原因）。
 			const routeBad = !route || route.source === "none" || !route.provider || !route.model;
 			const routeInfo = routeBad
-				? ("实际生效路线：拿不到 —— " + ((route && route.error) || "宿主没能解析出 provider / model（配置留空且取不到会话默认模型）"))
-				: ("实际生效路线：" + route.provider + " / " + route.model + (route.fromDefault ? "（跟随默认）" : "（配置指定）"));
+				? t("ad.route.bad", { error: (route && route.error) || t("ad.route.badFallback") })
+				: t("ad.route.ok", { provider: route.provider, model: route.model }) +
+					(route.fromDefault ? t("ad.route.fromDefault") : t("ad.route.fromConfig"));
 
 			// 模型 <select> 的取值：''=跟随默认；否则是 "provider::model" 的 JSON 编码。
 			// 配置里指定的路线万一下架了（不在目录里），也要让它显示出来 —— 否则
@@ -338,9 +345,9 @@
 
 			return h("div", { className: "smem-autodream" }, [
 				h("div", { className: "smem-subtabs", key: "segs" }, [
-					subtab("run", "运行"),
-					subtab("settings", "设置"),
-					subtab("records", "记录", String(snaps.length + runs.length + reports.length)),
+					subtab("run", t("ad.tab.run")),
+					subtab("settings", t("ad.tab.settings")),
+					subtab("records", t("ad.tab.records"), String(snaps.length + runs.length + reports.length)),
 				]),
 				segOf === "run" ? h("div", { key: "seg-run" }, [
 				h("div", { className: "smem-autodream-sec", key: "top" }, [
@@ -348,54 +355,53 @@
 						h("button", {
 							type: "button", key: "sw", className: "smem-switch",
 							"data-on": c.enabled ? "1" : "0",
-							title: c.enabled ? "点击停用" : "点击启用",
-							"aria-label": "启用或停用自动做梦",
+							title: c.enabled ? t("ad.switch.onTitle") : t("ad.switch.offTitle"),
+							"aria-label": t("ad.switch.aria"),
 							onClick: function () { patch({ enabled: !c.enabled }); },
 						}),
-						h("span", { key: "t", style: { fontWeight: "600" } }, "自动做梦"),
+						h("span", { key: "t", style: { fontWeight: "600" } }, t("ad.title")),
 						h("span", { className: "smem-status", key: "s" },
-							running ? ("运行中 · " + String((st && st.phase) || "准备中")) : (c.enabled ? "已启用 · 空闲" : "未启用")),
+							running ? t("ad.status.running", { phase: String((st && st.phase) || t("ad.status.preparing")) }) : (c.enabled ? t("ad.status.idle") : t("ad.status.off"))),
 					]),
-					h("div", { className: "smem-autodream-note", key: "n" },
-						"把记忆目录通读一遍：合并重复的、删掉被推翻的、修索引与断链、把相对日期换成绝对日期。"),
+					h("div", { className: "smem-autodream-note", key: "n" }, t("ad.note.what")),
 				]),
 				h("div", { className: "smem-autodream-sec", key: "mode" }, [
 					h("div", { className: "smem-autodream-row", key: "a" }, [
-						h("span", { className: "smem-autodream-key", key: "k" }, "触发"),
+						h("span", { className: "smem-autodream-key", key: "k" }, t("ad.row.trigger")),
 						h(Seg, {
 							key: "v", value: c.trigger,
-							options: [{ value: "manual", label: "只手动" }, { value: "auto", label: "满足条件自动跑" }],
+							options: [{ value: "manual", label: t("ad.trigger.manual") }, { value: "auto", label: t("ad.trigger.auto") }],
 							onChange: function (v) { patch({ trigger: v }); },
 						}),
 					]),
 					h("div", { className: "smem-autodream-row", key: "b" }, [
-						h("span", { className: "smem-autodream-key", key: "k" }, "改动方式"),
+						h("span", { className: "smem-autodream-key", key: "k" }, t("ad.row.apply")),
 						h(Seg, {
 							key: "v", value: c.apply ? "apply" : "report",
-							options: [{ value: "report", label: "只出报告" }, { value: "apply", label: "直接改写（先快照）" }],
+							options: [{ value: "report", label: t("ad.apply.report") }, { value: "apply", label: t("ad.apply.apply") }],
 							onChange: function (v) { patch({ apply: v === "apply" }); },
 						}),
 					]),
 					h("div", { className: "smem-autodream-row", key: "c" }, [
-						h("span", { className: "smem-autodream-key", key: "k" }, "输入源"),
+						h("span", { className: "smem-autodream-key", key: "k" }, t("ad.row.source")),
 						h(Seg, {
 							key: "v", value: c.source,
-							options: [{ value: "memory", label: "仅记忆目录" }, { value: "memory+sessions", label: "记忆 + 会话记录" }],
+							options: [{ value: "memory", label: t("ad.source.memory") }, { value: "memory+sessions", label: t("ad.source.sessions") }],
 							onChange: function (v) { patch({ source: v }); },
 						}),
 					]),
 					h("div", { className: "smem-autodream-note", key: "w" },
 						c.source === "memory+sessions"
-							? "会解压会话记录做定向搜索 —— 私密对话会进入模型上下文，token 成本也更高。"
-							: "只看记忆文件本身，不碰会话记录。"),
+							? t("ad.note.sourceSessions")
+							: t("ad.note.sourceMemory")),
 					h("div", { className: "smem-autodream-note", key: "w2" },
 						c.apply
-							? "改写前会自动把整个记忆目录快照一份（memory 上一层 .sage-mem/autodream/snapshots/），改坏可回退。"
-							: "只读模式：这一趟连写工具都不会挂给模型，所以它不可能改到任何文件。"),
+							? t("ad.note.applySnapshot")
+							: t("ad.note.reportOnly")),
 				]),
 				h("div", { className: "smem-autodream-sec", key: "model" }, [
 					h("div", { className: "smem-autodream-row", key: "model" }, [
-						h("span", { className: "smem-autodream-key", key: "k" }, "模型"),
+						h("span", { className: "smem-autodream-key", key: "k" }, t("ad.row.model")),
 						// 有可枚举的模型目录就给 <select>（首项 = 跟随会话默认，值 "":""）；
 						// 目录不可用就退化成两个文本框（契约第六节第 2 条）。
 						(models && models.catalogAvailable)
@@ -409,11 +415,11 @@
 										patch({ provider: r.provider, model: r.model });
 									},
 								}, [h("option", { key: "__def", value: "" },
-										"跟随当前会话默认模型" + ((models.defaultRoute && models.defaultRoute.provider && models.defaultRoute.model)
-											? ("（" + String(models.defaultRoute.provider) + " / " + String(models.defaultRoute.model) + "）")
+										t("ad.model.followDefault") + ((models.defaultRoute && models.defaultRoute.provider && models.defaultRoute.model)
+											? t("ad.model.defaultRoute", { provider: String(models.defaultRoute.provider), model: String(models.defaultRoute.model) })
 											: ""),
 									)].concat(
-										modelValueInCatalog ? [] : [h("option", { key: "__cur", value: modelValue }, String(c.provider) + " / " + String(c.model) + "（配置里指定，不在目录中）")],
+										modelValueInCatalog ? [] : [h("option", { key: "__cur", value: modelValue }, String(c.provider) + " / " + String(c.model) + t("ad.model.currentOutOfCatalog"))],
 										modelRoutes.map(function (r) {
 											return h("option", { key: String(r.provider) + "/" + String(r.model), value: encodeRoute(r.provider, r.model) },
 												r.label || (String(r.provider) + " / " + String(r.model)));
@@ -421,13 +427,13 @@
 									))
 							: models
 								? [
-										h("input", { className: "smem-input", key: "p", style: { flex: "1", minWidth: "110px" }, value: prov, placeholder: "provider（留空=跟随默认）", onChange: function (e) { setProv(e.target.value); } }),
-										h("input", { className: "smem-input", key: "m", style: { flex: "1", minWidth: "110px" }, value: model, placeholder: "model（留空=跟随默认）", onChange: function (e) { setModel(e.target.value); } }),
-										h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "ok", onClick: function () { patch({ provider: prov, model: model }); setNotice("模型已保存"); } }, "保存"),
+										h("input", { className: "smem-input", key: "p", style: { flex: "1", minWidth: "110px" }, value: prov, placeholder: t("ad.model.placeholder.provider"), onChange: function (e) { setProv(e.target.value); } }),
+										h("input", { className: "smem-input", key: "m", style: { flex: "1", minWidth: "110px" }, value: model, placeholder: t("ad.model.placeholder.model"), onChange: function (e) { setModel(e.target.value); } }),
+										h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "ok", onClick: function () { patch({ provider: prov, model: model }); setNotice(t("ad.model.saved")); } }, t("ad.action.save")),
 									]
 								: [
-										h("span", { className: "smem-status", key: "load" }, "模型目录载入中…"),
-										h("button", { type: "button", className: "smem-btn", key: "man", onClick: function () { setModels({ catalogAvailable: false, routes: [], note: "" }); } }, "手填"),
+										h("span", { className: "smem-status", key: "load" }, t("ad.loadingModels")),
+										h("button", { type: "button", className: "smem-btn", key: "man", onClick: function () { setModels({ catalogAvailable: false, routes: [], note: "" }); } }, t("ad.action.manualEntry")),
 									],
 					]),
 					h("div", {
@@ -444,29 +450,32 @@
 							type: "button", className: "smem-btn smem-btn-primary", key: "go",
 							disabled: busy || running || !remote,
 							onClick: run,
-						}, running ? "正在整理…" : "立即整理"),
+						}, running ? t("ad.action.runningNow") : t("ad.action.runNow")),
 						h("span", { className: "smem-status", key: "s" },
 							running
-								? ("已跑 " + ((st && st.steps && st.steps.length) || 0) + " 轮 · " + String((st && st.phase) || ""))
-								: (st && st.hoursSince != null ? ("距上次整理 " + st.hoursSince.toFixed(1) + " 小时") : "从未整理过")),
+								? t("ad.run.steps", { count: ((st && st.steps && st.steps.length) || 0), phase: String((st && st.phase) || "") })
+								: (st && st.hoursSince != null ? t("ad.run.hoursSince", { hours: st.hoursSince.toFixed(1) }) : t("ad.run.never"))),
 					]),
 					running && st && st.steps && st.steps.length
 						? h("div", { className: "smem-autodream-note", key: "prog" }, st.steps.map(function (x) {
-								return "第 " + x.step + " 轮：" + (x.tools.length ? x.tools.join("、") : "结束");
-							}).join("　·　"))
+								return t("ad.run.progress", { step: x.step, tools: (x.tools.length ? x.tools.join(t("ad.toolSep")) : t("ad.run.stepDone")) });
+							}).join(t("ad.progressSep")))
 						: null,
 					last
 						? h("div", { className: "smem-status", key: "last" },
-								"上次 " + String(last.atHuman || "") + " · " + (last.ok
-									? ("成功" + (last.apply ? "，改写了 " + ((last.touched || []).length) + " 个文件" : "（只出报告）") +
-										" · 结构问题 " + last.problemsBefore + " → " + last.problemsAfter +
-										" · token " + last.tokensIn + " / " + last.tokensOut)
-									: ("失败：" + (last.error || "未知"))) +
+								t("ad.last.prefix", {
+									at: String(last.atHuman || ""),
+									result: (last.ok
+										? (t("ad.last.ok") + (last.apply ? t("ad.last.applied", { count: ((last.touched || []).length) }) : t("ad.last.reportOnly")) +
+											t("ad.last.problems", { before: last.problemsBefore, after: last.problemsAfter }) +
+											t("ad.last.tokens", { in: last.tokensIn, out: last.tokensOut }))
+										: t("ad.last.failed", { error: (last.error || t("ad.unknown")) })),
+								}) +
 								// 1.9.2：残篇必须在状态行上就能看见 —— 只写「成功」正是 10-25 那次误判的来源。
-								(last.ok && last.truncated ? " · ⚠ 报告被截断（残篇）" : "") +
-								(last.ok && !last.truncated && last.retries ? (" · 零正文重试 " + last.retries + " 次后补齐") : "") +
-								(last.continuations ? (" · 续写 " + last.continuations + " 轮") : "") +
-								(last.report ? " · 报告 " + last.report : ""))
+								(last.ok && last.truncated ? t("ad.last.truncated") : "") +
+								(last.ok && !last.truncated && last.retries ? t("ad.last.retried", { count: last.retries }) : "") +
+								(last.continuations ? t("ad.last.continuations", { count: last.continuations }) : "") +
+								(last.report ? t("ad.last.report", { name: last.report }) : ""))
 						: null,
 				]),
 				]) : null,
@@ -475,11 +484,10 @@
 				// 「设置 → 记忆管理」这个入口永远在（它注册在 80-apply，和这个开关无关）。
 				h("div", { className: "smem-autodream-sec", key: "sidebar-entry" }, [
 					h("div", { className: "smem-autodream-row", key: "h" }, [
-						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, "侧栏入口"),
-						h("span", { className: "smem-status", key: "s" }, sidebarEntryOn ? "已开启" : "已关闭"),
+						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, t("ad.sidebar.title")),
+						h("span", { className: "smem-status", key: "s" }, sidebarEntryOn ? t("ad.sidebar.on") : t("ad.sidebar.off")),
 					]),
-					h("div", { className: "smem-autodream-note", key: "n" },
-						"在 DSH 侧栏显示「记忆管理」图标，点它把中央主区切到本页。默认开启；关闭后「设置 → 记忆管理」这个入口仍然保留。改动立即生效，不需要重启。"),
+					h("div", { className: "smem-autodream-note", key: "n" }, t("ad.sidebar.note")),
 					h("label", { className: "smem-check", key: "row" }, [
 						h("input", {
 							type: "checkbox", key: "c",
@@ -487,7 +495,7 @@
 							disabled: sidebarBusy,
 							onChange: function (e) { saveSidebarEntry(!!(e.target && e.target.checked)); },
 						}),
-						h("span", { key: "l" }, "在侧栏显示「记忆管理」入口"),
+						h("span", { key: "l" }, t("ad.sidebar.label")),
 					]),
 					sidebarErr ? h("div", { className: "smem-autodream-note smem-ad-warn", key: "err" }, sidebarErr) : null,
 				]),
@@ -496,27 +504,25 @@
 				// 同一件事只在一处设定，这里不再重复摆一份。
 				h("div", { className: "smem-autodream-sec", key: "limits" }, [
 					h("div", { className: "smem-autodream-row", key: "h" }, [
-						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, "记忆注入参数"),
+						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, t("ad.limits.title")),
 						memSet && memSet.restartRequired
-							? h("span", { className: "smem-ad-badge smem-ad-badge--warn", key: "w" }, "有改动待生效")
+							? h("span", { className: "smem-ad-badge smem-ad-badge--warn", key: "w" }, t("ad.limits.pending"))
 							: null,
 					]),
 					memSet && memSet.restartRequired
-						? h("div", { className: "smem-autodream-note smem-ad-warn", key: "rw" },
-								"⚠ 这些值在 DSH 启动时就固化了 —— 要重启 DSH 才生效。下面每行都写清「当前 → 重启后」。")
-						: h("div", { className: "smem-autodream-note", key: "rn" },
-								"这些值在 DSH 启动时固化：保存后要重启 DSH 才生效 —— 所以每行都会标出「当前生效」与「重启后」。"),
+						? h("div", { className: "smem-autodream-note smem-ad-warn", key: "rw" }, t("ad.limits.restartWarn"))
+						: h("div", { className: "smem-autodream-note", key: "rn" }, t("ad.limits.restartNote")),
 					// 五个参数排两列（一行两个）：同样的信息，行数少一半，扫读反而更清楚。
 					h("div", { className: "smem-ad-grid2", key: "grid" }, LIMIT_FIELDS.map(function (f) {
 						const cur = memSet && memSet.limits ? memSet.limits[f.key] : null;
 						const pend = memSet && memSet.pendingLimits ? memSet.pendingLimits[f.key] : null;
 						const diff = cur != null && pend != null && cur !== pend;
 						return h("div", { className: "smem-ad-field", key: f.key }, [
-							h("span", { className: "smem-autodream-key", key: "k", title: f.unit + " · 范围 " + f.lo + "–" + f.hi }, f.label),
+							h("span", { className: "smem-autodream-key", key: "k", title: t("ad.limit.labelTitle", { unit: limitUnit(f), lo: f.lo, hi: f.hi }) }, limitLabel(f)),
 							h("input", {
 								className: "smem-num", key: "v", type: "number",
 								min: String(f.lo), max: String(f.hi),
-								title: "范围 " + f.lo + "–" + f.hi + " " + f.unit,
+								title: t("ad.limit.inputTitle", { lo: f.lo, hi: f.hi, unit: limitUnit(f) }),
 								value: limitsDraft && limitsDraft[f.key] != null ? limitsDraft[f.key] : "",
 								onChange: function (e) {
 									const nx = Object.assign({}, limitsDraft);
@@ -525,73 +531,72 @@
 								},
 							}),
 							diff
-								? h("span", { className: "smem-ad-badge smem-ad-badge--warn", key: "d" }, "当前 " + String(cur) + " → 重启后 " + String(pend))
-								: h("span", { className: "smem-status", key: "d" }, "范围 " + f.lo + "–" + f.hi + (cur == null ? "" : (" · 当前生效 " + String(cur)))),
+								? h("span", { className: "smem-ad-badge smem-ad-badge--warn", key: "d" }, t("ad.limit.diff", { current: String(cur), pending: String(pend) }))
+								: h("span", { className: "smem-status", key: "d" }, t("ad.limit.range", { lo: f.lo, hi: f.hi }) + (cur == null ? "" : t("ad.limit.current", { current: String(cur) }))),
 						]);
 					})),
 					h("div", { className: "smem-autodream-row", key: "save" }, [
-						h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "s", disabled: saveBusy, onClick: saveLimits }, saveBusy ? "保存中…" : "保存注入参数"),
-						h("span", { className: "smem-status", key: "n" }, "保存后需重启 DSH 才生效"),
+						h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "s", disabled: saveBusy, onClick: saveLimits }, saveBusy ? t("ad.action.saving") : t("ad.action.saveLimits")),
+						h("span", { className: "smem-status", key: "n" }, t("ad.limits.saveHint")),
 					]),
 				]),
 				h("div", { className: "smem-autodream-sec", key: "reserved" }, [
 					h("div", { className: "smem-autodream-row", key: "h" }, [
-						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, "保留名保护名单"),
-						h("span", { className: "smem-status", key: "c" }, "名单里的文件不参与注入"),
+						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, t("ad.reserved.title")),
+						h("span", { className: "smem-status", key: "c" }, t("ad.reserved.subtitle")),
 					]),
-					h("div", { className: "smem-autodream-note", key: "n" },
-						"内置的两个固定不可删；下面可以再加自己的（只写文件名，不要带路径）。改完需重启 DSH 才生效。"),
+					h("div", { className: "smem-autodream-note", key: "n" }, t("ad.reserved.note")),
 					h("div", { className: "smem-raw-names", key: "fixed" }, fixedReserved.map(function (n) {
-						return h("span", { className: "smem-chip smem-chip--fixed", key: n, title: "内置固定，不可删除" }, n + " · 固定");
+						return h("span", { className: "smem-chip smem-chip--fixed", key: n, title: t("ad.reserved.fixedTitle") }, n + t("ad.reserved.fixedSuffix"));
 					})),
 					h("div", { className: "smem-raw-names", key: "extra" },
 						extraReserved.length
 							? extraReserved.map(function (n) {
 									return h("span", { className: "smem-chip", key: n, "data-on": "1" }, [
 										n,
-										h("button", { type: "button", className: "smem-chip-x", key: "x", title: "从名单里移除 " + n, onClick: function () { removeReserved(n); } }, "✕"),
+										h("button", { type: "button", className: "smem-chip-x", key: "x", title: t("ad.reserved.removeTitle", { name: n }), onClick: function () { removeReserved(n); } }, "✕"),
 									]);
 								})
-							: h("span", { className: "smem-status", key: "none" }, "（还没有自己加的保留名）")),
+							: h("span", { className: "smem-status", key: "none" }, t("ad.reserved.empty"))),
 					h("div", { className: "smem-autodream-row", key: "add" }, [
 						h("input", {
 							className: "smem-input", key: "i",
 							style: { flex: "1", minWidth: "150px" },
 							value: reservedNew,
-							placeholder: "例如 project_notes.md（要 .md 文件名）",
+							placeholder: t("ad.reserved.placeholder"),
 							onChange: function (e) { setReservedNew(e.target.value); },
 						}),
-						h("button", { type: "button", className: "smem-btn", key: "a", disabled: saveBusy, onClick: addReserved }, "加入名单"),
+						h("button", { type: "button", className: "smem-btn", key: "a", disabled: saveBusy, onClick: addReserved }, t("ad.action.addToList")),
 					]),
 				]),
 				h("details", { className: "smem-autodream-adv", key: "adv", open: true }, [
-					h("summary", { key: "s" }, "高级设置"),
+					h("summary", { key: "s" }, t("ad.advanced")),
 					h("div", { key: "d" }, [
 						c.trigger === "auto" ? h("div", { className: "smem-autodream-row", key: "gate" }, [
-							h("span", { className: "smem-autodream-key", key: "k" }, "自动触发"),
-							h("span", { className: "smem-status", key: "a" }, "距上次 ≥"),
+							h("span", { className: "smem-autodream-key", key: "k" }, t("ad.adv.autoTrigger")),
+							h("span", { className: "smem-status", key: "a" }, t("ad.adv.since")),
 							h("input", { className: "smem-num", key: "h", type: "number", min: "1", max: "720", value: c.minHours, onChange: function (e) { patch({ minHours: Number(e.target.value) }); } }),
-							h("span", { className: "smem-status", key: "b" }, "小时，且期间 ≥"),
+							h("span", { className: "smem-status", key: "b" }, t("ad.adv.hoursAndSessions")),
 							h("input", { className: "smem-num", key: "m", type: "number", min: "1", max: "200", value: c.minSessions, onChange: function (e) { patch({ minSessions: Number(e.target.value) }); } }),
-							h("span", { className: "smem-status", key: "c" }, "个会话有更新"),
+							h("span", { className: "smem-status", key: "c" }, t("ad.adv.sessionsUpdated")),
 						]) : null,
 						h("div", { className: "smem-autodream-row", key: "steps" }, [
-							h("span", { className: "smem-autodream-key", key: "k" }, "最多轮数"),
+							h("span", { className: "smem-autodream-key", key: "k" }, t("ad.adv.maxSteps")),
 							h("input", { className: "smem-num", key: "v", type: "number", min: "1", max: "80", value: c.maxSteps, onChange: function (e) { patch({ maxSteps: Number(e.target.value) }); } }),
-							h("span", { className: "smem-status", key: "s" }, "一轮 = 一次模型调用 + 它要的工具调用"),
+							h("span", { className: "smem-status", key: "s" }, t("ad.adv.stepNote")),
 						]),
 						// 1.9.2：单次输出上限（原写死 4096）。思考型模型下 4096 会让收尾轮只剩思考、零正文。
 						h("div", { className: "smem-autodream-row", key: "maxout" }, [
-							h("span", { className: "smem-autodream-key", key: "k" }, "单次输出上限"),
+							h("span", { className: "smem-autodream-key", key: "k" }, t("ad.adv.maxOutput")),
 							h("input", { className: "smem-num", key: "v", type: "number", min: "1024", max: "131072", value: c.maxOutputTokens, onChange: function (e) { patch({ maxOutputTokens: Number(e.target.value) }); } }),
-							h("span", { className: "smem-status", key: "s" }, "token（思考与正文共用；报告残篇时先调它）"),
+							h("span", { className: "smem-status", key: "s" }, t("ad.adv.maxOutputNote")),
 						]),
 						h("div", { className: "smem-autodream-row", key: "keep" }, [
-							h("span", { className: "smem-autodream-key", key: "k" }, "保留快照"),
+							h("span", { className: "smem-autodream-key", key: "k" }, t("ad.adv.keepSnapshots")),
 							h("input", { className: "smem-num", key: "v", type: "number", min: "1", max: "50", value: c.maxSnapshotKeep, onChange: function (e) { patch({ maxSnapshotKeep: Number(e.target.value) }); } }),
-							h("span", { className: "smem-status", key: "s" }, "份"),
+							h("span", { className: "smem-status", key: "s" }, t("ad.unit.copies")),
 						]),
-						h("div", { className: "smem-status", key: "paths" }, "配置与状态：" + ((st && st.paths && st.paths.configPath) || "—")),
+						h("div", { className: "smem-status", key: "paths" }, t("ad.adv.paths", { path: ((st && st.paths && st.paths.configPath) || "—") })),
 					]),
 				]),
 				]) : null,
@@ -600,53 +605,51 @@
 				segOf === "records" ? h("div", { key: "seg-rec" }, [
 				h("div", { className: "smem-autodream-sec", key: "snap" }, [
 					h("div", { className: "smem-autodream-row", key: "h" }, [
-						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, "回滚点"),
-						h("span", { className: "smem-status", key: "c" }, String(snaps.length) + " 个"),
-						h("button", { type: "button", className: "smem-btn", key: "rf", onClick: refreshLists }, "刷新"),
+						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, t("ad.records.snapshots")),
+						h("span", { className: "smem-status", key: "c" }, t("ad.records.countSnaps", { count: String(snaps.length) })),
+						h("button", { type: "button", className: "smem-btn", key: "rf", onClick: refreshLists }, t("ad.action.refresh")),
 					]),
 					h("div", { className: "smem-autodream-row", key: "scope" }, [
-						h("span", { className: "smem-autodream-key", key: "k" }, "回滚范围"),
+						h("span", { className: "smem-autodream-key", key: "k" }, t("ad.row.rollbackScope")),
 						h(Seg, {
 							key: "v", value: rollbackScope,
-							options: [{ value: "files", label: "只恢复本次动过的文件" }, { value: "all", label: "整目录回到该时点" }],
+							options: [{ value: "files", label: t("ad.scope.files") }, { value: "all", label: t("ad.scope.all") }],
 							onChange: function (v) { patch({ rollbackScope: v }); },
 						}),
 					]),
-					h("div", { className: "smem-autodream-note", key: "n" },
-						"回滚前会自动把整个记忆目录再存一份保护快照 —— 所以回滚本身也能再退回来。多出来的文件只移进 archive/，不删除。"),
+					h("div", { className: "smem-autodream-note", key: "n" }, t("ad.note.rollback")),
 					snaps.length === 0
-						? h("div", { className: "smem-status", key: "e" }, "还没有回滚点 —— 用「直接改写」跑过一次就有了。")
+						? h("div", { className: "smem-status", key: "e" }, t("ad.snap.empty"))
 						: h("div", { className: "smem-autodream-list", key: "l" }, snaps.slice(0, 15).map(function (sp) {
-								const label = sp.legacy ? "旧版快照" : (sp.runId ? ("运行 " + String(sp.runId)) : "回滚保护");
+								const label = sp.legacy ? t("ad.snap.legacyLabel") : (sp.runId ? t("ad.snap.runLabel", { id: String(sp.runId) }) : t("ad.snap.protectionLabel"));
 								return h("div", { className: "smem-ad-wrap", key: String(sp.name) }, [
 									h("div", { className: "smem-ad-snap", key: "row" }, [
 										h("div", { className: "smem-ad-main", key: "m" }, [
-											h("div", { key: "l1" }, String(sp.atHuman || "") + " · " + (sp.files == null ? "?" : sp.files) + " 个文件"),
+											h("div", { key: "l1" }, t("ad.snap.meta", { at: String(sp.atHuman || ""), files: (sp.files == null ? "?" : sp.files) })),
 											h("div", { className: "smem-ad-sub", key: "l2" }, label + " · " + String(sp.name || "")),
 										]),
-										sp.legacy ? h("span", { className: "smem-ad-badge smem-ad-badge--legacy", key: "lg" }, "旧版") : null,
+										sp.legacy ? h("span", { className: "smem-ad-badge smem-ad-badge--legacy", key: "lg" }, t("ad.snap.legacyBadge")) : null,
 										confirmSnap === sp.name
 											? null
 											: h("button", {
 													type: "button", className: "smem-btn", key: "go",
 													disabled: rbBusy !== null,
 													onClick: function () { setRbMsg(null); setConfirmSnap(sp.name); },
-												}, "回滚"),
+												}, t("ad.action.rollback")),
 									]),
 									confirmSnap === sp.name
 										? h("div", { className: "smem-ad-confirm", key: "cf" }, [
-												h("div", { key: "t", style: { fontWeight: "600" } }, "确认回滚到 " + String(sp.atHuman || "") + "？"),
-												h("div", { key: "d" }, "范围：" + (rollbackScope === "all"
-													? "整目录回到该时点 —— 快照里没有、当前目录里有的文件会被移进 archive/（不删除）"
-													: "只恢复这次运行动过的文件 —— 该次新建的移进 archive/，该次归档的移回顶层") +
-													"。回滚前会先存一份保护快照，所以这一步本身也能退。"),
+												h("div", { key: "t", style: { fontWeight: "600" } }, t("ad.snap.confirmTitle", { at: String(sp.atHuman || "") })),
+												h("div", { key: "d" }, t("ad.snap.confirmScope", {
+													scope: rollbackScope === "all" ? t("ad.snap.scopeAll") : t("ad.snap.scopeFiles"),
+												}) + t("ad.snap.confirmSuffix")),
 												h("div", { className: "smem-autodream-row", key: "acts" }, [
 													h("button", {
 														type: "button", className: "smem-btn smem-btn-danger", key: "yes",
 														disabled: rbBusy === sp.name,
 														onClick: function () { doRollback(sp); },
-													}, rbBusy === sp.name ? "回滚中…" : "确认回滚"),
-													h("button", { type: "button", className: "smem-btn", key: "no", onClick: function () { setConfirmSnap(null); } }, "取消"),
+													}, rbBusy === sp.name ? t("ad.action.rollingBack") : t("ad.action.confirmRollback")),
+													h("button", { type: "button", className: "smem-btn", key: "no", onClick: function () { setConfirmSnap(null); } }, t("ad.action.cancel")),
 												]),
 											])
 										: null,
@@ -657,14 +660,13 @@
 				// ── 整理声明（新）──────────────────────────────────────────
 				h("div", { className: "smem-autodream-sec", key: "runs" }, [
 					h("div", { className: "smem-autodream-row", key: "h" }, [
-						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, "整理记录"),
-						h("span", { className: "smem-status", key: "c" }, String(runs.length) + " 条"),
-						h("button", { type: "button", className: "smem-btn", key: "rf", onClick: refreshLists }, "刷新"),
+						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, t("ad.records.runs")),
+						h("span", { className: "smem-status", key: "c" }, t("ad.records.countRuns", { count: String(runs.length) })),
+						h("button", { type: "button", className: "smem-btn", key: "rf", onClick: refreshLists }, t("ad.action.refresh")),
 					]),
-					h("div", { className: "smem-autodream-note", key: "n" },
-						"每一趟都留一份整理声明：改了什么、为什么改、哪些想法被拒了。点一条看全文。"),
+					h("div", { className: "smem-autodream-note", key: "n" }, t("ad.records.runsNote")),
 					runs.length === 0
-						? h("div", { className: "smem-status", key: "e" }, "还没有整理记录 —— 跑一次就有了。")
+						? h("div", { className: "smem-status", key: "e" }, t("ad.records.runsEmpty"))
 						: h("div", { className: "smem-autodream-list", key: "l" }, runs.slice(0, 15).map(function (rn) {
 								return h("div", { className: "smem-ad-wrap", key: String(rn.runId) }, [
 									h("button", {
@@ -673,14 +675,14 @@
 										onClick: function () { openDecl(rn.runId); },
 									}, [
 										h("span", { key: "t" }, String(rn.atHuman || "")),
-										h("span", { className: "smem-ad-badge", key: "m" }, rn.mode === "apply" ? "直接改写" : "只出报告"),
-										h("span", { key: "c" }, "改 " + (rn.changeCount == null ? "?" : rn.changeCount) + " 条"),
-										rn.report ? h("span", { className: "smem-ad-sub", key: "r" }, "报告 " + String(rn.report)) : null,
+										h("span", { className: "smem-ad-badge", key: "m" }, rn.mode === "apply" ? t("ad.badge.apply") : t("ad.badge.report")),
+										h("span", { key: "c" }, t("ad.run.changes", { count: (rn.changeCount == null ? "?" : rn.changeCount) })),
+										rn.report ? h("span", { className: "smem-ad-sub", key: "r" }, t("ad.run.reportName", { name: String(rn.report) })) : null,
 										rn.rolledBackAt
 											? h("span", { className: "smem-ad-badge smem-ad-badge--warn", key: "rb" },
-													"已回滚" + (rn.rolledBackAtHuman ? (" · " + String(rn.rolledBackAtHuman)) : ""))
+													rn.rolledBackAtHuman ? t("ad.run.rolledBackAt", { at: String(rn.rolledBackAtHuman) }) : t("ad.run.rolledBack"))
 											: null,
-										h("span", { className: "smem-ad-sub", key: "x" }, declOpen === rn.runId ? "收起" : "看声明"),
+										h("span", { className: "smem-ad-sub", key: "x" }, declOpen === rn.runId ? t("ad.action.collapse") : t("ad.action.showDeclaration")),
 									]),
 									declOpen === rn.runId
 										? h("pre", { className: "smem-ad-md", key: "body" }, declBody)
@@ -690,11 +692,11 @@
 				]),
 				h("div", { className: "smem-autodream-sec", key: "rep" }, [
 					h("div", { className: "smem-autodream-row", key: "h" }, [
-						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, "历史报告"),
-						h("span", { className: "smem-status", key: "c" }, String(reports.length) + " 份"),
+						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, t("ad.records.reports")),
+						h("span", { className: "smem-status", key: "c" }, t("ad.records.countReports", { count: String(reports.length) })),
 					]),
 					reports.length === 0
-						? h("div", { className: "smem-status", key: "e" }, "还没有报告 —— 跑一次就有了。报告写在 memory/autodream/ 下，不会混进记忆列表。")
+						? h("div", { className: "smem-status", key: "e" }, t("ad.records.reportsEmpty"))
 						: h("div", { className: "smem-autodream-list", key: "l" }, reports.slice(0, 12).map(function (r) {
 								return h("button", {
 									type: "button", key: r.name, className: "smem-report",
@@ -702,8 +704,8 @@
 									onClick: function () { openReport(open === r.name ? null : r.name); },
 								}, [
 									h("span", { key: "t" }, String(r.atHuman || "") + " · " + String(r.name) + " · " + fmtSize(r.bytes)),
-									r.legacy ? h("span", { className: "smem-ad-badge smem-ad-badge--legacy", key: "lg", style: { marginLeft: "6px" } }, "旧版") : null,
-									h("span", { className: "smem-ad-sub", key: "x", style: { marginLeft: "6px" } }, open === r.name ? "收起" : "查看"),
+									r.legacy ? h("span", { className: "smem-ad-badge smem-ad-badge--legacy", key: "lg", style: { marginLeft: "6px" } }, t("ad.snap.legacyBadge")) : null,
+									h("span", { className: "smem-ad-sub", key: "x", style: { marginLeft: "6px" } }, open === r.name ? t("ad.action.collapse") : t("ad.action.view")),
 								]);
 							})),
 					open && body ? h("pre", { className: "smem-report-pre", key: "body" }, body) : null,

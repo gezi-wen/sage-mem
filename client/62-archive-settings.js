@@ -27,12 +27,25 @@
 			const sBusy = react.useState(false); const busy = sBusy[0], setBusy = sBusy[1];
 
 			const TH_KEYS = ["archiveAfterDaysProject", "archiveAfterDaysReference", "archiveAfterDaysUser"];
-			const TH_LABEL = { archiveAfterDaysProject: "项目", archiveAfterDaysReference: "参考", archiveAfterDaysUser: "用户" };
-			const TH_HINT = {
-				archiveAfterDaysProject: "project_* 连续这么多天没被注入 → 进候选",
-				archiveAfterDaysReference: "reference_* 同上（资料一般比项目留得久）",
-				archiveAfterDaysUser: "user_* 同上（人设这类动它要格外谨慎）",
+			// 2.1.0：标签与提示走字典（键在这里，文案在 55-i18n-memory.js）。
+			const TH_LABEL_KEY = {
+				archiveAfterDaysProject: "archive.th.project",
+				archiveAfterDaysReference: "archive.th.reference",
+				archiveAfterDaysUser: "archive.th.user",
 			};
+			const TH_HINT_KEY = {
+				archiveAfterDaysProject: "archive.th.hintProject",
+				archiveAfterDaysReference: "archive.th.hintReference",
+				archiveAfterDaysUser: "archive.th.hintUser",
+			};
+			const thLabel = function (k) { return t(TH_LABEL_KEY[k] || ""); };
+			const thHint = function (k) { return t(TH_HINT_KEY[k] || ""); };
+			// 2.1.0：三档策略的标题与代价走字典。键必须**写成字面量**（死键守卫会逐键回分片里找）；
+			// 用 "archive.mode." + v 拼接既拿不到字面量，也会让守卫把前缀当成一个缺失的键。
+			const MODE_KEY = { off: "archive.mode.off", report: "archive.mode.report", auto: "archive.mode.auto" };
+			const COST_KEY = { off: "archive.cost.off", report: "archive.cost.report", auto: "archive.cost.auto" };
+			const modeLabel = function (v) { return t(MODE_KEY[v] || ""); };
+			const costText = function (v) { return t(COST_KEY[v] || ""); };
 
 			/** 阈值 → 输入框草稿。存成字符串：number input 清空时立刻变 0 会很难用。 */
 			const draftOf = function (c) {
@@ -44,18 +57,18 @@
 
 			react.useEffect(function () {
 				if (!remote || typeof remote.getConfig !== "function") {
-					setErr("宿主侧没有 autodream 配置接口（插件版本较旧）");
+					setErr(t("archive.err.noConfig"));
 					return;
 				}
 				remote.getConfig()
 					.then(function (r) {
 						const d = unwrap(r);
 						const c = d && d.config ? d.config : null;
-						if (!c) { setErr("读不出自动做梦配置"); return; }
+						if (!c) { setErr(t("archive.err.readConfig")); return; }
 						setCfg(c);
 						setDraft(draftOf(c));
 					})
-					.catch(function (e) { setErr("读配置失败：" + ((e && e.message) || e)); });
+					.catch(function (e) { setErr(t("archive.err.readFailed", { error: (e && e.message) || e })); });
 			}, []);
 
 			const c = cfg || {};
@@ -77,16 +90,16 @@
 						if (got) { setCfg(got); setDraft(draftOf(got)); }
 						const bad = failOf(got);
 						if (!bad) { setNotice(okMsg); return; }
-						setErr("保存没生效：" + bad + "。setConfig 对非法值会忽略并保留原值 —— 请重试，或看 DSH 启动日志。");
+						setErr(t("archive.err.notApplied", { error: bad }));
 					})
-					.catch(function (e) { setErr("保存失败：" + ((e && e.message) || e)); })
+					.catch(function (e) { setErr(t("archive.err.saveFailed", { error: (e && e.message) || e })); })
 					.then(function () { setBusy(false); });
 			}
 
 			function saveMode(v) {
-				save({ autoArchive: v }, "自动归档已设为「" + AUTO_ARCHIVE_LABEL[v] + "」", function (got) {
+				save({ autoArchive: v }, t("archive.notice.modeSet", { mode: modeLabel(v) }), function (got) {
 					const g = got ? autoArchiveOf(got.autoArchive) : null;
-					return g === v ? null : ("配置里仍是「" + (g ? AUTO_ARCHIVE_LABEL[g] : "读不出来") + "」");
+					return g === v ? null : t("archive.err.modeStill", { mode: g ? modeLabel(g) : t("archive.unknown") });
 				});
 			}
 
@@ -97,15 +110,15 @@
 				for (const k of TH_KEYS) {
 					const n = Number(d[k]);
 					if (!Number.isFinite(n) || n < 1 || n > 3650) {
-						setErr(TH_LABEL[k] + "的阈值要是 1~3650 之间的天数（现在是「" + d[k] + "」）");
+						setErr(t("archive.err.thresholdBad", { label: thLabel(k), value: d[k] }));
 						return;
 					}
 					patch[k] = Math.round(n);
 				}
-				save(patch, "归档条件已保存", function (got) {
+				save(patch, t("archive.notice.thresholdsSaved"), function (got) {
 					const bad = TH_KEYS.filter(function (k) { return !got || Number(got[k]) !== patch[k]; });
 					if (!bad.length) return null;
-					return bad.map(function (k) { return TH_LABEL[k] + " 仍是 " + (got ? got[k] : "读不出来"); }).join("、");
+					return bad.map(function (k) { return t("archive.err.thresholdStill", { label: thLabel(k), value: got ? got[k] : t("archive.unknown") }); }).join(t("ad.toolSep"));
 				});
 			}
 
@@ -113,45 +126,41 @@
 				// ── ① 它做什么（这一屏存在的理由写在最前面）──
 				h("div", { className: "smem-autodream-sec", key: "what" }, [
 					h("div", { className: "smem-autodream-row", key: "h" }, [
-						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, "自动归档做什么"),
+						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, t("archive.title")),
 					]),
-					h("div", { className: "smem-autodream-note", key: "p1" },
-						"闲置太久没被注入过的记忆，会被移进 archive/ —— 不删除，随时能恢复。这一页决定「多久算闲置」，以及要不要真的动手。"),
-					h("div", { className: "smem-autodream-note", key: "p2" },
-						"它不调模型：候选完全按访问台账的天数算，同一份输入每次算出来都一样。"),
-					h("div", { className: "smem-autodream-note", key: "p3" },
-						"想现在看看会被收走哪些：文件列表 →「工具 ▾」→ 归档候选。"),
+					h("div", { className: "smem-autodream-note", key: "p1" }, t("archive.intro1")),
+					h("div", { className: "smem-autodream-note", key: "p2" }, t("archive.intro2")),
+					h("div", { className: "smem-autodream-note", key: "p3" }, t("archive.intro3")),
 				]),
 				// ── ② 三档策略 ──
 				h("div", { className: "smem-autodream-sec", key: "mode" }, [
 					h("div", { className: "smem-autodream-row", key: "r" }, [
-						h("span", { className: "smem-autodream-key", key: "k" }, "自动归档"),
+						h("span", { className: "smem-autodream-key", key: "k" }, t("archive.modeTitle")),
 						h(Seg, {
 							key: "v", value: mode,
 							options: [
-								{ value: "off", label: AUTO_ARCHIVE_LABEL.off },
-								{ value: "report", label: AUTO_ARCHIVE_LABEL.report },
-								{ value: "auto", label: AUTO_ARCHIVE_LABEL.auto },
+								{ value: "off", label: modeLabel("off") },
+								{ value: "report", label: modeLabel("report") },
+								{ value: "auto", label: modeLabel("auto") },
 							],
 							onChange: function (v) { if (v !== mode) saveMode(v); },
 						}),
-						busy ? h("span", { className: "smem-status", key: "s" }, "保存中…") : null,
+						busy ? h("span", { className: "smem-status", key: "s" }, t("archive.action.saving")) : null,
 					]),
-					h("div", { className: "smem-autodream-note", key: "cost" }, AUTO_ARCHIVE_COST[mode]),
+					h("div", { className: "smem-autodream-note", key: "cost" }, costText(mode)),
 					mode === "auto" && !c.apply
-						? h("div", { className: "smem-autodream-note smem-ad-warn", key: "deg" },
-								"注意：「自动做梦 → 改动方式」现在是只出报告 —— 这一档会自动降级成只出报告，不会动文件。")
+						? h("div", { className: "smem-autodream-note smem-ad-warn", key: "deg" }, t("archive.degrade"))
 						: null,
 				]),
 				// ── ③ 三个阈值 ──
 				h("div", { className: "smem-autodream-sec", key: "th" }, [
 					h("div", { className: "smem-autodream-row", key: "h" }, [
-						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, "闲置多少天算可以归档"),
+						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, t("archive.th.title")),
 					]),
 					draft
 						? h("div", { key: "rows" }, TH_KEYS.map(function (k) {
 								return h("div", { className: "smem-autodream-row", key: k }, [
-									h("span", { className: "smem-autodream-key", key: "k" }, TH_LABEL[k]),
+									h("span", { className: "smem-autodream-key", key: "k" }, thLabel(k)),
 									h("input", {
 										className: "smem-input smem-num", key: "i", type: "number", min: 1, max: 3650,
 										value: draft[k],
@@ -161,19 +170,18 @@
 											setDraft(nx);
 										},
 									}),
-									h("span", { className: "smem-muted", key: "u" }, TH_HINT[k]),
+									h("span", { className: "smem-muted", key: "u" }, thHint(k)),
 								]);
 							}))
-						: h("div", { className: "smem-muted", key: "loading" }, "读配置中…"),
+						: h("div", { className: "smem-muted", key: "loading" }, t("archive.loadingConfig")),
 					h("div", { className: "smem-autodream-row", key: "btns" }, [
 						h("button", {
 							type: "button", className: "smem-btn smem-btn-primary", key: "save",
 							disabled: busy || !draft, onClick: saveThresholds,
-						}, busy ? "保存中…" : "保存归档条件"),
-						h("span", { className: "smem-muted", key: "n" }, "保存即生效，不用重启 DSH"),
+						}, busy ? t("archive.action.saving") : t("archive.action.save")),
+						h("span", { className: "smem-muted", key: "n" }, t("archive.note.immediate")),
 					]),
-					h("div", { className: "smem-autodream-note", key: "note" },
-						"天数按访问台账算（这条记忆上次被注入给模型是什么时候）。feedback_* 永不入选；锁定的记忆也不会被选中。"),
+					h("div", { className: "smem-autodream-note", key: "note" }, t("archive.note.thresholds")),
 				]),
 				err ? h("div", { className: "smem-err", key: "err" }, "⚠ " + err) : null,
 				notice ? h("div", { className: "smem-ok", key: "ok" }, "✓ " + notice) : null,

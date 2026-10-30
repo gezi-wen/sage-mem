@@ -615,6 +615,26 @@ class FakeMutationObserver {
   disconnect() { const i = fakeObservers.indexOf(this); if (i >= 0) fakeObservers.splice(i, 1) }
 }
 
+/**
+ * 2.1.0：只做真宿主那一件事的假 locale —— 收下插件 register 的 {zh, en}，bind 时返回 en。
+ *
+ * 为什么需要它：字典键集 / 「en 无中日韩字符」只能证明**数据**对；这两屏是否有
+ * 真的还有写死的文案，只有在 en 绑定下渲染一次才看得见（1.9.0 的 pilot 就是这么验的）。
+ */
+function makeEnLocale() {
+  let dicts = null
+  return {
+    register: (ns, d) => { dicts = d; return () => {} },
+    bind: (ns) => (key, params) => {
+      const tpl = dicts && Object.prototype.hasOwnProperty.call(dicts.en, key) ? dicts.en[key] : key
+      const text = String(tpl)
+      return params
+        ? text.replace(/\{(\w+)\}/g, (m, n) => (Object.prototype.hasOwnProperty.call(params, n) ? String(params[n]) : m))
+        : text
+    },
+  }
+}
+
 async function loadClient(rt, remotes) {
   const code = readFileSync(CLIENT, 'utf8')
   let loaded = null
@@ -3077,6 +3097,66 @@ async function main() {
       ok(!!itemOf(tree, 'bbbb2222'), '写失败型（stale_version）记录照常列出（它不是矛盾，但不该被藏）')
       ok(treeText(tree).indexOf('版本冲突') >= 0, '写失败型有自己的 kind 文案')
     }
+  }
+
+  // ── 25. 2.1.0 i18n 第三批：切到 en 后自动做梦 / 自动归档两屏不再出现中文 ──
+  group('25. 2.1.0 i18n：自动做梦 / 自动归档两屏在 en 下是真的英文（不只是字典键集对）')
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    mem.st.settings = {
+      limits: { maxResults: 10, maxChars: 1500, maxBaseline: 8, maxSessionBytes: 61440, staleDays: 1 },
+      pendingLimits: { maxResults: 12, maxChars: 1500, maxBaseline: 8, maxSessionBytes: 61440, staleDays: 1 },
+      restartRequired: true,
+      reserved: ['memory.md', 'session-log.md', 'project_notes.md'],
+      reservedExtra: ['project_notes.md'],
+    }
+    const ad = makeAutodreamRemote()
+    const cf = makeConflictRemote({ items: CONFLICT_ITEMS })
+    const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad, conflict: cf, locale: makeEnLocale() })
+    let tree = await rt.settle(C, {})
+    const tabs = all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n)).map(textOf)
+    ok(JSON.stringify(tabs) === JSON.stringify(['Files', 'Star map', 'Autodream', 'Auto-archive', 'Audit', 'Conflicts']),
+      `六页签全部是英文（实际：${tabs.join(' / ')}）`)
+    const hasCjk = (s) => /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(s)
+
+    // 25a 自动做梦 → 运行段
+    click(btn(tree, 'Autodream')[0])
+    tree = await rt.settle(C, {})
+    let t1 = treeText(tree)
+    ok(t1.indexOf('Autodream') >= 0 && t1.indexOf('Organize now') >= 0 && t1.indexOf('Trigger') >= 0,
+      '运行段是英文（标题 / 立即整理 / 触发）')
+    ok(t1.indexOf('自动做梦') < 0 && t1.indexOf('立即整理') < 0 && t1.indexOf('只手动') < 0,
+      '运行段没有残留中文文案')
+
+    // 25b 设置段（注入参数 / 保留名 / 高级）
+    tree = await gotoSeg(rt, C, tree, 'Settings')
+    let t2 = treeText(tree)
+    ok(t2.indexOf('Sidebar entry') >= 0 && t2.indexOf('Injection limits') >= 0 &&
+      t2.indexOf('Reserved-name protection') >= 0 && t2.indexOf('Advanced') >= 0,
+      '设置段是英文（侧栏入口 / 注入参数 / 保留名 / 高级）')
+    ok(t2.indexOf('侧栏入口') < 0 && t2.indexOf('记忆注入参数') < 0 && t2.indexOf('保留名保护名单') < 0 &&
+      t2.indexOf('高级设置') < 0, '设置段没有残留中文文案')
+    ok(t2.indexOf('Save injection limits') >= 0, '保存按钮也走了字典')
+
+    // 25c 记录段（回滚点 / 整理记录 / 历史报告）
+    tree = await gotoSeg(rt, C, tree, 'Records')
+    let t3 = treeText(tree)
+    ok(t3.indexOf('Rollback points') >= 0 && t3.indexOf('Organization records') >= 0 && t3.indexOf('Past reports') >= 0,
+      '记录段是英文（回滚点 / 整理记录 / 历史报告）')
+    ok(t3.indexOf('回滚点') < 0 && t3.indexOf('整理记录') < 0 && t3.indexOf('历史报告') < 0, '记录段没有残留中文文案')
+
+    // 25d 自动归档页签
+    click(btn(tree, 'Auto-archive')[0])
+    tree = await rt.settle(C, {})
+    const t4 = treeText(tree)
+    ok(t4.indexOf('What auto-archive does') >= 0 && t4.indexOf('Save archive conditions') >= 0,
+      '自动归档页是英文（标题 / 保存按钮）')
+    ok(t4.indexOf('Project') >= 0 && t4.indexOf('Reference') >= 0 && t4.indexOf('User') >= 0,
+      '三个阈值标题是英文（Project / Reference / User）')
+    ok(t4.indexOf('自动归档做什么') < 0 && t4.indexOf('保存归档条件') < 0 && t4.indexOf('闲置多少天算可以归档') < 0,
+      '自动归档页没有残留中文文案')
+    ok(!hasCjk(t4), '自动归档页整页无中文')
   }
 
   console.log(`\n结果：${pass} passed, ${fail} failed`)

@@ -14,7 +14,7 @@
 
 > File-based cross-session memory for DeepSeek Harness — every memory is a plain markdown file you can open, edit and delete. No database, no worker, no port.
 
-**当前发布版本：`2.0.1`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
+**当前发布版本：`2.1.0`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
 [契约冻结](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)。
 
 如果它对你有用，给个 Star 是最直接的反馈。
@@ -164,7 +164,7 @@ SAGE_MEM_DIR=/path/to/your/memory
 
 下面每张图都是**从仓库里的界面代码渲染出来的**（同一份 CSS、同一棵组件树；数据是演示用的假数据，不是真实记忆目录）。
 
-1.9.0 起，记忆管理这一块跟随宿主语言（**设置 → 通用 → 语言**）；记忆内容本身保持它被写下时的语言，其余面板（自动做梦、自动归档、记忆星图、体检）仍是中文，等下一批 i18n。
+1.9.0 起，记忆管理这一块跟随宿主语言（**设置 → 通用 → 语言**）；记忆内容本身保持它被写下时的语言，2.1.0 起扩展到**自动做梦**（运行 / 设置 / 记录）与**自动归档**两屏；只剩记忆星图仍是中文，等下一批 i18n。
 
 ![文件列表：每条记忆一个 Markdown 文件，灰底的是已归档](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/files-list.png)
 
