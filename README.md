@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.1.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.1.1`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -493,6 +493,8 @@ Your memories are the files in that directory, openable at any time for confirma
 
 sage-mem is a pure DSH plugin and declares its host requirement through **`engines.dsh`** in `package.json`: `>=0.1.2-rc.1` — **a one-sided open interval with no upper bound**, so no future DSH version will be blocked by this declaration. `engines.node` requires `>= 18`.
 
+**Verified on DSH Go (the Android client).** After installing from the in-app plugin market, the settings section and sidebar panel render normally and the `sidebar.panellist` island opens; the memory directory keeps sage-mem's default `~/.sage-mem/memory`, no extra adaptation needed. 2.1.1 fixes the invisible primary-button label on the phone host (foreground token fallback).
+
 Version-by-version compatibility record:
 
 | DSH version | Status |
@@ -509,8 +511,10 @@ Version-by-version compatibility record:
 | 0.2.0-rc.2 | compatible |
 | 0.2.1-rc.1 | compatible |
 | 0.2.1-rc.3 | compatible |
+| 0.2.1-rc.4 | compatible |
+| 0.2.1-rc.5 | compatible |
 
-**How to read `compatible`.** It means this plugin's codec and manifest contract has been checked against that host generation (code-level comparison plus the unit/contract suite), **not** that an end-to-end probe was run on that exact host build. The table is a declaration; how each claim was checked is summarized here. Real-host probes so far: `headless` (2026-10-15), `web` (2026-10-16), and `web` on **0.2.1-rc.3** for the 2.0.0 release (2026-10-27: client activation, conflict panel arbitration, injection suppression, rollback to 1.9.2 — 23/23 checks); the `desktop` profile has **not** been probed yet (see [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b). CI runs on Ubuntu against **Node 18.x / 20.x / 24.x** with the `0.2.0-rc.1` peer generation; macOS and Windows are not CI-covered, and there is no desktop-host probe yet.
+**How to read `compatible`.** It means this plugin's codec and manifest contract has been checked against that host generation (code-level comparison plus the unit/contract suite), **not** that an end-to-end probe was run on that exact host build. The table is a declaration; how each claim was checked is summarized here. Real-host probes so far: `headless` (2026-10-15), `web` (2026-10-16), `web` on **0.2.1-rc.3** for the 2.0.0 release (2026-10-27: client activation, conflict panel arbitration, injection suppression, rollback to 1.9.2 — 23/23 checks), and the **DSH Go mobile engine on 0.2.1-rc.4** (2026-10-31: installed from the in-app plugin market, sidebar panel and settings section rendered by the app, `sidebar.panellist` island opened); `0.2.1-rc.5` was checked after upgrading the greycloud host the same day (composed config, boot, panel walk-through). The `desktop` profile has **not** been probed yet (see [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b). CI runs on Ubuntu against **Node 18.x / 20.x / 24.x** with the `0.2.0-rc.1` peer generation; macOS and Windows are not CI-covered, and there is no desktop-host probe yet.
 
 Two points worth spelling out:
 

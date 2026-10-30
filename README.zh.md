@@ -14,7 +14,7 @@
 
 > File-based cross-session memory for DeepSeek Harness — every memory is a plain markdown file you can open, edit and delete. No database, no worker, no port.
 
-**当前发布版本：`2.1.0`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
+**当前发布版本：`2.1.1`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
 [契约冻结](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)。
 
 如果它对你有用，给个 Star 是最直接的反馈。
@@ -495,6 +495,8 @@ sage-mem 只做三件事，全都在你本机：
 
 sage-mem 是纯 DSH 插件，用 `package.json` 的 **`engines.dsh`** 声明宿主要求：`>=0.1.2-rc.1` —— **单边开区间、不设上界**，所以任何未来的 DSH 版本都不会被这道声明挡住。`engines.node` 要求 `>= 18`。
 
+**已在 DSH Go（Android 客户端）上验证可用**：从 App 内插件市场安装后，设置分区与侧栏面板正常、`sidebar.panellist` 岛屿可打开；记忆目录用 `SAGE_MEM_DIR` 默认的 `~/.sage-mem/memory` 即可，不需要额外适配。2.1.1 修掉了手机宿主上主按钮文字不可见的问题（前景令牌兜底）。
+
 逐版本兼容记录：
 
 | DSH 版本 | 状态 |
@@ -511,8 +513,10 @@ sage-mem 是纯 DSH 插件，用 `package.json` 的 **`engines.dsh`** 声明宿�
 | 0.2.0-rc.2 | compatible |
 | 0.2.1-rc.1 | compatible |
 | 0.2.1-rc.3 | compatible |
+| 0.2.1-rc.4 | compatible |
+| 0.2.1-rc.5 | compatible |
 
-**`compatible` 怎么读**：它表示本插件的 codec / manifest 契约在该宿主代上核对过（代码层比对 + 单元/契约测试），**不表示**在那个确切宿主构建上跑过端到端探针。这张表是声明，核对方式总结在下面。真实宿主探针目前跑过 `headless`（2026-10-15）、`web`（2026-10-16），以及 **0.2.1-rc.3 上的 `web`**（2026-10-27，2.0.0 发布前：客户端激活、冲突面板裁决、注入抑制、回退到 1.9.2，23/23 项通过）；`desktop` profile **还没跑过**（见 [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b）。CI 在 Ubuntu 上覆盖 **Node 18.x / 20.x / 24.x**，peer 钉 `0.2.0-rc.1` 一代；macOS 与 Windows 没有 CI 覆盖，desktop 宿主探针也还没有。
+**`compatible` 怎么读**：它表示本插件的 codec / manifest 契约在该宿主代上核对过（代码层比对 + 单元/契约测试），**不表示**在那个确切宿主构建上跑过端到端探针。这张表是声明，核对方式总结在下面。真实宿主探针目前跑过 `headless`（2026-10-15）、`web`（2026-10-16）、**0.2.1-rc.3 上的 `web`**（2026-10-27，2.0.0 发布前：客户端激活、冲突面板裁决、注入抑制、回退到 1.9.2，23/23 项通过），以及 **0.2.1-rc.4 上的 DSH Go 手机引擎**（2026-10-31：App 插件市场安装、侧栏面板与设置分区原生呈现、`sidebar.panellist` 岛屿打开）；`0.2.1-rc.5` 于同日升级灰云月殿后按 dump/启动/面板走查核对；`desktop` profile **还没跑过**（见 [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b）。CI 在 Ubuntu 上覆盖 **Node 18.x / 20.x / 24.x**，peer 钉 `0.2.0-rc.1` 一代；macOS 与 Windows 没有 CI 覆盖，desktop 宿主探针也还没有。
 
 两点值得说明：
 

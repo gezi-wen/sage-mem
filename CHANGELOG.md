@@ -7,6 +7,35 @@
 
 ---
 
+## 2.1.1
+
+**主题：DSH Go 手机端两处硬伤 —— 主按钮文字在手机宿主上不可见；兼容表补到 0.2.1-rc.4/rc.5。**
+
+版本判定：2.1.1（PATCH）｜理由：只改样式兜底色与声明表，无行为/契约/注入变化｜运行时源文件 **1**（`client/40-styles.js`）+ 构建产物 `lib/client.js` + `package.json` 的 `dsh.compatibility.dshReleases`
+
+### 行为变更
+
+- **`.smem-btn-primary` 的文字色改成前景令牌链** `var(--dsw-alias-label-primary-foreground, var(--dsw-alias-bg-base, #10131a))`。原来写 `color: var(--dsw-alias-bg-base, #fff)` —— **借的是页面底色变量当文字色**，只是桌面宿主的配对碰巧成立；**DSH Go 的网页岛屿没按桌面那套注入 `--dsw-alias-bg-base`**，兜底 `#fff` 生效，白字压在浅蓝品牌色上，整颗按钮看起来是**一块空白蓝色方块**（「+ 添加记忆」在标题栏与空态各出现一次，正好两处；旁边的「刷新」是普通按钮，用 `--dsw-alias-label-primary`，所以正常）。
+- 新的三级链：宿主有前景色就用它；没有就退回旧的 `bg-base`（桌面观感不变）；两者都没有才用深色兜底 `#10131a`（压在浅色品牌底上可读）。
+
+### 不变
+
+- 注入行为、工具面、remote 契约、配置项、记忆文件格式全部未变。
+- 普通按钮（`.smem-btn`）用 `--dsw-alias-label-primary`，未受影响。
+
+### 新增测试
+
+- `release-test`：兼容表 ↔ `package.json.dshReleases` 两行新增后仍逐行相等（en/zh 两张表）。
+- 无新增运行时测试：这次只动 CSS 兜底色，`client-render-test` 的断言不需要改；样式由手机端实机截图走查确认。
+
+### 实测
+
+- **DSH Go 1.0.2 / DSH 0.2.1-rc.4（Android 12 手机）**：市场安装 sage-mem 后，设置分区与侧栏面板正常；补上兜底色后主按钮文字可见（实机走查）。
+- **0.2.1-rc.5（灰云月殿，systemd）**：升级后 dump-config、启动、面板走查通过。
+- 兼容表声明口径与 2.0.0 相同：`compatible` = 契约层核对过，不等于每个构建都跑过端到端探针。
+
+---
+
 ## 2.1.0
 
 **主题：i18n 第三批 —— 「自动做梦」与「自动归档」两屏跟随宿主语言；切到英文不再是一半中文一半英文。**
