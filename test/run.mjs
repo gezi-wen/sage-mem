@@ -28,6 +28,8 @@ const SUITES = [
   // 1.6.3：快照在多文件 / 大文件下的正确性与内存峰值回归（外部审查 PERF-01）。
   'snapshot-stress-test.mjs',
   'race-guards-test.mjs',
+  // 2.1.3：自动整理的读时版本必须与读到的那份正文同源（外部审查 2026-10-31，Q01）。
+  'review-211-q01-test.mjs',
   'q-fixes-093.mjs',
   'q-fixes-094.mjs',
   'q-fixes-095.mjs',
