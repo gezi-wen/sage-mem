@@ -2,8 +2,8 @@
 		// 基元（parseSchema / isStr / isBool / isNum / strSchema）在 05-shared.js。
 		const fileSchema = parseSchema({ "file": isStr, "type": isStr, "description": isStr, "size": isNum });
 		const listSchema = { parse(v) { if (!Array.isArray(v)) throw new Error("expected array"); v.forEach((f) => fileSchema.parse(f)); return v; } };
-		const readSchema = parseSchema({ "name": isStr, "content": isStr });
-		const writeSchema = parseSchema({ "ok": isBool, "file": isStr });
+		const readSchema = withOptional(parseSchema({ "name": isStr, "content": isStr }), ["revision"]);
+		const writeSchema = withOptional(parseSchema({ "ok": isBool, "file": isStr }), ["code", "revision"]);
 		const deleteSchema = parseSchema({ "ok": isBool });
 		const starmapStarSchema = parseSchema({ "file": isStr, "kind": isStr, "title": isStr, "desc": isStr, "bytes": isNum, "mtimeMs": isNum });
 		const starmapListSchema = { parse(v) { if (!v || typeof v !== "object") throw new Error("expected object"); if (!Array.isArray(v.stars)) throw new Error("expected stars array"); v.stars.forEach((f) => starmapStarSchema.parse(f)); return v; } };
@@ -28,11 +28,39 @@
 			},
 		};
 		// 归档文件的读 / 写（B1b）：形状与活跃记忆那套的 readSchema / writeSchema 对称。
-		const archivedReadSchema = parseSchema({ "name": isStr, "content": isStr });
-		const archivedWriteSchema = parseSchema({ "ok": isBool, "file": isStr });
+		const archivedReadSchema = withOptional(parseSchema({ "name": isStr, "content": isStr }), ["revision"]);
+		const archivedWriteSchema = withOptional(parseSchema({ "ok": isBool, "file": isStr }), ["code", "revision"]);
 		// 「彻底删除」的入参：归档代次（`archivedAt`）。它不是装饰 —— 宿主拿它核对
 		// 「要删的是不是用户确认过的那一版」。老归档件没有留痕时传空串，所以只校类型。
 		const archiveStampSchema = strSchema;
+
+		// ── 2.1.2（Q02）写协议：读快照 revision / 写回执的 additive 字段 / 写选项 ──
+		/**
+		 * **可选**字段校型：新宿主一定给（读 revision、写 code / revision），旧宿主没有。
+		 * 混合版本环境里「旧宿主 + 新面板」必须还能用，所以这里不能当必填字段拒掉；
+		 * 但字段给了就必须是字符串 —— 否则面板拿到一个数字或对象会静默走错分支。
+		 */
+		function withOptional(base, keys) {
+			return {
+				parse(v) {
+					base.parse(v);
+					for (let i = 0; i < keys.length; i++) if (keys[i] in v) isStr(v[keys[i]]);
+					return v;
+				},
+			};
+		}
+		/**
+		 * 写协议的第三参（`{ expectedRevision?, create? }`）——**两个字段都可选**。
+		 * 不传 = 旧调用方，行为与从前一致（宿主会打一条 warn）；传了就必须是正确类型。
+		 */
+		const writeOptsSchema = {
+			parse(v) {
+				if (v === null || typeof v !== "object" || Array.isArray(v)) throw new Error("sage-mem: expected object");
+				if ("expectedRevision" in v) isStr(v.expectedRevision);
+				if ("create" in v) isBool(v.create);
+				return v;
+			},
+		};
 
 		// ── autodream 的 codec ──
 		// 刻意写得宽：这几个方法返回的是配置 / 状态对象，字段会随版本增删。

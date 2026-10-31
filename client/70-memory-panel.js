@@ -50,6 +50,10 @@
 			// 打开时展示给用户的类型（判断他是否真的改过类型）
 			const sFormBaseType = react.useState("");
 			const formBaseType = sFormBaseType[0], setFormBaseType = sFormBaseType[1];
+			// 2.1.2（Q02）：打开编辑时读到的**版本**（readFile 的 revision）。保存时原样带回；
+			// 宿主发现盘上已变就回 stale_revision，编辑框与草稿原地保留，绝不自动重试覆盖。
+			const sFormRevision = react.useState(null);
+			const formRevision = sFormRevision[0], setFormRevision = sFormRevision[1];
 			const sBusy = react.useState(false);
 			const busy = sBusy[0], setBusy = sBusy[1];
 			const sOk = react.useState(false);
@@ -78,6 +82,9 @@
 			const archEdit = sArchEdit[0], setArchEdit = sArchEdit[1];
 			const sArchText = react.useState("");
 			const archText = sArchText[0], setArchText = sArchText[1];
+			// 2.1.2（Q02）：这份归档件读到的版本（保存时带回；冲突时草稿保留）
+			const sArchRevision = react.useState(null);
+			const archRevision = sArchRevision[0], setArchRevision = sArchRevision[1];
 			const sArchLoad = react.useState(false);
 			const archLoad = sArchLoad[0], setArchLoad = sArchLoad[1];
 			const sArchSaving = react.useState(false);
@@ -118,6 +125,9 @@
 			const rawText = sRawText[0], setRawText = sRawText[1];
 			const sRawIsNew = react.useState(false);
 			const rawIsNew = sRawIsNew[0], setRawIsNew = sRawIsNew[1];
+			// 2.1.2（Q02）：这份保留名文件读到的版本；null + rawIsNew = 走 createIfAbsent 新建
+			const sRawRevision = react.useState(null);
+			const rawRevision = sRawRevision[0], setRawRevision = sRawRevision[1];
 			const sRawBusy = react.useState(false);
 			const rawBusy = sRawBusy[0], setRawBusy = sRawBusy[1];
 			const sRawLoading = react.useState(false);
@@ -252,6 +262,7 @@
 			function closeForm() {
 				setFormOpen(false); setEditingFile(null); setFormName(""); setFormDesc(""); setFormBody(""); setFormType("feedback");
 				setFormFm(null); setFormBaseType(""); setFormTags("");
+				setFormRevision(null);
 			}
 
 			// 空记忆库时「建立索引骨架」写进去的引导文件。它只是给人看的起点：
@@ -337,6 +348,8 @@
 						setFormTags(detectTags(parts.fm).join(", "));
 						// 关键：原 frontmatter 原文留着，保存时「就地合并」而不是重建
 						setFormFm(parts.hasFm ? parts.fm : null);
+						// 2.1.2（Q02）：把这一版的 revision 一起记住（保存时带回；旧宿主没有就是 null）
+						setFormRevision(typeof data.revision === "string" ? data.revision : null);
 						setFormOpen(true);
 					})
 					.catch(function (e) { setError(String((e && e.message) || e)); })
@@ -353,6 +366,7 @@
 				setFormBody("");
 				setFormFm(null);
 				setFormTags("");
+				setFormRevision(null);
 				setFormOpen(true);
 			}
 
@@ -379,9 +393,16 @@
 						tags: tags,
 					});
 				}
-				remote.writeFile(safeName, content)
+				// 2.1.2（Q02）：编辑已有文件时交回读到的 revision（盘上变了 → 宿主拒绝）；
+				// 新建走 createIfAbsent —— 撞上同名文件是**明确报已存在**，绝不覆盖入口。
+				const writeOpts = editingFile
+					? (formRevision ? { expectedRevision: formRevision } : undefined)
+					: { create: true };
+				remote.writeFile(safeName, content, writeOpts)
 					.then(function (r) {
 						// host 侧对保留名 / 非字符串内容 / 超限一律返回 { ok: false, error }，不再抛异常。
+						// 冲突看**结构化 code**（stale_revision / already_exists），不解析文案：
+						// 编辑框不关、草稿原地保留，由用户看过最新内容后自己决定重新应用 —— 绝不自动重试覆盖。
 						if (r && r.ok === false) { setError(r.error || t("error.writeRejected")); return; }
 						closeForm();
 						setNotice(t(editingFile ? "notice.updated" : "notice.saved", { file: safeName }));
@@ -514,11 +535,14 @@
 				setArchDelete(null);
 				setArchEdit(file);
 				setArchText("");
+				setArchRevision(null);
 				setArchLoad(true);
 				remote.readArchived(file)
 					.then(function (r) {
 						const d = unwrap(r);
 						setArchText(d && typeof d.content === "string" ? d.content : "");
+						// 2.1.2（Q02）：记住这一版的 revision（保存时带回）
+						setArchRevision(d && typeof d.revision === "string" ? d.revision : null);
 						setArchLoad(false);
 					})
 					.catch(function (e) {
@@ -535,7 +559,10 @@
 				}
 				setArchSaving(true); setError(null); setNotice("");
 				// 原样交回：不 trim、不补 frontmatter、不做任何「智能」处理。
-				remote.writeArchived(file, archText)
+				// 2.1.2（Q02）：带上读到的 revision；归档件在别处被改过 → 宿主回 stale_revision，
+				// 编辑框与文本原地保留（不自动重试覆盖）。
+				const writeOpts = archRevision ? { expectedRevision: archRevision } : undefined;
+				remote.writeArchived(file, archText, writeOpts)
 					.then(function (r) {
 						if (r && r.ok === false) { setError(r.error || t("error.saveRejected")); return; }
 						setArchEdit(null);
@@ -546,7 +573,7 @@
 					.then(function () { setArchSaving(false); });
 			}
 
-			function cancelArchEdit() { setArchEdit(null); setArchText(""); }
+			function cancelArchEdit() { setArchEdit(null); setArchText(""); setArchRevision(null); }
 
 			// ── 工具面板的三个数据通道 ──────────────────────────────────────
 
@@ -859,11 +886,14 @@
 				setRawName(name);
 				setRawText("");
 				setRawIsNew(false);
+				setRawRevision(null);
 				setRawLoading(true);
 				remote.readRaw(name)
 					.then(function (r) {
 						const d = unwrap(r);
 						setRawText(d && typeof d.content === "string" ? d.content : "");
+						// 2.1.2（Q02）：记住这一版的 revision（保存时带回）
+						setRawRevision(d && typeof d.revision === "string" ? d.revision : null);
 						setRawLoading(false);
 					})
 					.catch(function (e) {
@@ -887,11 +917,18 @@
 				if (typeof remote.writeRaw !== "function") { setError(t("error.noWriteRaw")); return; }
 				setRawBusy(true); setError(null); setNotice("");
 				// 原样交回：不 trim、不补 frontmatter、不做任何「智能」处理。
-				remote.writeRaw(name, rawText)
+				// 2.1.2（Q02）：新建走 createIfAbsent（撞名明确失败、不覆盖）；编辑带读到的 revision
+				// （盘上变了 → stale_revision，文本原地保留，绝不自动重试覆盖）。
+				const writeOpts = rawIsNew
+					? { create: true }
+					: (rawRevision ? { expectedRevision: rawRevision } : undefined);
+				remote.writeRaw(name, rawText, writeOpts)
 					.then(function (r) {
 						if (r && r.ok === false) { setError(r.error || t("error.saveRejected")); return; }
 						setNotice(t(rawIsNew ? "notice.rawNew" : "notice.saved", { file: name }));
 						setRawIsNew(false);
+						// 保存成功后把版本换成刚写下的那一版，连续保存不用重读
+						if (r && typeof r.revision === "string") setRawRevision(r.revision);
 					})
 					.catch(function (e) { setError(String((e && e.message) || e)); })
 					.then(function () { setRawBusy(false); });

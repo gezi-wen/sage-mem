@@ -32,6 +32,8 @@
 					parameters: [
 						{ name: "name", wire: "name", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#FileName", schema: strSchema, create: () => strSchema } },
 						{ name: "content", wire: "content", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#FileContent", schema: strSchema, create: () => strSchema } },
+						// 2.1.2（Q02）：写协议第三参（expectedRevision / create），可选 —— 与宿主 manifest 同一条。
+						{ name: "opts", wire: "opts", source: "json", acceptsUndefined: true, codec: { mode: "strict", typeSymbol: "sage-mem/types#WriteOpts", schema: writeOptsSchema, create: () => writeOptsSchema } },
 					],
 					result: { mode: "strict", typeSymbol: "sage-mem/types#WriteResult", schema: writeSchema, create: () => writeSchema },
 					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
@@ -104,6 +106,7 @@
 					parameters: [
 						{ name: "name", wire: "name", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#ArchivedFileName", schema: strSchema, create: () => strSchema } },
 						{ name: "content", wire: "content", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#ArchivedFileContent", schema: strSchema, create: () => strSchema } },
+						{ name: "opts", wire: "opts", source: "json", acceptsUndefined: true, codec: { mode: "strict", typeSymbol: "sage-mem/types#WriteOpts", schema: writeOptsSchema, create: () => writeOptsSchema } },
 					],
 					result: { mode: "strict", typeSymbol: "sage-mem/types#ArchivedWriteResult", schema: archivedWriteSchema, create: () => archivedWriteSchema },
 					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
@@ -228,6 +231,7 @@
 					parameters: [
 						{ name: "name", wire: "name", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#ReservedFileName", schema: strSchema, create: () => strSchema } },
 						{ name: "content", wire: "content", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#RawFileContent", schema: strSchema, create: () => strSchema } },
+						{ name: "opts", wire: "opts", source: "json", acceptsUndefined: true, codec: { mode: "strict", typeSymbol: "sage-mem/types#WriteOpts", schema: writeOptsSchema, create: () => writeOptsSchema } },
 					],
 					result: { mode: "strict", typeSymbol: "sage-mem/types#RawWriteResult", schema: objCodec, create: () => objCodec },
 					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },

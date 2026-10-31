@@ -94,6 +94,8 @@ const SUITES = [
   'conflict-decision-test.mjs',
   'conflict-arbitration-test.mjs',
   'conflict-inject-test.mjs',
+  // 2.1.2：外部审查 Q02 —— 读快照带 revision、写带 expectedRevision 的守卫、createIfAbsent。
+  'review-211-q02-test.mjs',
   // ⚠️ 下面两个必须排在最后：它们读的是**前面套件跑完落的断言台账**（见 `_passlog.mjs`），
   // 排在前面就会读到残缺的账。它们盯的是「契约里说了不验的承诺」与「两份文档说法不一致」。
   'contract-binding-test.mjs',

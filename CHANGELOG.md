@@ -7,6 +7,35 @@
 
 ---
 
+## 2.1.2
+
+**主题：面板保存改为「读时版本」乐观锁 —— 内容在别处被改过时保存被拒绝，不再静默覆盖。**
+
+版本判定：2.1.2（PATCH）｜理由：修数据丢失缺陷；契约只做 **additive**（新增可选入参 `WriteOpts`、读结果 `revision`、结构化冲突码），无新对外面、无删除字段｜运行时源文件 7：实现 3（`lib/memory/write-protocol.js` 新增 / `lib/index.js` / `client/70-memory-panel.js`）+ strict 契约声明镜像 4（`lib/typert.host.js`、`client/20-codecs.js`、`client/30-descriptors.js`、`lib/autodream.js` 再导出层）｜护栏外说明：strict schema 不声明的新字段在传输层会被剥掉/拒收，声明与实现是同一件事，不可拆
+
+### 行为变更
+
+- **面板保存不再静默覆盖**：编辑器打开时记住「这份正文是哪一版」（正文字节 SHA-256），保存时带回；这期间文件被别处改过时返回 `stale_revision`，**当前内容逐字节不变**，编辑框与草稿原地保留并提示查看当前版本，**不自动重试覆盖**。活动记忆、归档文件、`MEMORY.md` 三个入口一致。
+- **新建同名不再覆盖**：新建走 `createIfAbsent`，撞名返回 `already_exists`。
+- **旧调用方不受影响**（additive）：不传期望版本的调用仍按旧行为写入，但宿主落一条 warn —— 不再存在「静默无守卫覆盖」这条路而不出声。
+
+### 不变
+
+- 活动记忆 / 归档 / `MEMORY.md` 的文件格式不变；remote 方法名与必填入参不变；写入仍是原子替换（临时名 + rename）。
+- 注入、检索、工具面、配置项零改动。
+
+### 新增测试
+
+- `test/review-211-q02-test.mjs`（39 条，已登记 `npm test`）：活动文件 / 归档文件 / `MEMORY.md` 三组「旧读后新写」都被拒绝且当前内容逐字节不变；`createIfAbsent` 撞名明确失败；无并发保存成功并回新 revision（反向对照）；缺文件时 `createIfAbsent` 成功、二次撞名失败。
+- 契约对拍：三个写方法都声明了 `WriteOpts` 入参、三个读结果都带 `revision`（`client-exec-test` / `contract-binding-test` 覆盖）。
+- 修前红：8 passed / 31 failed（`readFile` 无 revision、旧快照保存 `ok:true`、`B` 被覆盖、`MEMORY.md` 可被覆盖、描述符无 `WriteOpts`）。
+
+### 实测
+
+- 审查报告附录 `current-repro.mjs` 的 Q02 段调用的是**旧协议**（不传 revision），因此仍打印 `ok:true` —— 这正是 additive 契约的预期（旧调用方兼容 + warn）；面板路径（新协议）由新测试覆盖。
+- `npm test`：3614 → **3653 passed / 0 failed**。
+- 边界：本版只做面板路径的乐观锁；跨进程文件锁不在本版（与 Q06 / N02 的队列问题分开处理）。
+
 ## 2.1.1
 
 **主题：DSH Go 手机端两处硬伤 —— 主按钮文字在手机宿主上不可见；兼容表补到 0.2.1-rc.4/rc.5。**
