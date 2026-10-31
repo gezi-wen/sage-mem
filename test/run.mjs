@@ -81,6 +81,9 @@ const SUITES = [
   // 2.1.6（外部审查 Q07）：归档删除的内容身份 = 归档代次 + 正文 revision；分钟时间戳只是展示值。
   // 同一时间戳不同正文 / 同分钟重新归档 / 校验后被替换都拒绝，老确认（缺 revision）一律拒绝。
   'review-211-q07-test.mjs',
+  // 2.1.7（外部审查 Q11）：回滚的「不支持硬链接」降级改为 COPYFILE_EXCL 排他复制，绝不默认
+  // rename 覆盖已有归档；EEXIST / EPERM / ENOTSUP / EXDEV / EIO 逐分支验证，失败保留源。
+  'review-211-q11-test.mjs',
   'access-test.mjs',
   'access-v2-test.mjs',
   'panel-api-test.mjs',
