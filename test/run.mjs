@@ -106,6 +106,9 @@ const SUITES = [
   // 1.4.0：客户端共享基元的「只许一处」与拼接顺序守卫。
   'client-scope-test.mjs',
   'client-render-test.mjs',
+  // 2.1.20：外部审查 Q15 —— 星图按需绘制的入场 / 回放 / 页面隐藏调度
+  // （伪时钟 + 假 WebGL 直接读 render 写进去的 uTime / uRevealT）。
+  'review-211-q15-test.mjs',
   // 契约 §5（环境变量）的默认值 / 越界夹取 —— 以前这半边一条断言都没有。
   'env-contract-test.mjs',
   // 1.2.0：结构守卫 —— 组合根体积 / 依赖方向 / typert 契约位置。

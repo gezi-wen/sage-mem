@@ -1,3 +1,19 @@
+		/**
+		 * 星图动画的统一时钟（Q15）。
+		 *
+		 * rAF 回调的时间戳与 `performance.now()` 是**同一个原点**（单调、从页面加载起算），
+		 * 而 `Date.now()` 是 epoch 毫秒 —— 两套混用会让相位变成大负数。旧版入场动画就是这个
+		 * bug：`t0 = Date.now()` 去减 rAF 的 `ts`，`ts - t0` 恒为大负数 → 永远「入场没结束」，
+		 * 但每帧画完又不接着排帧，于是入场只画了一帧、相位还是负的。
+		 *
+		 * 星图里所有「过了多少毫秒」都走这里（freshness 那种墙钟判断除外，那本来就该用 Date.now）。
+		 */
+		function starmapNow() {
+			return (typeof performance !== "undefined" && performance && typeof performance.now === "function")
+				? performance.now()
+				: Date.now();
+		}
+
 		// ── 星图主体（canvas + 图例 + 详情面板）──
 		function StarMap(props) {
 			const ctx = props.ctx || appCtx;
@@ -128,16 +144,18 @@
 				if (!data || !layout || !canvasEl) return undefined;
 				const renderer = createRenderer(canvasEl, layout, visBox, hoverBox);
 				drawBox.renderer = renderer;
-				drawBox.t0 = Date.now();
+				// t0 与 rAF 的 ts 必须同一时钟（见 starmapNow）。旧版用 Date.now 当 t0，
+				// 于是相位是 epoch 级的大负数，入场窗口永远关不上。
+				drawBox.t0 = starmapNow();
 				renderer.render(0);
 
 				// ── 按需重绘（重做过一版）──
 				// 旧版是一个常驻 rAF 循环：只要星图页开着就永远满帧重画，后台标签页也一样，
 				// 而画面其实早就静止了。新的规矩只有三种情况会画：
 				//   1. 入场展示动画期间（约 1.3s，星点按诞生时间依次点亮）
-				//   2. 有人调 markDirty()（hover / 数据或筛选变化 / 尺寸变化）
+				//   2. 有人调 markDirty()（hover / 数据或筛选变化 / 尺寸变化 / 回放）
 				//   3. 诞生回放进行中
-				// 其余时间一帧都不画。另外帧率封顶 30fps，页面不可见时直接跳过。
+				// 其余时间一帧都不画。另外帧率封顶 30fps，页面不可见时暂停（回来再补一帧）。
 				const FRAME_MS = 1000 / 30;
 				const ENTRANCE_MS = 1300;
 				let raf = 0;
@@ -146,26 +164,51 @@
 				function schedule() {
 					if (!raf) raf = window.requestAnimationFrame(tick);
 				}
+				/** 还需要连续帧的两种状态：入场动画没走完 / 诞生回放激活。 */
+				function animating(ts) {
+					return (ts - drawBox.t0 < ENTRANCE_MS) || replayBox.active === true;
+				}
 				function tick(ts) {
 					raf = 0;
 					if (!drawBox.renderer) return;
-					if (ts - drawBox.t0 < ENTRANCE_MS || replayBox.active) dirty = true;
+					if (animating(ts)) dirty = true;
+					// 页面不可见：这一帧不画，也**不**再排下一帧（旧版直接 return，结果从后台
+					// 切回来就再也不画了）。visibilitychange 回到可见时会补一帧。
+					if (typeof document !== "undefined" && document && document.hidden) {
+						dirty = true;
+						return;
+					}
 					if (!dirty) return;
-					if (typeof document !== "undefined" && document.hidden) return;
 					if (ts - lastDraw < FRAME_MS) { schedule(); return; }
 					dirty = false;
 					lastDraw = ts;
 					drawBox.renderer.render((ts - drawBox.t0) / 1000);
+					// 入场 / 回放没结束就接着排下一帧；静止之后一帧都不排（不允许常驻空转）。
+					if (animating(ts)) schedule();
 				}
 				drawBox.markDirty = function () { dirty = true; schedule(); };
+				// 从后台标签页回来：补一帧（隐藏期间不排帧，靠这个事件唤醒）。
+				const onVisibility = function () {
+					if (typeof document === "undefined" || !document) return;
+					if (document.hidden) { dirty = true; return; }
+					dirty = true;
+					schedule();
+				};
+				if (typeof document !== "undefined" && document && typeof document.addEventListener === "function") {
+					document.addEventListener("visibilitychange", onVisibility);
+				}
 				schedule();
 
 				return () => {
 					window.cancelAnimationFrame(raf);
+					if (typeof document !== "undefined" && document && typeof document.removeEventListener === "function") {
+						document.removeEventListener("visibilitychange", onVisibility);
+					}
 					drawBox.renderer = null;
 					drawBox.markDirty = null;
 					replayBox.active = false;
 					window.cancelAnimationFrame(replayBox.raf);
+					replayBox.raf = 0;
 					if (renderer.destroy) renderer.destroy();
 				};
 			}, [data, layout, canvasEl, themeKey]);
@@ -183,7 +226,7 @@
 					if (drawBox.renderer.setGeometry) drawBox.renderer.setGeometry();
 					// 交给按需重绘那一套：下一帧画（<33ms），不再这里直接 render
 					if (drawBox.markDirty) drawBox.markDirty();
-					else drawBox.renderer.render((Date.now() - drawBox.t0) / 1000);
+					else drawBox.renderer.render((starmapNow() - drawBox.t0) / 1000);
 				}
 			}, [data, layout, kindsOn, query, showArchive]);
 
@@ -318,7 +361,9 @@
 			function stopReplay() {
 				replayBox.active = false;
 				window.cancelAnimationFrame(replayBox.raf);
+				replayBox.raf = 0;
 				if (drawBox.renderer && drawBox.renderer.setReveal) drawBox.renderer.setReveal(null);
+				// 停回放要回到「全亮」：markDirty 让绘制循环补这一帧。
 				if (drawBox.markDirty) drawBox.markDirty();
 				setReplaying(false);
 				setReplayDate(null);
@@ -336,17 +381,22 @@
 				window.cancelAnimationFrame(replayBox.raf);
 				const span = Math.max(mx - mn, 60000) + 2400;
 				const dur = 18000;
-				const t0 = Date.now();
+				let t0 = null;
 				replayBox.active = true;
 				setReplaying(true);
+				// 关键：回放期间由「按需绘制」那套逐帧重画。setReveal 只改渲染器的变量，
+				// 不标脏 / 不唤醒绘制循环的话屏幕上什么都不动（旧版就是这样，回放是空的）。
+				if (drawBox.markDirty) drawBox.markDirty();
 				let lastLabel = 0;
-				const tick = () => {
+				const tick = (ts) => {
 					if (!replayBox.active) return;
-					const p = Math.min(1, (Date.now() - t0) / dur);
+					// 进度也用 rAF 的单调时间戳，和绘制循环同一个时钟（旧版用 Date.now 又混了一次）。
+					if (t0 === null) t0 = ts;
+					const p = Math.min(1, (ts - t0) / dur);
 					const cur = mn - 1200 + span * p;
 					if (drawBox.renderer && drawBox.renderer.setReveal) drawBox.renderer.setReveal(cur);
-					if (Date.now() - lastLabel > 250) {
-						lastLabel = Date.now();
+					if (ts - lastLabel > 250) {
+						lastLabel = ts;
 						setReplayDate(Math.min(mx, cur));
 					}
 					if (p >= 1) { stopReplay(); return; }
