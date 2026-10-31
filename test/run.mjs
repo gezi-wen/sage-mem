@@ -75,6 +75,9 @@ const SUITES = [
   'recall-golden-test.mjs',
   'host-facts-test.mjs',
   'archive-test.mjs',
+  // 2.1.5（外部审查 Q06）：恢复归档改成「接管源 → 核对 → 排他落位 → 退役私有副本」的事务移动，
+  // 读源后 / 接管前后 / 目标落位后插入源改写都不许丢新版本；EEXIST / EIO / 崩溃残留各留一份可捞回的原文。
+  'review-211-q06-test.mjs',
   'access-test.mjs',
   'access-v2-test.mjs',
   'panel-api-test.mjs',
