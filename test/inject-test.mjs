@@ -417,7 +417,10 @@ group('9. R02：控制提示不依赖候选')
   const cpOut = await step(h1, 'task-cp-a', '继续上次任务')
   ok(!!cpOut && cpOut.includes('tasks/task-cp-a/WORKING.md'),
     '空目录 + 有效检查点 → 发出检查点句柄（旧行为在这里一条都不注）', String(cpOut))
-  ok(!!cpOut && /检查点 task-cp-a（revision 1）/.test(cpOut), '句柄带任务 id 与 revision')
+  // 2.1.15（Q12）：句柄说法改成「revision 在前、完整路径只说一次、基准是状态根」——
+  // 旧写法把 id 写了两遍，长 id 时会被截成不存在的 `tasks/WORKING.md`。断言名保持不变
+  // （4.3 / 5.8 两条契约绑定指向它），只更新成新说法。
+  ok(!!cpOut && /检查点 revision 1：状态根下 tasks\/task-cp-a\/WORKING\.md/.test(cpOut), '句柄带任务 id 与 revision')
   ok(!!cpOut && countEntries(cpOut) === 0, '这条路上没有任何正文（目录本来就是空的）')
 
   // 9b. 非空目录、零命中、历史依赖问题 → 未命中提示

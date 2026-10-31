@@ -17,4 +17,4 @@ baseline: true
 
 我是甲。
 
-检查点 golden-task（revision 3）：读 tasks/golden-task/WORKING.md，续做前先读
+检查点 revision 3：状态根下 tasks/golden-task/WORKING.md，续做前先读

@@ -7,6 +7,36 @@
 
 ---
 
+## 2.1.15
+
+**主题：检查点句柄只表达一次身份 —— 句柄必须能定位到真实文件，不再给出不存在的 `tasks/WORKING.md`。**
+
+版本判定：2.1.15（PATCH）｜理由：修「注入给模型的读取指令指向不存在的路径」（恢复路径等于失效）；无新对外面、无契约变化｜运行时源文件 1（`lib/memory/checkpoint.js`）｜护栏内
+
+### 行为变更（**说法变更**）
+
+- 注入文本里的检查点句柄从
+  `检查点 <id>（revision N）：读 tasks/<id>/WORKING.md，续做前先读`
+  改成
+  `检查点 revision N：状态根下 tasks/<id>/WORKING.md，续做前先读`
+  —— **id 只出现一次**（放在完整相对路径里），并显式标出相对路径的基准是「状态根下」。
+- 预算（≤160 字节）不够时按优先级退化：先丢项目名，再丢「续做前先读」提示；**路径与 revision 永不截断**。旧实现在 64 字符 taskId 时把路径退成 `tasks/WORKING.md`（短、也含 id，但真实布局里没有这条路径）。
+- 新增 `parseCheckpointHandle()`：把句柄解析回 `{ taskId, revision }`，与生成共用同一条规则，让「句柄能不能定位真实文件」这件事**可以被断言**（旧测试只断言「≤160 字节 + 包含 id」，正是这么放它过去的）。
+
+### 不变
+
+- 检查点文件布局（`<状态根>/tasks/<taskId>/WORKING.md`）、读写 API、注入位置与时机不变；只是句柄文案变了。
+- `test/fixtures/recall-golden/checkpoint-handle.txt` 与 `test/inject-test.mjs` 里固定旧说法的断言已同步更新（**说法变更，不是行为退化**，断言名保留）。
+
+### 新增测试
+
+- `test/review-211-q12-test.mjs`（30 条，已登记 `npm test`）：**写检查点 → 取句柄 → `parseCheckpointHandle` 解析 → `checkpointPathFor` 定位 → 读回**，覆盖最大 64 字符 id / 中文项目名 / 长 revision 三种形状；断言句柄 ≤160 字节**且**能定位到刚写下的真实文件。旧退化句柄（`读 tasks/WORKING.md`）与缺基准标记的裸相对路径都必须解析失败（反向对照）。
+
+### 实测
+
+- 修前红：把 `checkpoint.js` 退回上一版跑同一套件 → 15 passed / 15 failed（失败项直接打出旧句柄 `…读 tasks/WORKING.md`）。
+- 修后：单跑 30/30；`npm test`：4078 → **4108 passed / 0 failed**。
+
 ## 2.1.14
 
 **主题：观测代次与投递账分开推进 —— 被去重的轮次也推进观测，消息缩短时能识别「上下文被压缩了」。**
