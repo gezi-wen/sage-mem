@@ -18,6 +18,9 @@
 		const archivedFileSchema = parseSchema({
 			"file": isStr, "type": isStr, "description": isStr, "size": isNum,
 			"archivedAt": isStr, "archivedReason": isStr,
+			// 2.1.6（外部审查 Q07）：内容身份（归档代次 + 正文 revision）。它不是装饰 ——
+			// 「彻底删除」必须把它原样交回宿主，否则只能按名字删，而名字不是身份。
+			"revision": isStr,
 		});
 		const archivedListSchema = {
 			parse(v) {
@@ -30,9 +33,11 @@
 		// 归档文件的读 / 写（B1b）：形状与活跃记忆那套的 readSchema / writeSchema 对称。
 		const archivedReadSchema = withOptional(parseSchema({ "name": isStr, "content": isStr }), ["revision"]);
 		const archivedWriteSchema = withOptional(parseSchema({ "ok": isBool, "file": isStr }), ["code", "revision"]);
-		// 「彻底删除」的入参：归档代次（`archivedAt`）。它不是装饰 —— 宿主拿它核对
-		// 「要删的是不是用户确认过的那一版」。老归档件没有留痕时传空串，所以只校类型。
+		// 「彻底删除」的入参：`archivedAt`（展示时间）+ `revision`（内容身份，见 archive.js 的
+		// archivedRevisionOf）。两个都不是装饰 —— 宿主拿它们核对「要删的是不是用户确认过的那一版」；
+		// 只有前者的旧确认在 2.1.6 起会被宿主拒绝（分钟精度的时间不是内容身份）。
 		const archiveStampSchema = strSchema;
+		const archiveRevisionSchema = { parse(v) { isStr(v); if (v.length === 0) throw new Error("sage-mem: expected revision"); return v; } };
 
 		// ── 2.1.2（Q02）写协议：读快照 revision / 写回执的 additive 字段 / 写选项 ──
 		/**

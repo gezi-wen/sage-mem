@@ -331,7 +331,7 @@ function makeMemoryRemote(active, archived, raw) {
       const i = st.active.findIndex((x) => x.file === name)
       if (i < 0) return Promise.resolve({ ok: false, error: 'sage-mem: file not found: ' + name })
       const [it] = st.active.splice(i, 1)
-      st.archived.unshift({ ...it, archivedAt: '2026-10-08 21:00', archivedReason: reason || '手动归档' })
+      st.archived.unshift({ ...it, archivedAt: '2026-10-08 21:00', archivedReason: reason || '手动归档', revision: '0123456789abcdef@sha256:fedcba987654' })
       return Promise.resolve({ ok: true, file: name })
     },
     restore(name) {
@@ -342,13 +342,15 @@ function makeMemoryRemote(active, archived, raw) {
       const rest = { ...it }
       delete rest.archivedAt
       delete rest.archivedReason
+      delete rest.revision
       st.active.unshift(rest)
       return Promise.resolve({ ok: true, file: name })
     },
-    // v1.1.0：彻底删除（不可恢复）。第二个参数是归档代次 —— 真宿主会拿它核对
-    // 「要删的是不是用户确认过的那一版」，这里只记录、并对拒绝分支留一个开关。
-    deleteArchived(name, archivedAt) {
-      st.calls.push(['deleteArchived', name, archivedAt])
+    // v1.1.0：彻底删除（不可恢复）。第二、第三个参数是身份判据 —— 真宿主会拿它们核对
+    // 「要删的是不是用户确认过的那一版」（2.1.6 起 archivedAt 是展示时间、revision 是内容身份），
+    // 这里只记录、并对拒绝分支留一个开关。
+    deleteArchived(name, archivedAt, revision) {
+      st.calls.push(['deleteArchived', name, archivedAt, revision])
       if (st.refuseDelete) {
         return Promise.resolve({ ok: false, error: 'sage-mem: ' + name + ' 在确认之后被换成了另一版，本次一个字节都没删 —— 请刷新列表再看一眼。' })
       }
@@ -413,7 +415,7 @@ function makeStarmapRemote(mem, meta) {
       archived: archived === true,
     }
     // 归档留痕只对归档星出现 —— 与宿主 listStars 的形状一致
-    if (s.archived) { s.archivedAt = f.archivedAt; s.archivedReason = f.archivedReason }
+    if (s.archived) { s.archivedAt = f.archivedAt; s.archivedReason = f.archivedReason; s.revision = f.revision }
     return s
   }
   return {
@@ -809,8 +811,9 @@ const ACTIVE = [
   { file: 'reference_gamma.md', type: 'reference', description: '丙：外部资料指针', size: 800, tags: ['参考'] },
 ]
 const ARCHIVED = [
-  { file: 'feedback_old.md', type: 'feedback', description: '丁：已被推翻的反馈', size: 640, tags: ['归档'], archivedAt: '2026-10-01 09:30', archivedReason: '结论已被 project_beta 取代' },
-  { file: 'project_dead.md', type: 'project', description: '戊：停掉的项目', size: 900, tags: ['项目'], archivedAt: '2026-09-20 18:05', archivedReason: '手动归档' },
+  // revision 是 2.1.6（外部审查 Q07）起的内容身份：面板的「彻底删除」必须把它原样交回宿主。
+  { file: 'feedback_old.md', type: 'feedback', description: '丁：已被推翻的反馈', size: 640, tags: ['归档'], archivedAt: '2026-10-01 09:30', archivedReason: '结论已被 project_beta 取代', revision: '9f8e7d6c5b4a3210@sha256:0123456789ab' },
+  { file: 'project_dead.md', type: 'project', description: '戊：停掉的项目', size: 900, tags: ['项目'], archivedAt: '2026-09-20 18:05', archivedReason: '手动归档', revision: '1a2b3c4d5e6f7788@sha256:abcdefabcdef' },
 ]
 // 归档文件的**原始全文**：带自定义字段（重建式编辑器会吞掉它）与两行归档留痕。
 // 一字不改地喂进去 / 一字不改地比出来，就是 R4 的验收判据。
@@ -888,7 +891,7 @@ const STAR_DEMO = (() => {
   const mk = (kind, k, isArch) => {
     const file = 'demo_' + kind + '_' + String(k).padStart(2, '0') + '.md'
     const it = { file, size: BYTES[i % BYTES.length], mtimeMs: FIXED_NOW - i * 86400000 }
-    if (isArch) { it.archivedAt = '2026-10-01 09:30'; it.archivedReason = '演示：结论已被新条目取代' }
+    if (isArch) { it.archivedAt = '2026-10-01 09:30'; it.archivedReason = '演示：结论已被新条目取代'; it.revision = 'feedfacecafebeef@sha256:0123456789ab' }
     i++
     meta[file] = { kind, title: '演示 ' + k, desc: '演示条目', mtimeMs: it.mtimeMs }
     return it
@@ -1334,7 +1337,10 @@ async function main() {
     tree = await rt.settle(C, {})
     const call = mem.st.calls.find((c) => c[0] === 'deleteArchived')
     ok(!!call && call[1] === 'feedback_old.md', `确认后调了 deleteArchived（${JSON.stringify(call)}）`)
-    ok(!!call && call[2] === '2026-10-01 09:30', '请求带上列表里那条的归档代次 archivedAt')
+    ok(!!call && call[2] === '2026-10-01 09:30', '请求带上列表里那条的展示时间 archivedAt')
+    // 2.1.6（外部审查 Q07）：只带时间不够 —— 宿主真正拿来核对的是内容身份 revision。
+    ok(!!call && call[3] === '9f8e7d6c5b4a3210@sha256:0123456789ab',
+      '请求同时带上内容身份 revision（缺它宿主会拒绝，旧实现根本没传）', JSON.stringify(call?.[3]))
     ok(mem.st.archived.length === 1 && !mem.st.archived.some((x) => x.file === 'feedback_old.md'), '归档区里那条真的没了')
     ok(treeText(tree).indexOf('已彻底删除 feedback_old.md') >= 0, '删除后有明确反馈')
     ok(all(tree, byClass('smem-card--archived')).length === 1, '卡片从列表里消失')

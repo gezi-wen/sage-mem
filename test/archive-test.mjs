@@ -400,12 +400,22 @@ group('10b. 彻底删除归档件：代次判据 + 闸门 + 不误伤活记忆')
   ok(!!listed && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(listed.archivedAt),
     '(前提) beta 在归档区、且带着可核对的归档代次', JSON.stringify(listed))
   const stamp = listed?.archivedAt ?? ''
+  // 2.1.6（外部审查 Q07）：`archivedAt` 只是展示时间，删除的真判据是内容身份 revision。
+  ok(!!listed && typeof listed.revision === 'string' && listed.revision.length > 0,
+    '(前提) 归档条目带内容身份 revision', JSON.stringify(listed?.revision))
+  const rev = listed?.revision ?? ''
 
   // ① 代次对不上 → 拒绝，一个字节都不删
-  const wrong = await gw.deleteArchived(NAME, '1999-01-01 00:00')
+  const beforeRejected = readFileSync(archivedPath(NAME), 'utf8')
+  const wrong = await gw.deleteArchived(NAME, '1999-01-01 00:00', rev)
   ok(wrong.ok === false && /另一版/.test(wrong.error),
     '代次对不上 → {ok:false} 并说明「被换成了另一版」', JSON.stringify(wrong))
-  ok(existsSync(archivedPath(NAME)), '被拒绝时那份归档件仍在')
+  ok(existsSync(archivedPath(NAME)) && readFileSync(archivedPath(NAME), 'utf8') === beforeRejected,
+    '被拒绝时那份归档件仍在、一个字节没动')
+  const noRev = await gw.deleteArchived(NAME, stamp)
+  ok(noRev.ok === false && /revision|代次/.test(String(noRev.error)),
+    '只交回展示时间（没有 revision）→ 拒绝（2.1.6 起不许退回按名字删）', JSON.stringify(noRev))
+  ok(readFileSync(archivedPath(NAME), 'utf8') === beforeRejected, '这一条被拒绝时同样一个字节没删')
 
   // ② 目标不在归档区 / 名字不合法 / 保留名
   await rejects('彻底删除一条活动记忆 → 拒绝', () => gw.deleteArchived('project_alpha.md', ''), 'not archived')
@@ -416,7 +426,7 @@ group('10b. 彻底删除归档件：代次判据 + 闸门 + 不误伤活记忆')
 
   // ③ 真删：只删归档区那份
   const activeBefore = readFileSync(activePath(NAME), 'utf8')
-  const okDel = await gw.deleteArchived(NAME, stamp)
+  const okDel = await gw.deleteArchived(NAME, stamp, rev)
   ok(okDel.ok === true && okDel.file === NAME, 'deleteArchived 成功返回 { ok: true, file }', JSON.stringify(okDel))
   ok(!existsSync(archivedPath(NAME)), 'archive/ 里那份真的没了')
   ok(!(await gw.listArchived()).files.some((f) => f.file === NAME), 'listArchived 不再列它')
@@ -424,7 +434,7 @@ group('10b. 彻底删除归档件：代次判据 + 闸门 + 不误伤活记忆')
     '根目录那份**同名活记忆**一个字节没动（删除只碰归档区）')
 
   // ④ 再删一次 → 明确拒绝（不是静默成功）
-  await rejects('对同一份重复彻底删除 → 拒绝', () => gw.deleteArchived(NAME, stamp), 'not archived')
+  await rejects('对同一份重复彻底删除 → 拒绝', () => gw.deleteArchived(NAME, stamp, rev), 'not archived')
 
   // ⑤ 归档区是目录联接 → 拒绝（删的是外部文件的话，比「没删掉」严重得多）
   const fsp = await import('node:fs/promises')
@@ -467,6 +477,11 @@ group('10b. 彻底删除归档件：代次判据 + 闸门 + 不误伤活记忆')
   const stampParam = TYPERT.invocations.find((i) => i.id === 'sage-mem#memory/deleteArchived').parameters[1].codec.schema
   ok(stampParam.safeParse('2026-10-01 09:30').success && stampParam.safeParse('').success && !stampParam.safeParse(123).success,
     'ArchiveStamp 收字符串（含空串：老归档件没有留痕时用它），拒绝其它类型')
+  // 2.1.6（外部审查 Q07）：第三个入参是内容身份，非空字符串 —— 空串会让宿主退回按名字删。
+  const revParam = TYPERT.invocations.find((i) => i.id === 'sage-mem#memory/deleteArchived').parameters[2]
+  ok(revParam?.name === 'revision' && revParam.codec.schema.safeParse('9f8e@sha256:0123456789ab').success === true &&
+    revParam.codec.schema.safeParse('').success === false,
+    'ArchiveRevision 入参存在、收非空字符串、拒绝空串')
 }
 
 // ── 11. 体检的三种假阳性 ──────────────────────────────────────

@@ -78,6 +78,9 @@ const SUITES = [
   // 2.1.5（外部审查 Q06）：恢复归档改成「接管源 → 核对 → 排他落位 → 退役私有副本」的事务移动，
   // 读源后 / 接管前后 / 目标落位后插入源改写都不许丢新版本；EEXIST / EIO / 崩溃残留各留一份可捞回的原文。
   'review-211-q06-test.mjs',
+  // 2.1.6（外部审查 Q07）：归档删除的内容身份 = 归档代次 + 正文 revision；分钟时间戳只是展示值。
+  // 同一时间戳不同正文 / 同分钟重新归档 / 校验后被替换都拒绝，老确认（缺 revision）一律拒绝。
+  'review-211-q07-test.mjs',
   'access-test.mjs',
   'access-v2-test.mjs',
   'panel-api-test.mjs',

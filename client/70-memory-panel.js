@@ -496,8 +496,10 @@
 			/**
 			 * **彻底删除**一条归档件（不可恢复）。
 			 *
-			 * 第二个参数是归档代次（列表上看到的 `archivedAt`）：宿主拿它核对「要删的是不是
-			 * 我确认过的那一版」。不传它会变成「按名字删」—— 名字底下的内容刚才可能已经换人了。
+			 * 第二、第三个参数是身份判据：`archivedAt` 是展示时间，`revision` 是**内容身份**
+			 * （归档代次 + 正文 revision，2.1.6 起）。宿主拿它们核对「要删的是不是我看过的那一版」——
+			 * 只传时间的话，正文被改成同时间戳的另一版、或同一分钟内重新归档，旧确认都会删错。
+			 * 二次确认只是交互，服务端的版本核对才是判据。
 			 */
 			function deleteArchivedFile(file) {
 				if (typeof remote.deleteArchived !== "function") {
@@ -506,8 +508,9 @@
 				}
 				const item = archiveItems.filter(function (x) { return x.file === file; })[0];
 				const stamp = (item && item.archivedAt) || "";
+				const revision = (item && item.revision) || "";
 				setBusy(true); setError(null); setNotice("");
-				remote.deleteArchived(file, stamp)
+				remote.deleteArchived(file, stamp, revision)
 					.then(function (r) {
 						if (r && r.ok === false) { setError(r.error || t("error.deleteRejected")); return; }
 						setArchDelete(null);

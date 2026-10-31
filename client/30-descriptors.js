@@ -112,8 +112,9 @@
 					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
 				},
 				{
-					// 彻底删除一条归档件（不可恢复）。第二个参数是归档代次：宿主拿它核对
+					// 彻底删除一条归档件（不可恢复）。第二、第三个参数是身份判据：宿主拿它们核对
 					// 「要删的是不是用户确认过的那一版」，传错（比如列表过期）会被拒绝。
+					// `archivedAt` 只是展示时间；`revision` 才是内容身份（2.1.6 起，外部审查 Q07）。
 					id: "sage-mem#memory/deleteArchived",
 					service: "memory",
 					namespace: "memory",
@@ -122,6 +123,7 @@
 					parameters: [
 						{ name: "name", wire: "name", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#ArchivedFileName", schema: strSchema, create: () => strSchema } },
 						{ name: "archivedAt", wire: "archivedAt", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#ArchiveStamp", schema: archiveStampSchema, create: () => archiveStampSchema } },
+						{ name: "revision", wire: "revision", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#ArchiveRevision", schema: archiveRevisionSchema, create: () => archiveRevisionSchema } },
 					],
 					result: { mode: "strict", typeSymbol: "sage-mem/types#ArchiveResult", schema: archiveSchema, create: () => archiveSchema },
 					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
