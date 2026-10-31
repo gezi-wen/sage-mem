@@ -120,8 +120,10 @@ group('1. 窗口① before-stat → read：第一次 stat 之后、读取之前�
   ok(disk.includes('B human addition'), '【要点】版本取样与正文不一致时，B 必须原样保留', disk)
   ok(!write.startsWith('已写入'), '写回被拒绝（没有把 A 的内容写成 C 覆盖 B）', write)
   ok(host.calls.write === 0, '被拒绝的写根本没落到宿主写入（writeText 一次都没调）', JSON.stringify(host.calls))
-  // 读本身允许成功：读到的是窗口里那份正文，但**不允许**把它当作可覆盖的依据。
-  ok(read.includes('B human addition') || read.includes('A old'), '读取不崩，返回内容来自窗口内的真实文件', read)
+  // 读本身允许成功（窗口内读到的是真实文件），也允许在身份/大小核对时直接拒绝 ——
+  // 但**绝不允许**把这份正文当作可覆盖的依据。
+  ok(read.includes('B human addition') || read.includes('A old') || /工具执行失败|拒绝|被替换|不一致|变过/.test(read),
+    '读取要么返回窗口内的真实内容，要么明确拒绝（不返回来路不明的正文）', read)
 }
 
 group('2. 窗口② read → after-stat：正文读成 A 之后、第二次 stat 之前被改')

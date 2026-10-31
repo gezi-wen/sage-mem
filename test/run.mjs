@@ -30,6 +30,8 @@ const SUITES = [
   'race-guards-test.mjs',
   // 2.1.3：自动整理的读时版本必须与读到的那份正文同源（外部审查 2026-10-31，Q01）。
   'review-211-q01-test.mjs',
+  // 2.1.4：自动整理的三个模型可调用读取分支统一走 readVerified（外部审查 N03）。
+  'review-211-n03-test.mjs',
   'q-fixes-093.mjs',
   'q-fixes-094.mjs',
   'q-fixes-095.mjs',
