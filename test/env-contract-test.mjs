@@ -58,6 +58,14 @@ function readConfig(overrides = {}, extraEnv = {}) {
   for (const k of Object.keys(env)) if (k.startsWith('SAGE_MEM_')) delete env[k]
   // 沙箱残留的两个也可能影响派生值，一并清掉再由 overrides 决定
   delete env.DSH_HOME
+  // 2.1.11（Q04）：状态根现在会在**启动时**读 `<状态根>/settings.json`。默认状态根挂在
+  // home 下，而开发机上真的可能有一份面板保存过的 settings.json —— 不隔离 home 的话，
+  // 这组「默认值」断言的其实是**开发机自己的设置**（测试被环境配置污染）。显式给了
+  // HOME/USERPROFILE 的场景（下面第 4 组）照旧用调用方给的。
+  if (!('HOME' in overrides) && !('USERPROFILE' in overrides) && !extraEnv.HOME && !extraEnv.USERPROFILE) {
+    env.HOME = join(sandbox, 'isolated-home')
+    env.USERPROFILE = env.HOME
+  }
   Object.assign(env, overrides)
   if (extraEnv.DSH_HOME) env.DSH_HOME = extraEnv.DSH_HOME
 

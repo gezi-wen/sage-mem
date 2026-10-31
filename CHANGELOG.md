@@ -7,6 +7,34 @@
 
 ---
 
+## 2.1.11
+
+**主题：面板注入上限「保存 → 重启」后真的生效 —— 启动解析与面板 pending 共用同一份判据。**
+
+版本判定：2.1.11（PATCH）｜理由：修「设置写进去了、重启也永远不加载」的功能缺陷；不新增 remote / 设置项（面板字段与 2.0.x 相同）｜运行时源文件 3（`lib/memory/config.js` / `lib/settings.js` / `lib/index.js`）｜护栏内（非注释改动 139 行）
+
+### 行为变更
+
+- **持久设置现在真的进入启动解析**：`resolveLimits()` 把「持久设置（`settings.json`）> 环境变量 > 默认值」合成一份判据；`getSettings` 的 `pendingLimits` 与启动时的生效常量用**同一份**函数。面板保存 `maxResults=3` 后重启，`getSettings` 与注入链看到的都是 3 —— 不再是「UI 永久显示『待重启』、而重启永远不会加载它」。
+- **坏设置给明确诊断、不静默回默认**：启动期的问题 + 读 `settings.json` 的错误 + 逐项非法/越界说明，去重后经 `limitDiagnostics` 一起给出（宿主侧）。
+
+### 不变
+
+- 五个上限仍然是**模块加载时**读、改完要重启 DSH 才生效（这个语义没变，变的是「重启确实会加载」）。
+- 环境变量仍可单独使用；面板字段、remote 方法、`restartRequired` 的含义都不变。
+
+### 新增测试
+
+- `test/review-211-q04-test.mjs`（40 条，已登记 `npm test`）：五个字段分别做「保存 → **另起新 Node 进程**读取」；无设置文件、非法 JSON、环境变量与持久值同时存在时的优先级；坏值诊断文本能被读到；`restartRequired` 在保存后为 false（反向对照：现值 = 待生效值）。
+- `test/env-contract-test.mjs` 补了 home 隔离：否则开发机 `~/.sage-mem/settings.json` 会污染「默认值」断言（这不是改判据，是把夹具关进沙箱）。
+
+### 实测
+
+- 修前红：19 passed / 21 failed（子进程读到 `current=10 / pending=3 / restartRequired=true`）。
+- 修后：审查报告附录 `current-repro.mjs` 的 Q04 段 → `current=3 / pending=3 / restartRequired=false`。
+- `npm test`：3962 → **4002 passed / 0 failed**。
+- 边界：`limitDiagnostics` 目前**只在宿主 API 与日志可见**，面板还没有展示它的位置（客户端文案留待下一批界面工作）；问题本身（值不生效）已修完。
+
 ## 2.1.10
 
 **主题：建立索引骨架改为一次意图调用 —— 缺目录能建、已有索引一字不动、读失败不再被当成「可以覆盖」。**
