@@ -70,6 +70,8 @@ const SUITES = [
   'checkpoint-test.mjs',
   // 2.1.15：Q12 —— 长任务 ID 的检查点句柄必须能按同一解析规则定位到真实文件。
   'review-211-q12-test.mjs',
+  // 2.1.16：Q13 —— 主动摘要检索在完整候选上分页，自动注入名额仍守自己的配置。
+  'review-211-q13-test.mjs',
   'typert-test.mjs',
   'inject-test.mjs',
   // 1.2.0：注入链从组合根搬出前先建的 golden —— 11 个场景逐字节比对，

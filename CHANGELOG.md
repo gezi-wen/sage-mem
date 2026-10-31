@@ -7,6 +7,31 @@
 
 ---
 
+## 2.1.16
+
+**主题：主动摘要检索不再被「自动注入名额」截断 —— 翻页能取全，注入侧的上限仍照旧。**
+
+版本判定：2.1.16（PATCH）｜理由：修「主动检索与自动注入共用同一个上限函数，导致候选被截断且翻页取不回」的召回缺陷；不新增工具 / 参数 / 设置项｜运行时源文件 2（`lib/memory/search.js` / `lib/memory/retrieval.js`）｜护栏内
+
+### 行为变更
+
+- **摘要排序与「注入名额」解耦**：新增 `rankSummaries()`（只排序、不截断），`selectRelevant()` 改为「排序后取前 `MAX_RESULTS`」——**自动注入侧的条数语义一字未变**。
+- 主动检索（`search_memory` / `retrieve`，`scope=summary`）现在在**完整合格候选**上应用工具自己的 `limit` / `cursor`：`SAGE_MEM_MAX_RESULTS=3` 而库中 7 份摘要全命中时，翻页能取到全部 7 条（旧实现只返 3 条、`nextCursor=null`、`complete=true`，丢掉的候选永远取不回）。
+
+### 不变
+
+- 排序函数本身的评分与排序规则不变；自动注入的条数、预算、去重语义不变（测试里同进程对照：`selectRelevant` 在 1 / 3 / 10 下仍只返回 1 / 3 / 7）。
+- 检索结果字段、`coverage` 形状、cursor 语义不变；离线评测无退化。
+
+### 新增测试
+
+- `test/review-211-q13-test.mjs`（28 条，已登记 `npm test`）+ `test/_q13-child.mjs`（子进程夹具：在干净环境变量下验证注入侧，不被宿主进程的 `SAGE_MEM_MAX_RESULTS` 污染）：`MAX_RESULTS=1 / 3 / 10` 下主动检索完整翻页结果相同；每页不重复、不漏候选；与注入侧条数对照。
+- 修前红：15 passed / 13 failed（`MAX_RESULTS=1` 与 `3` 时 `candidates=1 / 3`、`nextCursor=null`、翻页只拿到 `[1]` / `[3]`）。
+
+### 实测
+
+- 修后单跑 28/28；`npm test`：4108 → **4136 passed / 0 failed**；`eval-retrieval --mode all --baseline` **exit 0（无退化）**。
+
 ## 2.1.15
 
 **主题：检查点句柄只表达一次身份 —— 句柄必须能定位到真实文件，不再给出不存在的 `tasks/WORKING.md`。**
