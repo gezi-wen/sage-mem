@@ -7,6 +7,34 @@
 
 ---
 
+## 2.1.13
+
+**主题：状态根一次解析、显式传给所有子模块 —— 面板与引擎不再各读一套配置。**
+
+版本判定：2.1.13（PATCH）｜理由：修「`SAGE_MEM_STATE_DIR` 只对部分模块生效」的配置一致性与数据保护缺陷；不新增设置项 / remote｜运行时源文件 4（`lib/memory/config.js` / `lib/memory/lock.js` / `lib/autodream/engine.js` / `lib/assembly/autodream-mount.js`）｜护栏说明：比 3 个上限多一个装配点（验收要求「装配时一次解析并显式传给子模块」，该文件只 +7 行）
+
+### 行为变更
+
+- **`SAGE_MEM_STATE_DIR` 现在真的对整个状态面生效**：装配期一次解析 `{memoryDir, stateRoot, sessionsRoot}` 并**显式传**给自动做梦引擎、锁表、台账、冲突队列、任务检查点与回滚快照 —— 不再出现「配置模块读自定义状态根、而引擎和锁表仍按记忆目录的父目录去拼默认 `.sage-mem`」这种两套配置并存。审查复现里的 `engineRoot/lockFile` 现在都指向自定义根，面板快照与引擎策略一致。
+- **更改状态根不自动迁移旧数据**：新根优先，旧的 `.sage-mem` 原样保留但不再读取，启动时打印一行提示点名旧根里还有哪些数据（`autodream.json` / `locked.json` / `access.json` / `settings.json` / `autodream` / `tasks` / `conflicts` …）。要保留请手动移动。
+- 默认布局下行为不变：默认根仍是 `<记忆目录的上一层>/.sage-mem`，**默认根里不会新增任何文件**。
+
+### 不变
+
+- 状态目录下的文件布局与格式、锁语义（2.1.12）、设置优先级（2.1.11）、自动做梦的策略与报告格式都不变。
+- README 双语补了一段「状态根的范围与迁移」（原先只写了「状态目录（配置、台账、锁…）」这一句、没写清范围与迁移口径）。
+
+### 新增测试
+
+- `test/review-211-q09-test.mjs`（31 条，已登记 `npm test`）：自定义状态根下跑配置、锁、台账、冲突、检查点、快照**完整往返**；引擎与面板读到同一个 `autoArchive` 策略；默认根下不新增文件（反向对照）；旧根存在时报提示且旧文件逐字节不动。
+
+### 实测
+
+- 修前红（干净副本）：13 failed / 15 passed —— `engineRoot`/`lockFile` 指向默认 `.sage-mem`；面板快照 `autoArchive=report` 而引擎 `off`；默认根多出 `autodream.json` / `locked.json` / `autodream`；旧根无提示。
+- 修后：审查报告附录的 Q09 段 → `engineRoot=lockFile=custom-state`、`engineAutoArchive=off`、`panelSnapshotAutoArchive=off`。
+- `npm test`：4028 → **4059 passed / 0 failed**。
+- 边界：迁移是「不自动搬」，不是「自动搬」——审查也只要求规则确定，这里选的是**最不冒险**的那条（不碰用户已有数据，只提示）。
+
 ## 2.1.12
 
 **主题：锁表并发不再丢更新；锁表损坏返回「未知」并暂停自动归档 —— 不再把「不知道」当成「都没锁」。**

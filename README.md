@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.1.12`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.1.13`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -419,6 +419,8 @@ The two things are moved **differently**, spelled out:
 | `SAGE_MEM_VALIDITY` | on | master switch for invalidity filtering and contradiction suppression. **Only `0` / `false` / `off` turn it off** (empty or misspelled values count as on); off restores the 1.9.x injection behaviour |
 
 Value semantics: **out-of-range values are clamped to the boundary, illegal values (including pure whitespace) fall back to the default.**
+
+**Scope of the state root, and migration (spelled out since 2.1.13).** `SAGE_MEM_STATE_DIR` is the **single** state root: settings, autodream configuration and reports, the lock table, the access ledger, the conflict queue, task checkpoints, rollback snapshots and its index all live under it, and every module (including the autodream engine and the lock table) resolves it from the same value instead of re-deriving `<parent of the memory directory>/.sage-mem`. **Changing the state root does not migrate old data**: the new root wins, the old `.sage-mem` is left untouched but no longer read, and startup prints one line naming what is still in the old root. Move it by hand if you want to keep it.
 
 ### What the Settings Page Can Change
 
