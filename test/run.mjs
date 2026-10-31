@@ -74,6 +74,8 @@ const SUITES = [
   'review-211-q12-test.mjs',
   // 2.1.16：Q13 —— 主动摘要检索在完整候选上分页，自动注入名额仍守自己的配置。
   'review-211-q13-test.mjs',
+  // 2.1.18：Q17 —— 体检的索引识别走实际索引名（大小写归一），双变体报冲突。
+  'review-211-q17-test.mjs',
   'typert-test.mjs',
   'inject-test.mjs',
   // 1.2.0：注入链从组合根搬出前先建的 golden —— 11 个场景逐字节比对，

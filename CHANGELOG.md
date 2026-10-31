@@ -7,6 +7,33 @@
 
 ---
 
+## 2.1.18
+
+**主题：体检复用「实际索引定位」规则 —— 索引文件叫 `memory.md` 时不再把它自己报成漏索引 / 无 frontmatter。**
+
+版本判定：2.1.18（PATCH）｜理由：修「同一目录里两套索引判据互相矛盾」的体检误报缺陷；不新增 remote / 工具｜运行时源文件 2（`lib/autodream/audit.js` / `lib/memory/index-file.js`）｜护栏内
+
+### 行为变更
+
+- **索引识别收口到一处**：`lib/memory/index-file.js` 新增 `isIndexName()` / `resolveIndexNames()`（大小写归一、规范名优先；目录里同时存在多个大小写变体时**明确报冲突**，而不是随意挑一个）。体检（`auditMemoryDir`）改为用**真实索引名**读取、按名字归一排除索引 —— 不再硬编码 `MEMORY.md`、也不再拿精确字符串比较。
+- 体检报告新增字段 `indexFile` / `indexConflicts`；冲突计入 `problems` 并出现在格式化输出里。
+- 这样索引合法地叫 `memory.md` / `MEMORY.MD` 时，它不会被当成「普通记忆漏索引」+「无 frontmatter」报两遍。
+
+### 不变
+
+- 其它体检项（漏索引、type 与前缀不一致、CRLF、断链、hash 危险、strays、unreadable…）判据与文案不变；真实记忆漏索引仍照常报（反向对照）。
+- 索引文件的内容格式、命名约定不变。
+
+### 新增测试
+
+- `test/review-211-q17-test.mjs`（41 条，已登记 `npm test`）：`memory.md` / `MEMORY.md` 两种索引名体检结果一致（问题数与非问题项相同）；真记忆漏索引、type 与前缀不一致仍报（反向对照）；`resolveIndexNames` 的纯函数判据覆盖规范化与冲突分支；大小写敏感性用运行时探测（`fsIsCaseInsensitive`），不靠 `process.platform` 猜。
+
+### 实测
+
+- 修前红：17 passed / 24 failed（`memory.md` 当索引时 `problems=2`、`unlisted` / `noFrontmatter` 里含索引本身、`indexFile` 为 `undefined`）。
+- 修后：单跑 41/41；`npm test`：4174 → **4215 passed / 0 failed**。
+- 边界：Windows 的 NTFS 不区分大小写，**物理「双索引共存」在本机造不出来** —— 测试**显式断言这一事实**（不静默跳过），冲突判定逻辑用纯函数在本地验过，物理执行分支留给 Linux CI。
+
 ## 2.1.17
 
 **主题：扫描失败不再被渲染成「完整搜索、没有命中」—— 「检索不可用」与「记忆里没有」分开说。**
