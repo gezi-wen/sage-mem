@@ -1,7 +1,7 @@
 {
   "name": "sage-mem",
   "description": "Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.",
-  "version": "2.1.16",
+  "version": "2.1.17",
   "type": "module",
   "main": "lib/index.js",
   "icon": "./icon.png",

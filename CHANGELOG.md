@@ -7,6 +7,33 @@
 
 ---
 
+## 2.1.17
+
+**主题：扫描失败不再被渲染成「完整搜索、没有命中」—— 「检索不可用」与「记忆里没有」分开说。**
+
+版本判定：2.1.17（PATCH）｜理由：修「目录级 I/O 失败被降级成空结果」的误导缺陷（模型会以为「记忆里没有匹配项」）；不新增工具 / 参数｜运行时源文件 2（`lib/memory/scan.js` / `lib/tools/memory-tools.js`）｜护栏内（非注释改动 115 行）
+
+### 行为变更
+
+- **扫描结果带「完整性」**：新增 `scanMemoryDirDetailed()` / `scanMemoryFilesDetailed()`，返回 `{ files, complete, errors, skipped, missing, namesKey }`；旧的数组签名保留为兼容包装（其它调用点不动）。
+- **契约拍板**（写进测试）：目录**不存在** = 合法空库（`complete:true, missing:true`，行为与之前一致）；`ENOTDIR` / `EACCES` 等目录级失败 = **检索不可用**（`complete:false` + `errors`），**不落缓存**（避免把一次失败记成「目录是空的」）。
+- **`search_memory` 如实转达**：目录级失败时返回 `{ ok:false, code:'memory_unavailable', error, coverage:{ complete:false, errors } }`，渲染文案改成「检索失败：记忆目录读不了……这是『检索不可用』，不代表记忆里没有匹配项」；单条目被策略跳过计入 `skippedFiles`，与目录级失败分开统计。
+
+### 不变
+
+- 空目录仍是「成功、零命中」；正常检索的候选、排序、分页、失效信息都不变。
+- 注入链与星图扫描没有改动（仍走原签名）—— 本版只收口审查点名的 `scanMemoryDir` 与 `search_memory` 这一条工具面。
+
+### 新增测试
+
+- `test/review-211-q14-test.mjs`（38 条，已登记 `npm test`）：真实 `ENOTDIR`（路径被普通文件占住）→ 工具返回 `ok:false` + `complete:false` + `errors:[{code:'ENOTDIR'}]` 且渲染为「检索不可用」；目录不存在 → 成功零命中 + 说明；注入式 `EACCES` 失败后恢复能重新扫到并命中（证明失败没被缓存）；单条目跳过与目录失败分开计数（反向对照）。
+
+### 实测
+
+- 修前红（原始树副本）：`scanMemoryDirDetailed` 不存在；`ENOTDIR` 场景下工具仍 `ok:true, complete:true, searched:0, hits:[]`，渲染「检索面：all；扫了 0 份记忆」。
+- 修后：同一场景 `ok:false`、`coverage.complete:false`、`errors` 带 `ENOTDIR`。
+- `npm test`：4136 → **4174 passed / 0 failed**。
+
 ## 2.1.16
 
 **主题：主动摘要检索不再被「自动注入名额」截断 —— 翻页能取全，注入侧的上限仍照旧。**

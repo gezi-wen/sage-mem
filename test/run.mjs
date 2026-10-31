@@ -32,6 +32,8 @@ const SUITES = [
   'review-211-q01-test.mjs',
   // 2.1.4：自动整理的三个模型可调用读取分支统一走 readVerified（外部审查 N03）。
   'review-211-n03-test.mjs',
+  // 2.1.17：扫描失败不能被渲染成「完整搜索且没有命中」（外部审查 Q14）。
+  'review-211-q14-test.mjs',
   'q-fixes-093.mjs',
   'q-fixes-094.mjs',
   'q-fixes-095.mjs',
