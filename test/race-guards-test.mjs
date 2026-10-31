@@ -356,13 +356,20 @@ if (WORKER) {
     await rm(memoryDir, { recursive: true, force: true }).catch(() => {})
   }
 
-  console.log('== R08：并发上锁丢一条是**已声明的取舍**（钉住行为，不计回归）==')
+  console.log('== R08：并发上锁**不许丢**（2.1.12 翻转旧判据：旧断言只要求「至少一条生效」）==')
   {
     const { memoryDir } = await world()
-    const rs = await Promise.all([setLocked(memoryDir, 'a.md', true), setLocked(memoryDir, 'b.md', true)])
+    // ⚠️ 旧改写：这条原本钉的是「并发丢一条是已声明的取舍」——断言写成 `locked.length >= 1`，
+    // 等于把 bug 钉成了正确行为。外部审查 Q05 指出锁丢失的代价是**受保护的记忆被自动归档**，
+    // 不是「重按一次按钮」；修法（按锁表路径串行 RMW）落地后，判据改为「两条都必须生效」。
+    await Promise.all([
+      setLocked(memoryDir, 'a.md', true),
+      setLocked(memoryDir, 'b.md', true),
+      setLocked(memoryDir, 'c.md', true),
+    ])
     const locked = [...(await readLockSet(memoryDir))]
-    ok(rs.every((r) => r.ok === true), '两次上锁都返回成功（与源码注释的声明一致）', JSON.stringify(rs))
-    ok(locked.length >= 1, `至少有一条真的生效（实测 ${JSON.stringify(locked)}）—— 源码注释已明示允许丢一条`)
+    ok(locked.length === 3 && ['a.md', 'b.md', 'c.md'].every((n) => locked.includes(n)),
+      `三次并发上锁必须全部生效（修前实测只剩 1 条；旧断言只要求 ≥1）`, JSON.stringify(locked))
     await rm(memoryDir, { recursive: true, force: true }).catch(() => {})
   }
 

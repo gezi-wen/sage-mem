@@ -7,6 +7,35 @@
 
 ---
 
+## 2.1.12
+
+**主题：锁表并发不再丢更新；锁表损坏返回「未知」并暂停自动归档 —— 不再把「不知道」当成「都没锁」。**
+
+版本判定：2.1.12（PATCH）｜理由：修「并发上锁丢更新」与「坏表当成全解锁继续归档」的数据保护缺陷；锁文件格式不变、不新增 remote / 设置项｜运行时源文件 3（`lib/memory/lock.js` / `lib/memory/archive.js` / `lib/index.js`）｜护栏内（非注释改动 114 行）
+
+### 行为变更
+
+- **并发上锁不再丢**：锁表是整文件 read-modify-write，原先两个并发各自读到旧表、后写的盖掉先写的、两边都报成功（实测 12 次并发只剩 1 条）。现在按锁表路径分键串行（复用 `lib/memory/util.js` 的 `createWriteQueue`），**12 次并发成功就有 12 条**；不同记忆目录互不阻塞。
+- **「保护状态未知」与「确实没有锁」分开**：新增 `readLockState()` —— `ok` / `missing`（仅 `ENOENT`，确实没有锁）/ `unknown`（坏 JSON、权限失败、路径被占成目录……）。锁表 `unknown` 时：
+  - **自动 / 手动归档一律拒绝**并返回 `lock-unknown`（不再把保护状态当空集合继续删）；
+  - `setLocked` 拒绝写入（`lock-table-unknown`），**坏文件逐字节不动**，不会被静默重置成一条；
+  - 面板仍可读：`listFiles` / `archiveCandidates` 照常返回，并带出 `lockedUnknown` / `lockedError` + 一条日志说明。
+
+### 不变
+
+- 锁文件的位置与格式（`<状态根>/locked.json`）、`nameKey` 归一、`setLocked` 的返回形状、候选计算逻辑都不变；锁仍然表示「拒绝归档」。
+
+### 新增测试
+
+- `test/review-211-q05-test.mjs`（27 条，已登记 `npm test`）：12 个并发不同文件上锁 → 12 条全在；坏表 → `readLockState.status='unknown'`、`readLockSet` 抛 `LOCK_TABLE_UNKNOWN`、`setLocked` 拒绝且坏文件逐字节不变、归档返回 `lock-unknown`；正常表路径反向对照。
+- **一条旧断言被点名翻转**：`test/race-guards-test.mjs` 的 R08 原本写 `locked.length >= 1` 并注明「丢一条是已声明的取舍」—— 那等于把本缺陷钉成正确行为，现改为「3 并发必须 3/3 全在」。
+
+### 实测
+
+- 修前红：新套件因 `readLockState` 不存在直接崩；并发段 12 次全报成功而盘上只有 1 条。修后：并发 `persisted=12`。
+- `npm test`：4002 → **4028 passed / 0 failed**。
+- 边界：面板**还没有**展示「锁状态异常」的位置（客户端未动，本次只保证宿主侧语义正确 + 日志出声）；跨进程并发仍不在支持范围。
+
 ## 2.1.11
 
 **主题：面板注入上限「保存 → 重启」后真的生效 —— 启动解析与面板 pending 共用同一份判据。**

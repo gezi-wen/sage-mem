@@ -117,6 +117,8 @@ const SUITES = [
   'review-211-q10-test.mjs',
   // 2.1.11：Q04 —— 面板上限设置「保存 → 重启」后真的生效（启动解析与面板 pending 共用一份）。
   'review-211-q04-test.mjs',
+  // 2.1.12：Q05 —— 锁表并发丢更新 + 坏表当全解锁（按锁表路径串行 RMW / unknown 暂停归档）。
+  'review-211-q05-test.mjs',
   // ⚠️ 下面两个必须排在最后：它们读的是**前面套件跑完落的断言台账**（见 `_passlog.mjs`），
   // 排在前面就会读到残缺的账。它们盯的是「契约里说了不验的承诺」与「两份文档说法不一致」。
   'contract-binding-test.mjs',
