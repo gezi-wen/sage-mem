@@ -309,9 +309,14 @@ function makeMemoryRemote(active, archived, raw) {
       if (!(name in st.raw)) return Promise.reject(new Error('ENOENT: no such file or directory: ' + name))
       return Promise.resolve({ name, content: st.raw[name] })
     },
-    writeRaw(name, content) {
+    writeRaw(name, content, opts) {
       // 原样记录交回来的内容：测试要比对「逐字节一致」
-      st.calls.push(['writeRaw', name, content])
+      st.calls.push(['writeRaw', name, content, opts])
+      // 2.1.10（Q10）：与真宿主同一条 createIfAbsent 语义 —— 已有文件绝不覆盖，
+      // 明确回 already_exists（面板据此提示「已存在」）。旧协议（不带 opts）照旧覆盖。
+      if (opts && opts.create === true && name in st.raw) {
+        return Promise.resolve({ ok: false, code: 'already_exists', file: name })
+      }
       st.raw[name] = content
       return Promise.resolve({ ok: true, file: name })
     },

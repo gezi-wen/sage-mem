@@ -289,23 +289,22 @@
 			function createIndexSkeleton() {
 				setError(null);
 				setNotice("");
-				if (!remote || typeof remote.readRaw !== "function" || typeof remote.writeRaw !== "function") {
+				if (!remote || typeof remote.writeRaw !== "function") {
 					setError(t("error.noRaw"));
 					return;
 				}
 				setBusy(true);
-				// 先读再写：**已有索引绝不覆盖**。readRaw 对不存在的文件会 reject，正好当探针。
-				remote.readRaw("MEMORY.md").then(function () {
+				// 2.1.10（Q10）：只调**一个意图接口**（writeRaw 的 createIfAbsent）：
+				// 服务端负责「全新安装、memory 目录还不存在」时先建父目录；
+				// 已有索引 → 明确回 already_exists（逐字节不动）。绝不再「先读一次、读失败就当
+				// 可以覆盖」—— 读失败也可能是权限错误，而那正是会顶掉一份真索引的路。
+				remote.writeRaw("MEMORY.md", INDEX_SKELETON, { create: true }).then(function (res) {
+					const out = unwrap(res);
 					setBusy(false);
-					setNotice(t("notice.indexExists"));
-				}, function () {
-					return remote.writeRaw("MEMORY.md", INDEX_SKELETON).then(function (res) {
-						const out = unwrap(res);
-						setBusy(false);
-						if (out && out.ok === false) { setError(out.error || t("error.skeletonFailed")); return; }
-						setNotice(t("notice.indexCreated"));
-						load();
-					});
+					if (out && out.code === "already_exists") { setNotice(t("notice.indexExists")); return; }
+					if (out && out.ok === false) { setError(out.error || t("error.skeletonFailed")); return; }
+					setNotice(t("notice.indexCreated"));
+					load();
 				}).catch(function (e) {
 					setBusy(false);
 					setError(String((e && e.message) || e));
