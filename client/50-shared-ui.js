@@ -720,6 +720,8 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 			malformed: "conflict.code.malformed",
 			invalid_transition: "conflict.code.invalidTransition",
 			stale_version: "conflict.code.staleVersion",
+			// 2.1.9（N01）：撤销时发现标记已被后来人重写 —— 不删别人的判断，交给用户比较。
+			stale_decision: "conflict.code.staleDecision",
 			write_denied: "conflict.code.writeDenied",
 			unsupported: "conflict.code.unsupported",
 			io_error: "conflict.code.ioError",
