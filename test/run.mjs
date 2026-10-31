@@ -109,6 +109,9 @@ const SUITES = [
   // 2.1.20：外部审查 Q15 —— 星图按需绘制的入场 / 回放 / 页面隐藏调度
   // （伪时钟 + 假 WebGL 直接读 render 写进去的 uTime / uRevealT）。
   'review-211-q15-test.mjs',
+  // 2.1.21：外部审查 Q16 —— 文件列表展开按钮引用未定义的 setExpanded
+  // （真源组件渲染 + 直接调 Card.props.onToggle + 定点 no-undef 接线守卫）。
+  'review-211-q16-test.mjs',
   // 契约 §5（环境变量）的默认值 / 越界夹取 —— 以前这半边一条断言都没有。
   'env-contract-test.mjs',
   // 1.2.0：结构守卫 —— 组合根体积 / 依赖方向 / typert 契约位置。

@@ -255,6 +255,20 @@
 			}, props.label);
 		}
 
+		/**
+		 * 活动卡片「展开态」的合并（Q16，2.1.21）。
+		 *
+		 * 为什么是个纯函数：连续点两张卡（或同一帧里点两次）时，事件回调手里那个
+		 * `expanded` 可能还是上一帧的快照 —— 拿快照拼新对象会把另一笔改动覆盖掉。
+		 * 所以 Section 走**函数式 setState**，把「怎么合并」收敛到这里：
+		 * 只翻转目标文件那一条，其余原样保留。测试也直接喂 prev 来验这条语义。
+		 */
+		function mergeExpanded(prev, file) {
+			const next = Object.assign({}, prev);
+			next[file] = !(prev && prev[file]);
+			return next;
+		}
+
 		function Card(props) {
 			const item = props.item;
 			const meta = TYPE_META[item.type] || TYPE_META.reference;

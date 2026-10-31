@@ -7,6 +7,31 @@
 
 ---
 
+## 2.1.21
+
+**主题：文件列表的展开按钮接上业务回调 —— 点击不再抛 `ReferenceError: setExpanded is not defined`。**
+
+版本判定：2.1.21（PATCH）｜理由：修「点活动卡片展开/收起直接报错」的界面缺陷；无新对外面、无契约变化｜运行时源文件 3（`client/72-files-view.js` / `client/70-memory-panel.js` / `client/50-shared-ui.js`）｜护栏内
+
+### 行为变更
+
+- `FilesView` 不再自己引用 `setExpanded`（那个名字在拆分后属于父组件的闭包，早就不可见），改为接收**业务回调** `onToggleExpanded(file)`；父组件用**函数式 setState** + 新的纯函数 `mergeExpanded`（`client/50-shared-ui.js`）合并展开状态，避免读到旧闭包里的过期 `expanded`。
+- 结果：点击活动卡片能在展开 / 收起之间切换（`data-clamp` 1 → 0 → 1），不会再抛未定义标识符。
+
+### 不变
+
+- 归档卡片的编辑 / 恢复 / 删除、筛选条、四种空态、悬浮与点外部关闭等交互路径不变；三屏 DOM 快照未重生成（本次没有改变静态结构）。
+
+### 新增测试
+
+- `test/review-211-q16-test.mjs`（30 条，已登记 `npm test`）：用 VM 真渲染源组件后直接调 `Card.props.onToggle('a.md')` —— 修前抛 `ReferenceError: setExpanded is not defined`；修后断言展开状态真的翻转、再点一次收起、点 B 只展开 B；另加「快照式合并」的反向对照（旧写法会把另一条的展开状态丢掉）与一条定点 `no-undef` 判据（旧写法能被静态判据抓到）。
+
+### 实测
+
+- 修前红：11 passed / 16 failed（两条路径 —— 直调 `Card.props.onToggle` 与真渲染后点击 —— 都抛同一个 `ReferenceError`）。
+- 修后：单跑 30/30；`npm test`：4250 → **4280 passed / 0 failed**。
+- 边界：本次修的是**行为**（能展开）；没有做真实浏览器截图走查（客户端测试是源组件 VM 执行）。
+
 ## 2.1.20
 
 **主题：星图按需绘制接上入场与回放调度 —— 时间基准统一、回放改状态就标脏、静止时不排帧。**

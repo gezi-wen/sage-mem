@@ -16,6 +16,12 @@
 			const query = sQuery[0], setQuery = sQuery[1];
 			const sExpanded = react.useState({});
 			const expanded = sExpanded[0], setExpanded = sExpanded[1];
+			// Q16：卡片「展开 / 收起」是业务回调（FilesView 只上报点了哪张卡）。
+			// 必须走**函数式** setState：事件里捕获的 expanded 可能是上一帧快照，
+			// 直接 Object.assign({}, expanded, …) 会把连续点击的上一笔改动覆盖掉。
+			function onToggleExpanded(file) {
+				setExpanded(function (prev) { return mergeExpanded(prev, file); });
+			}
 			const sDeleting = react.useState(null);
 			const deleting = sDeleting[0], setDeleting = sDeleting[1];
 			const sFormOpen = react.useState(false);
@@ -1028,7 +1034,7 @@
 				archText: archText, setArchText: setArchText,
 				openArchEdit: openArchEdit, saveArchEdit: saveArchEdit, cancelArchEdit: cancelArchEdit,
 				restoreFile: restoreFile, setArchDelete: setArchDelete, setArchEdit: setArchEdit, deleteArchivedFile: deleteArchivedFile,
-				expanded: expanded, deleting: deleting, archiving: archiving,
+				expanded: expanded, onToggleExpanded: onToggleExpanded, deleting: deleting, archiving: archiving,
 				archiveReason: archiveReason, setArchiveReason: setArchiveReason,
 				setArchiving: setArchiving, setDeleting: setDeleting,
 				confirmArchive: confirmArchive, toggleLock: toggleLock,
