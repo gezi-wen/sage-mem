@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.1.18`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.1.19`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.

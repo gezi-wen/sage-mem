@@ -92,6 +92,9 @@ const SUITES = [
   // 2.1.7（外部审查 Q11）：回滚的「不支持硬链接」降级改为 COPYFILE_EXCL 排他复制，绝不默认
   // rename 覆盖已有归档；EEXIST / EPERM / ENOTSUP / EXDEV / EIO 逐分支验证，失败保留源。
   'review-211-q11-test.mjs',
+  // 2.1.19（外部审查 Q18）：原子替换继承已有普通文件的 POSIX 权限、新建文件用保守 0600；
+  // 权限位只在 POSIX 有意义 → 运行时探测，Windows 上跳过行为断言（机制/内容断言照跑）。
+  'review-211-q18-test.mjs',
   'access-test.mjs',
   'access-v2-test.mjs',
   'panel-api-test.mjs',
