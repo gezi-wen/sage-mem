@@ -164,8 +164,13 @@ group('6. 面板分片只调意图接口（静态守卫）')
   const end = panel.indexOf('function openMemoryFolder', start)
   const body = start >= 0 && end > start ? panel.slice(start, end) : ''
   ok(body !== '', '找到 createIndexSkeleton 函数体')
-  ok(!/readRaw\s*\(/.test(body), '不再用 readRaw 当「不存在」探针（读失败可能是权限错误）')
-  ok(/writeRaw\("MEMORY\.md",\s*INDEX_SKELETON,\s*\{\s*create:\s*true\s*\}\)/.test(body), '只调 writeRaw(create:true) 这一个意图接口')
+  // 2.1.22（issue #10）之后：正常宿主仍只调一个意图接口；readRaw 只在「宿主还停在升级前
+  // 的旧 manifest」这一条降级路径里当 create 探针出现，而且只认明确的 not-found。
+  ok(/writeWithFallback\(remote, "writeRaw", \["MEMORY\.md", INDEX_SKELETON\], \{ create: true \}, probeIndexExists\)/.test(body),
+    '建立索引骨架仍只调一个意图接口（陈旧宿主降级由统一 helper 处理）')
+  ok(!/readRaw\s*\(/.test(body), '函数体里没有直接 readRaw 调用（探针收敛到共享 probeRemoteExists）')
+  ok(/probeRemoteExists\(remote, "readRaw", "MEMORY\.md"\)/.test(body),
+    'create 探针走 probeRemoteExists(readRaw)，它只把明确的 not-found 当「不存在」')
   ok(/already_exists/.test(body) && /notice\.indexExists/.test(body), '把 already_exists 映射成「索引已存在」提示（不发错误）')
   ok(!/\.then\(function \(\) \{\s*setNotice\(t\("notice\.indexExists"\)\)/.test(body), '不再有「读成功 → 直接当已存在」的分支')
 }

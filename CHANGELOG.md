@@ -7,6 +7,39 @@
 
 ---
 
+## 2.1.22
+
+**主题：宿主没真正重启时写操作全挂 —— 客户端识别「陈旧宿主」并按旧协议安全降级（issue #10）。**
+
+版本判定：2.1.22（PATCH）｜理由：修「升级 sage-mem 后，只要 DSH 宿主进程没有真正退出，记忆面板里任何写入都报 `gateway/arguments-invalid: unexpected "opts"`」；不改 wire 协议、不新增 remote / 参数 / 设置项 / 界面元素｜运行时源文件 3（`client/05-shared.js` / `client/70-memory-panel.js` / `client/55-i18n-memory.js`）｜护栏内
+
+### 行为变更
+
+- **根因不是 DSH 版本，是宿主进程里的旧 descriptor**：`@deepseek-ai/dsh-typert-loader` 把每个包的 TYPERT manifest **按包名缓存、进程内不失效**。在 DSH 开着的时候装上新版 sage-mem 之后，宿主进程里仍然是旧版（2.1.1）的 strict descriptor（`writeFile` 只有 `name` / `content` 两个 wire 字段），而浏览器侧是从磁盘现取的新客户端分片 —— 第三参 `opts` 在**网关参数校验阶段**就被挡掉，落盘一次都没发生。彻底退出 DSH（**含托盘常驻进程**；只关窗口不够）后重开即恢复，本版同时让写入**不再被这个状态卡死**。
+- **陈旧宿主降级**：客户端只在收到 `gateway/arguments-invalid` 且文案点名 `unexpected "opts"` 时，按旧协议（两参）重试一次，并在面板提示「本次未做版本校验；彻底退出 DSH 后重开即可恢复」。其它网关错误（内容不合法等）照旧原样抛出，绝不重试。
+- **降级不扩大风险**：`{create:true}` 在旧宿主上没有 create 语义，重试前先用 `readFile` / `readRaw` 探一次存在性 —— 目标已存在就明确报「同名文件已经存在」，**不发生任何覆盖写**；没有探针的 create 写一律不降级；探针只认「明确的 not-found」（ENOENT 类文案），权限 / IO 读失败同样不降级 —— 读不到不能当成不存在。
+- 覆盖四个写入口：活动记忆保存、新建记忆（含「建立索引骨架」）、归档件原样保存、保留名（MEMORY.md / session-log.md）原样保存；中英双语文案同步。
+
+### 不变
+
+- wire 协议、typert 契约（39 条 invocation）与宿主侧行为一字未改；新鲜宿主上仍然带 `expectedRevision` / `create` 走 2.1.2 以来的写协议。
+- 冲突 / 自动归档 / 自动做梦 / 星图 / 体检等其它路径不变；`stale_revision` 的「不自动重试覆盖」原则不变 —— 降级只在「宿主根本不认识第三个参数」时发生，不碰真正的版本冲突。
+
+### 新增测试
+
+- `test/issue-10-stale-host-test.mjs`（66 条，已登记 `npm test`）：把 `client/05-shared.js` 跑进 VM，用假宿主逐条覆盖 —— 新宿主只调一次带 opts；陈旧宿主带 `expectedRevision` 降级成功（第二次第三参退成 `undefined`）；create 目标不存在 → 探针 → 旧协议写成功；create 目标已存在 → 只发生被拒的那一次、结果 `already_exists`、**零旧协议覆盖写**；没有探针的 create 直接抛原错误；探针只认明确的 ENOENT（权限 / IO / EACCES 一律不降级）；`input-invalid` 不重试；「返回值 `{ok:false,error}`」与「rejection」两种失败形态各覆盖一遍；四个入口接线 + 双语键位静态守卫。
+- 修前红：同一套件在 2.1.21 上是 **7 passed / 30 failed**（helper 不存在）；实现后 66/66。
+
+### 实测
+
+- **真机复现**（隔离 home + DSH 0.2.1-rc.5 运行时 + sage-mem 2.1.21）：装 2.1.1 启动 → 运行中升级到 2.1.21 → 新页面点「+ 添加记忆」保存，稳定复现 `RemoteError: typert gateway: memory/writeFile: args fields do not match the descriptor: unexpected "opts"`；同一进程内重载页面依然失败；**彻底重启宿主进程**后同一步骤成功。
+- **真机三轮才通过（两个只有 E2E 才抓得到的坑，已写进测试）**：
+  1. 第一版只判 **rejection** → 真机上网关失败其实是 remote 的**返回值** `{ok:false, error}`（api-gateway 的 RemoteResult 语义），降级一次都没触发；
+  2. 第二版识别对了，但降级调用只传两个位置参数 → 客户端 remote 代理当场报 `client api: memory/writeFile expected 3 argument(s), got 2`（它按**客户端描述符**校验位置参数个数）→ 旧协议调用必须保留第三参位置、显式传 `undefined`（JSON 里自然缺席）；
+  3. 第三版真机通过：**陈旧宿主**下新建成功并显示降级提示；同名新建明确拒绝且文件 SHA-256 逐字节不变；**重启宿主**后正常路径只发一次带 `opts` 的写、提示「已保存」；编辑路径照旧带 `expectedRevision`。
+- `npm test`：4280 → **4347 passed / 0 failed**；离线评测 `eval-retrieval --mode all --baseline` 退出 0（无退化，本版没动检索）。
+- 证据：只改客户端三片，`lib/` 零改动 —— 宿主契约与其它套件不受影响。
+
 ## 2.1.21
 
 **主题：文件列表的展开按钮接上业务回调 —— 点击不再抛 `ReferenceError: setExpanded is not defined`。**

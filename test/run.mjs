@@ -112,6 +112,10 @@ const SUITES = [
   // 2.1.21：外部审查 Q16 —— 文件列表展开按钮引用未定义的 setExpanded
   // （真源组件渲染 + 直接调 Card.props.onToggle + 定点 no-undef 接线守卫）。
   'review-211-q16-test.mjs',
+  // 2.1.22（issue #10）：宿主没真正重启时 typert manifest 仍是升级前那份（按包名缓存、进程内
+  // 不失效），新客户端第三参会先被网关挡掉。盯降级 helper 的识别 / 重试 / create 探针安全边界，
+  // 以及面板四个写入口的接线与双语提示。
+  'issue-10-stale-host-test.mjs',
   // 契约 §5（环境变量）的默认值 / 越界夹取 —— 以前这半边一条断言都没有。
   'env-contract-test.mjs',
   // 1.2.0：结构守卫 —— 组合根体积 / 依赖方向 / typert 契约位置。

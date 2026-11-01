@@ -304,12 +304,18 @@
 				// 服务端负责「全新安装、memory 目录还不存在」时先建父目录；
 				// 已有索引 → 明确回 already_exists（逐字节不动）。绝不再「先读一次、读失败就当
 				// 可以覆盖」—— 读失败也可能是权限错误，而那正是会顶掉一份真索引的路。
-				remote.writeRaw("MEMORY.md", INDEX_SKELETON, { create: true }).then(function (res) {
-					const out = unwrap(res);
+				// 2.1.22（issue #10）：陈旧宿主没有 create 语义，降级前先探一次存在性。
+				// 探针只认「明确的 not-found」；读失败（权限 / IO）一律不降级 —— 否则会把一份
+				// 读不到的真索引当成「不存在」顶掉（2.1.10 / Q10 的教训）。
+				const probeIndexExists = function () {
+					return probeRemoteExists(remote, "readRaw", "MEMORY.md");
+				};
+				writeWithFallback(remote, "writeRaw", ["MEMORY.md", INDEX_SKELETON], { create: true }, probeIndexExists).then(function (out) {
+					const res = unwrap(out.result);
 					setBusy(false);
-					if (out && out.code === "already_exists") { setNotice(t("notice.indexExists")); return; }
-					if (out && out.ok === false) { setError(out.error || t("error.skeletonFailed")); return; }
-					setNotice(t("notice.indexCreated"));
+					if (res && res.code === "already_exists") { setNotice(t("notice.indexExists")); return; }
+					if (res && res.ok === false) { setError(res.error || t("error.skeletonFailed")); return; }
+					setNotice(out.degraded ? t("notice.staleHostWrite", { file: "MEMORY.md" }) : t("notice.indexCreated"));
 					load();
 				}).catch(function (e) {
 					setBusy(false);
@@ -400,17 +406,26 @@
 				}
 				// 2.1.2（Q02）：编辑已有文件时交回读到的 revision（盘上变了 → 宿主拒绝）；
 				// 新建走 createIfAbsent —— 撞上同名文件是**明确报已存在**，绝不覆盖入口。
+				const wasEditing = Boolean(editingFile);
 				const writeOpts = editingFile
 					? (formRevision ? { expectedRevision: formRevision } : undefined)
 					: { create: true };
-				remote.writeFile(safeName, content, writeOpts)
-					.then(function (r) {
+				// 2.1.22（issue #10）：宿主若还停在升级前的旧 manifest，先按旧协议降级一次；
+				// 新建语义在旧宿主上没有对应参数，降级前必须探存在性（绝不覆盖已有文件）。
+				const probeTarget = wasEditing ? null : function () {
+					return probeRemoteExists(remote, "readFile", safeName);
+				};
+				writeWithFallback(remote, "writeFile", [safeName, content], writeOpts, probeTarget)
+					.then(function (out) {
 						// host 侧对保留名 / 非字符串内容 / 超限一律返回 { ok: false, error }，不再抛异常。
 						// 冲突看**结构化 code**（stale_revision / already_exists），不解析文案：
 						// 编辑框不关、草稿原地保留，由用户看过最新内容后自己决定重新应用 —— 绝不自动重试覆盖。
+						const r = out.result;
 						if (r && r.ok === false) { setError(r.error || t("error.writeRejected")); return; }
 						closeForm();
-						setNotice(t(editingFile ? "notice.updated" : "notice.saved", { file: safeName }));
+						setNotice(out.degraded
+							? t("notice.staleHostWrite", { file: safeName })
+							: t(wasEditing ? "notice.updated" : "notice.saved", { file: safeName }));
 						load();
 					})
 					.catch(function (e) { setError(String((e && e.message) || e)); })
@@ -569,12 +584,16 @@
 				// 原样交回：不 trim、不补 frontmatter、不做任何「智能」处理。
 				// 2.1.2（Q02）：带上读到的 revision；归档件在别处被改过 → 宿主回 stale_revision，
 				// 编辑框与文本原地保留（不自动重试覆盖）。
+				// 2.1.22（issue #10）：陈旧宿主按旧协议降级（没有 create 语义，这里本来也没有）。
 				const writeOpts = archRevision ? { expectedRevision: archRevision } : undefined;
-				remote.writeArchived(file, archText, writeOpts)
-					.then(function (r) {
+				writeWithFallback(remote, "writeArchived", [file, archText], writeOpts)
+					.then(function (out) {
+						const r = out.result;
 						if (r && r.ok === false) { setError(r.error || t("error.saveRejected")); return; }
 						setArchEdit(null);
-						setNotice(t("notice.saved", { file: file }));
+						setNotice(out.degraded
+							? t("notice.staleHostWrite", { file: file })
+							: t("notice.saved", { file: file }));
 						load();
 					})
 					.catch(function (e) { setError(String((e && e.message) || e)); })
@@ -927,13 +946,21 @@
 				// 原样交回：不 trim、不补 frontmatter、不做任何「智能」处理。
 				// 2.1.2（Q02）：新建走 createIfAbsent（撞名明确失败、不覆盖）；编辑带读到的 revision
 				// （盘上变了 → stale_revision，文本原地保留，绝不自动重试覆盖）。
+				// 2.1.22（issue #10）：陈旧宿主按旧协议降级；新建语义要先探存在性，绝不覆盖。
+				const wasNew = Boolean(rawIsNew);
 				const writeOpts = rawIsNew
 					? { create: true }
 					: (rawRevision ? { expectedRevision: rawRevision } : undefined);
-				remote.writeRaw(name, rawText, writeOpts)
-					.then(function (r) {
+				const probeRaw = wasNew ? function () {
+					return probeRemoteExists(remote, "readRaw", name);
+				} : null;
+				writeWithFallback(remote, "writeRaw", [name, rawText], writeOpts, probeRaw)
+					.then(function (out) {
+						const r = out.result;
 						if (r && r.ok === false) { setError(r.error || t("error.saveRejected")); return; }
-						setNotice(t(rawIsNew ? "notice.rawNew" : "notice.saved", { file: name }));
+						setNotice(out.degraded
+							? t("notice.staleHostWrite", { file: name })
+							: t(wasNew ? "notice.rawNew" : "notice.saved", { file: name }));
 						setRawIsNew(false);
 						// 保存成功后把版本换成刚写下的那一版，连续保存不用重读
 						if (r && typeof r.revision === "string") setRawRevision(r.revision);
