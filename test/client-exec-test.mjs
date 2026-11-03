@@ -421,6 +421,67 @@ if (clientInv) {
     if (JSON.stringify(hp) !== JSON.stringify(cp)) modeMismatch.push(`${k} 入参 mode：宿主 ${hp} vs 客户端 ${cp}`)
   }
   ok(modeMismatch.length === 0, 'result/parameter 的 mode 逐条 strict 且两侧一致', modeMismatch.join('\n       '))
+
+  // ── 字段面对表（2.1.25）：上面这组 mode 检查有个盲区 ──
+  // 「strict」只说明两侧都声明了 strict，**不比字段面**。于是宿主给 fileSchema 加了
+  // tags / locked、给 starmapStar 加了 archived，客户端没跟上，而两侧 mode 仍然都是
+  // 'strict' —— 那句「任何一侧悄悄退化成宽松模式都要现形」因此是假的（2026-11-03 实测已漂三处）。
+  // 宿主用的是 **zod v4**：形状在 `_def.type`（'object' / 'array' / 'readonly' / 'optional'）
+  // 与 `_def.shape` / `_def.element` / `_def.innerType` 上，不是 v3 的 `_def.typeName`。
+  const defShapeOf = (def) => (typeof def.shape === 'function' ? def.shape() : def.shape)
+  const hostFieldsOf = (schema) => {
+    if (!schema || typeof schema !== 'object') return null
+    const def = schema._def
+    if (!def) return null
+    if (def.type === 'object' && defShapeOf(def)) return Object.keys(defShapeOf(def))
+    if (def.type === 'readonly' && def.innerType) return hostFieldsOf(def.innerType)
+    if (def.type === 'array' && def.element) return hostFieldsOf(def.element)
+    if (def.type === 'optional' && def.innerType) return hostFieldsOf(def.innerType)
+    if (schema.shape) return Object.keys(defShapeOf({ shape: schema.shape })) // 兼容 zod v3
+    return null
+  }
+  const drift = []
+  let shapeChecked = 0
+  for (const [k, h] of hostMap) {
+    const c = clientMap.get(k)
+    if (!c) continue
+    const hc = h.result && h.result.schema
+    const cc = c.result && c.result.schema
+    // 宽松 codec（objCodec / arrCodec）是**有意为之**（host 加字段不该让旧界面整体报错），不参与
+    if (!hc || !cc || !Array.isArray(cc.fields)) continue
+    const hf = hostFieldsOf(hc)
+    if (!hf) continue
+    shapeChecked++
+    const a = [...hf].sort().join(',')
+    const b = [...cc.fields].sort().join(',')
+    if (a !== b) drift.push(`${k} 宿主[${a}] vs 客户端[${b}]`)
+    // 列表包装（{count, files} / {count, stars}）：元素形状也要对上
+    if (Array.isArray(cc.elementFields)) {
+      const unwrap = (s) => {
+        while (s && s._def && (s._def.type === 'readonly' || s._def.type === 'optional')) s = s._def.innerType
+        return s
+      }
+      const outer = unwrap(hc)
+      const shape = outer && outer._def && outer._def.type === 'object' ? defShapeOf(outer._def) : null
+      const elKey = shape ? Object.keys(shape).find((n) => (unwrap(shape[n]) || {})._def?.type === 'array') : null
+      if (elKey) {
+        const hef = hostFieldsOf(shape[elKey])
+        const a2 = hef ? [...hef].sort().join(',') : ''
+        const b2 = [...cc.elementFields].sort().join(',')
+        if (a2 !== b2) drift.push(`${k} 元素 宿主[${a2}] vs 客户端[${b2}]`)
+      }
+    }
+  }
+  ok(shapeChecked >= 8, `字段面对表覆盖足够多的 strict result（实际 ${shapeChecked}）`)
+  ok(drift.length === 0, 'strict result codec 的字段集与宿主 schema 逐条一致', drift.join('\n       '))
+  // 反向对照：判据本身会红
+  const fakeHost = { _def: { type: 'object', shape: { a: 1, b: 2 } } }
+  const fakeClient = { fields: ['a'] }
+  ok([...hostFieldsOf(fakeHost)].sort().join(',') !== [...fakeClient.fields].sort().join(','),
+    '【反向对照】客户端少声明一个字段会被抓到')
+  // 宽松 codec 是被**识别**出来的，不是靠「恰好没有 fields」蒙对
+  const loose = [...clientInv].filter((i) => i.result && i.result.schema && !Array.isArray(i.result.schema.fields))
+  ok(loose.length > 0, `场上有 ${loose.length} 条宽松 codec（有意为之，不参与字段对表）`)
 }
 
 console.log(`\n结果：${pass} passed, ${fail} failed`)

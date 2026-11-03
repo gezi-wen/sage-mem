@@ -7,6 +7,36 @@
 
 ---
 
+## 2.1.25
+
+**主题：契约守卫补上「字段面」—— 客户端 strict codec 与宿主 schema 逐条对表，补掉 5 处已漂的字段（其中一处是真 bug）。**
+
+版本判定：2.1.25（PATCH）｜理由：修客户端 strict codec 与宿主 manifest 的字段不一致；原有对表只比方法集 / name:wire / typeSymbol / mode，**不比字段面**，所以漂了也没人报｜运行时源文件 2（`client/05-shared.js` / `client/20-codecs.js`）+ 产物重建｜护栏内
+
+### 行为变更
+
+- **修复真 bug：`writeArchived` 失败分支会被判成坏结果。** 宿主归档结果除 `ok` 外**全部 optional**（失败时没有 `file`），客户端却把 `file` 声明成必填 —— 一次失败的归档会让客户端抛 `missing field file`，把「归档失败」显示成「结果不合法」。现在按宿主 `archiveResultSchema` 对齐。
+- **客户端 strict codec 补上宿主已有的字段**：`fileSchema` 加 `tags` / `locked`（少了它们，列表页的「按标签筛」与锁定按钮永远拿到 `undefined`）；`archivedFileSchema` 加 `tags`；`starmapStarSchema` 加 `archived`（+ `archivedAt` / `archivedReason` 可选）；`writeSchema` 加 `error`；`deleteSchema` 加 `error`。
+- 客户端在**字段面**上变严格了。宿主这侧这些字段本来就是必填（zod strict），所以正常响应不受影响；只有「宿主没发」时才会从「静默拿到 undefined」变成「明确报错」。
+
+### 不变
+
+- wire 协议、typert 契约（39 条 invocation）、remote 方法集、界面全部不变。
+- 27 条**故意宽松**的 codec（`objCodec` / `arrCodec`）保持原样 —— 「host 加字段不该让旧界面对整条调用报错」这个取舍没有被推翻，只是让它们从「恰好没有 fields」变成「被识别为宽松」。
+
+### 新增测试
+
+- `test/client-exec-test.mjs` 第 3 组新增字段面对表（+4 条）：把客户端 codec 的 `fields` 与宿主 zod v4 的 `_def.shape` 逐条比较（含列表包装的元素面）；带反向对照；并断言场上的宽松 codec 被识别出来（不是蒙对）。
+- `npm test` 断言数 4361 → 4365。
+
+### 实测
+
+- 对表首跑就抓到 **5 处漂移**（`writeArchived` / `deleteArchived` / `memory/listFiles` / `listArchived` / `starmap/listStars`），补完后 12 条 strict result 全覆盖、0 漂移。
+- `client-render-test` 464/0；界面快照守卫 6/0（codec 改动不影响渲染）。
+- 离线评测：退出码 0，判定「无退化」。
+
+---
+
 ## 2.1.24
 
 **主题：autodream 写路径的文件名判据收敛到唯一实现 —— `a:b.md` 这类 NTFS 交替数据流名字不再能写进记忆目录。**

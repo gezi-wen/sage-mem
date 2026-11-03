@@ -7,6 +7,10 @@
 		const isNum = (v) => { if (typeof v !== "number") throw new Error("expected number"); };
 		function parseSchema(shape) {
 			return {
+				// 字段清单**暴露出来**：`test/client-exec-test.mjs` 第 3.1 组拿它跟宿主 zod 的
+				// shape 逐条对表。没有这一项，「strict」只意味着「不查多余键」——
+				// 宿主加了字段、客户端没声明这种漂移它挡不住（2026-11-03 实测已漂三处）。
+				fields: Object.keys(shape),
 				parse(value) {
 					if (value === null || typeof value !== "object") throw new Error("sage-mem: invalid payload");
 					for (const [key, check] of Object.entries(shape)) {
