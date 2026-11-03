@@ -34,6 +34,7 @@ const { localStamp } = await import(new URL('memory/scan.js', LIB).href)
 const { stampHuman: adHuman, stampCompact: adCompact } = await import(new URL('autodream/util.js', LIB).href)
 const { parseFrontmatter } = await import(new URL('memory/frontmatter.js', LIB).href)
 const { parseFrontmatterLite } = await import(new URL('autodream/audit.js', LIB).href)
+const { safeMemoryPath } = await import(new URL('autodream/tools.js', LIB).href)
 
 const fileNameSchema = TYPERT.invocations.find((i) => i.id === 'sage-mem#memory/readFile').parameters[0].codec.schema
 
@@ -67,6 +68,35 @@ group('1. 文件名判据：isPlainMdName / rawName / fileNameSchema / safeName'
   const tooLong = 'x'.repeat(260) + '.md'
   ok(isPlainMdName(tooLong) && !fileNameSchema.safeParse(tooLong).success, '超长名字：底线规则不管长度，传输层 max(255) 管')
   ok(safeName('MEMORY.md') === null && rawName('MEMORY.md') === 'MEMORY.md', '索引名：safeName 拒（不是一条记忆）、rawName 收（原样读写目标）')
+
+  // ── 第 5 个消费者（2.1.24 收敛）：autodream 写路径的入口 ──
+  // 它原先自己抄了一份判据，只拒 `/ \ ..`，于是 `a:b.md` / `MEMORY.md:evil.md`
+  // 能一路走到 join —— 那是**模型可达**的写路径（write_memory / report_contradiction）。
+  const acceptPath = inputs.map((s) => !!safeMemoryPath('/mem', s))
+  // 语义上先 trim 再判；额外只多一条「不写隐藏文件」
+  const expectPath = inputs.map((s) => { const t = s.trim(); return isPlainMdName(t) && !t.startsWith('.') })
+  ok(JSON.stringify(expectPath) === JSON.stringify(acceptPath),
+    'safeMemoryPath = isPlainMdName（先 trim）− 隐藏文件',
+    inputs.filter((s, i) => expectPath[i] !== acceptPath[i]).join(','))
+  // ① 不许比基准**宽**：接受基准拒绝的名字 = 判据漂了（这正是 2.1.24 之前的 bug 形状）。
+  //    基准取 **trim 后**：safeMemoryPath 的语义是「先去掉首尾空白再判名字」，
+  //    所以 `'a.md '` 被它接受是设计，不算宽。
+  const plainTrim = inputs.map((s) => isPlainMdName(s.trim()))
+  const wider = inputs.filter((s, i) => acceptPath[i] && !plainTrim[i])
+  ok(wider.length === 0, 'safeMemoryPath 不比基准宽（trim 后，不接受基准拒绝的名字）', wider.join(','))
+  // ② 比基准严的项只许是「. 开头」这一类
+  const stricter = inputs.filter((s, i) => !acceptPath[i] && plainTrim[i])
+  ok(stricter.every((s) => s.trim().startsWith('.')), 'safeMemoryPath 比基准严的项只有隐藏文件', stricter.join(','))
+  // ③ 报告里的具体形状，钉成行为断言
+  ok(!safeMemoryPath('/mem', 'a:b.md') && !safeMemoryPath('/mem', 'MEMORY.md:evil.md'), 'NTFS 交替数据流名字被写路径拒绝')
+  ok(!!safeMemoryPath('/mem', 'a.md') && !safeMemoryPath('/mem', '.hidden.md'), '正常名字收、隐藏文件拒')
+  // ④ 反向对照：判据本身会红
+  const fakeWide = (s) => !!s
+  const fakeWider = inputs.filter((s) => fakeWide(s) && !isPlainMdName(s))
+  ok(fakeWider.length > 0, '【反向对照】「照收」的实现会被「不比基准宽」抓到', fakeWider.slice(0, 3).join(','))
+  const fakeStrict = (s) => isPlainMdName(s) && !s.trim().startsWith('.') && !s.startsWith('session-')
+  const fakeStricter = inputs.filter((s) => !fakeStrict(s) && isPlainMdName(s))
+  ok(fakeStricter.some((s) => !s.trim().startsWith('.')), '【反向对照】多拒一类会被「只许隐藏文件」抓到', fakeStricter.join(','))
 }
 
 // ── 2. 时间戳：三处入口逐字相同 ─────────────────────────────────
