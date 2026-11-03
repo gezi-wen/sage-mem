@@ -105,7 +105,7 @@ console.log('== 3. 恢复失败时索引一个字节都不动 ==')
   await writeFile(join(memoryDir, 'user_persona.md'), NOTE('活的那条'), 'utf8')
   const before = await readFile(join(memoryDir, 'MEMORY.md'), 'utf8')
   const r = await restoreMemory(memoryDir, 'user_persona.md')
-  ok(r.ok === false && r.code === 'target-exists', '顶层同名 → 恢复被拒（原有行为）', JSON.stringify(r))
+  ok(r.ok === false && r.code === 'target_exists', '顶层同名 → 恢复被拒（原有行为）', JSON.stringify(r))
   const after = await readFile(join(memoryDir, 'MEMORY.md'), 'utf8')
   ok(after === before, '拒绝时索引未被改动')
 }

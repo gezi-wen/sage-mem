@@ -110,7 +110,7 @@ group('4. 坏表上的下一次 setLocked：拒绝写入，坏表逐字节不变
   writeLockFile(w, '{broken')
   const before = readLockFile(w)
   const res = await setLocked(w.memoryDir, 'x.md', true)
-  ok(res.ok === false && res.code === 'lock-table-unknown',
+  ok(res.ok === false && res.code === 'lock_table_unknown',
     '坏表上写入被明确拒绝（不是「重写成空表 + 新锁」）', JSON.stringify(res))
   ok(readLockFile(w) === before, '坏表一个字节都没被改（用户的保护状态还在盘上，可人工恢复）', readLockFile(w))
   ok(existsSync(w.lockFile), '文件没被删掉')
@@ -137,7 +137,7 @@ group('5. 锁状态未知时，归档必须暂停（受保护的文件不能被�
   writeFileSync(join(w.memoryDir, 'a.md'), body('PROTECTED'), 'utf8')
   writeLockFile(w, '{broken')
   const res = await archiveMemory(w.memoryDir, 'a.md', '自动归档：project 类，超过 30 天未被注入')
-  ok(res.ok === false && res.code === 'lock-unknown',
+  ok(res.ok === false && res.code === 'lock_unknown',
     '锁表损坏时归档被拒绝（code=lock-unknown），而不是当成「没锁」继续删', JSON.stringify(res))
   ok(existsSync(join(w.memoryDir, 'a.md')), '受保护文件仍在原位', existsSync(join(w.memoryDir, 'a.md')))
   ok(!existsSync(join(w.memoryDir, 'archive', 'a.md')), '归档区没有多出副本（确实没动）')

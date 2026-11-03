@@ -7,6 +7,43 @@
 
 ---
 
+## 2.2.0
+
+**主题：业务错误码归一 —— 三套命名法收成一套 snake_case，并建唯一清单 + 守卫。**
+
+版本判定：2.2.0（MINOR）｜理由：**破坏性**（对外可见的 `code` 值改名 15 个），且新增 `lib/shared/codes.js` 作为唯一清单｜运行时源文件 8（`shared/codes.js` 新建 + `autodream/tools.js`、`memory/{archive,lock,reader,scan,util,watch}.js`）｜超出 PATCH 护栏（≤3），但性质是 MINOR，故不按 patch 发
+
+### 行为变更（**破坏性**）
+
+- **15 个业务码改名**（kebab / UPPER → snake_case）：
+  `not-found`→`not_found`、`move-failed`→`move_failed`、`not-archived`→`not_archived`、
+  `target-exists`→`target_exists`、`delete-failed`→`delete_failed`、`stat-failed`→`stat_failed`、
+  `invalid-name`→`invalid_name`、`lock-unknown`→`lock_unknown`、`restore-failed`→`restore_failed`、
+  `lock-table-unknown`→`lock_table_unknown`、`not-file`→`not_file`、`too-big`→`too_big`、
+  `not-dir`→`not_dir`、`UNVERIFIED_OVERWRITE`→`unverified_overwrite`、`FLOOD`→`flood`。
+- **同一概念不再有两个值**：`not_found`（reader 侧）与 `not-found`（archive 侧）合并；`too_big` 与 `too-big` 合并。
+- **谁受影响**：直接读 `result.code` 的消费方。remote 方法名与 code **不在契约承诺内**（`docs/1.0.0-contract.md` §7 把界面与接口方法名列为 UI 管道），但这是本插件第一次动 code 值，单列。
+- **有意保留的三类码**（见 `lib/shared/codes.js` 头注释）：Node errno（`ENOENT` / `EEXIST` / `EIO` …）、宿主的码（`FS_SANDBOX_DENIED` / `FS_STALE_VERSION`）、`Error.code`（`SAGE_MEM_UNVERIFIED_OVERWRITE` / `LOCK_TABLE_UNKNOWN` —— 与 errno 区分而保留 UPPER；`error.code` 与 `result.code` 是两个命名空间，不合并）。
+
+### 不变
+
+- wire 协议、typert 契约（39 条 invocation）、remote 方法集、界面、typert 类型名全部不变。
+- **客户端无需改动**：它消费的码本来就是 snake_case（`invalid` / `missing` / `io_error` / `stale_version` …），映射表覆盖的正是那一批。
+
+### 新增
+
+- `lib/shared/codes.js`：30 个业务码的唯一清单 + `isKnownCode()`。
+- `test/code-registry-test.mjs`（16 条，已登记）：lib 里每个 `code:` 字面量必须在清单里、不许 kebab / 未登记 UPPER、清单键=值；白名单与清单不重叠；六条反向对照。
+- `npm test` 断言数 4365 → 4381。
+
+### 实测
+
+- `npm test`：4381 passed / 0 failed（本机）。
+- 归一扫描：43 处替换 / 10 个文件；复查 kebab 业务码零残留。
+- 离线评测：退出码 0，判定「无退化」。
+
+---
+
 ## 2.1.25
 
 **主题：契约守卫补上「字段面」—— 客户端 strict codec 与宿主 schema 逐条对表，补掉 5 处已漂的字段（其中一处是真 bug）。**

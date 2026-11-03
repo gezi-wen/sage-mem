@@ -645,7 +645,7 @@ if (WORKER) {
       fsPromises.rename = realRename
       syncBuiltinESMExports()
     }
-    ok(res.ok === false && res.code === 'move-failed', '如实报「移不动」（不是 not-found）', JSON.stringify(res))
+    ok(res.ok === false && res.code === 'move_failed', '如实报「移不动」（不是 not-found）', JSON.stringify(res))
     ok(!/not found|没有这个文件/.test(String(res.error)), '错误里不谎称文件不存在', String(res.error).slice(0, 120))
     ok(await exists(join(memoryDir, 'a.md')), '源文件仍在原处（一个字节没动）')
     ok(!(await exists(join(memoryDir, 'archive', 'a.md'))), '没留下半截归档副本')

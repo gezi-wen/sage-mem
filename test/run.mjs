@@ -120,6 +120,8 @@ const SUITES = [
   'env-contract-test.mjs',
   // 1.2.0：结构守卫 —— 组合根体积 / 依赖方向 / typert 契约位置。
   'structure-test.mjs',
+  // 2.2.0：错误码登记 —— 业务码必须在 lib/shared/codes.js 里，且一律 snake_case。
+  'code-registry-test.mjs',
   // 1.6.2：发布物一致性 —— 打包白名单 / 版本三处一致 / 兼容表对拍（本地操作，不联网）。
   'release-test.mjs',
   // 2.0.0：有效性标注（三字段解析 / 失效判定 / 冲突→集合映射），每条都带反向对照。
