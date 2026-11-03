@@ -349,8 +349,9 @@ group('10. 归档文件的读 / 写：改正文但留痕不许丢')
   }
   const contentBefore = after2.content
   await rejects('writeArchived 归档区没有的名字 → {ok:false}', () => gw.writeArchived('nope.md', 'x'), 'not found')
-  await throws('writeArchived 带路径成分 → 抛错', () => gw.writeArchived('../evil.md', 'x'), 'invalid file name')
-  await throws('writeArchived 非 .md → 抛错', () => gw.writeArchived('notes.txt', 'x'), 'invalid file name')
+  // 2.2.1：写入口的「名字不合法」统一成回执（原来是抛异常，与同方法内其他拒绝形态不一致）
+  await rejects('writeArchived 带路径成分 → {ok:false}', () => gw.writeArchived('../evil.md', 'x'), 'invalid file name')
+  await rejects('writeArchived 非 .md → {ok:false}', () => gw.writeArchived('notes.txt', 'x'), 'invalid file name')
   await rejects('writeArchived 保留名 → {ok:false}', () => gw.writeArchived('memory.md', 'x'), 'reserved')
   await rejects('writeArchived 内容不是字符串 → {ok:false}', () => gw.writeArchived(NAME, 123), 'must be a string')
   await rejects('writeArchived 超体积 → {ok:false}', () => gw.writeArchived(NAME, 'x'.repeat(512 * 1024 + 1)), 'too large')

@@ -7,6 +7,43 @@
 
 ---
 
+## 2.2.1
+
+**主题：三处写路径收敛到同一个 `prepareWrite`，读方法拒绝统一带 `.code`，写方法拒绝统一回执，日志出口归一。**
+
+版本判定：2.2.1（PATCH）｜理由：内部重构 + 错误形态统一（不新增 remote / 参数 / 设置项 / 界面元素）；唯一可见变化是「名字不合法」从抛异常变成回执、异常对象上多了 `code`｜运行时源文件 5（`lib/index.js`、`memory/write-protocol.js`、`memory/access.js`、`autodream/engine.js`、`client/05-shared.js` + 产物）｜略超 PATCH 护栏（≤3），但性质是重构 + 一致性，不是新能力
+
+### 行为变更
+
+- **写入口的「名字不合法」不再抛异常，改为回执** `{ok:false, code:'invalid_name'}`：`writeFile` / `writeArchived` / `deleteFile` 三处。原来同一方法里「保留名回执、非法名抛异常」两种机制并存，而 JSDoc 写着「拒绝一律返回 `{ ok: false }`」—— 那句话当时是假的。
+- **读入口的异常现在带 `.code`**：`readFile` / `readRaw` / `readArchived` / `starmap/readFile` 的拒绝从裸 `Error` 变成 `Error & { code }`（`invalid_name` / `reserved` / `not_found` / `io_error` / 闸门码）。
+- **客户端判「文件不存在」改为优先看结构化码**：`isNotFoundError` 先看 `.code`（`not_found` / `missing` / `ENOENT`），文案正则只留兜底；`probeRemoteExists` 同时认「信封外层的 code」与「reject 里的 code」。这条链控制一次**写决策**（`{create:true}` 是否降级成覆盖写），以前只能靠正则匹配英文文案 —— 改一句措辞就会走错边。
+- **日志前缀归一**：`autodream/engine.js` 手搓的第二套 logger 删除，改走 `warnLog`（前缀统一 `sage-mem: `，子系统名进正文）；`access.js` 的 `[sage-mem][debug]` 改为 `sage-mem: `，且 `SAGE_MEM_DEBUG` 从模块级常量改成**每次现读**（常量在「运行中打开开关」时会停在旧值）。
+
+### 不变
+
+- wire 协议、typert 契约、remote 方法集、界面全部不变。
+- 三段写路径的**拒绝矩阵没有变**：保留名、影子文件、内容类型、体积、磁盘探针仍然逐一拒；变的只是顺序统一与「失败用哪种形态表达」。
+- `writeRaw` 仍然只服务保留名（名字判据用 `rawName`），`writeFile` / `writeArchived` 仍用 `safeName`。
+
+### 修复
+
+- **同一个坏输入从三个写入口进去会报三个不同的「第一个错」**：内容类型检查原来排在 第 3 / 第 6 / 第 3 位，`writeRaw` 用的上限常量也不同。现在统一为 `prepareWrite` 的固定顺序：保留名 → 名字合法 → 目录闸 → 影子文件 → 内容类型 → 体积 → 磁盘探针。
+- `lib/index.js` 999 → **955 行**（三处各约 30 行收敛成各约 12 行），组合根重新有了余量。
+
+### 新增测试
+
+- 无新增套件；`archive-test.mjs` 的两条从「必须抛」改成「必须回执」（行为变更的同步）。
+- `npm test` 断言数保持 4381（形态变了，断言数不变）。
+
+### 实测
+
+- `npm test`：4381 passed / 0 failed（本机）。
+- `client-render-test` 464/0；界面快照守卫 6/0（客户端只改错误判据，不改渲染）。
+- 离线评测：退出码 0，判定「无退化」。
+
+---
+
 ## 2.2.0
 
 **主题：业务错误码归一 —— 三套命名法收成一套 snake_case，并建唯一清单 + 守卫。**

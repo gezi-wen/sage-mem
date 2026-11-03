@@ -304,7 +304,7 @@ group('9. 静态守卫：面板写入口接上降级 helper + 双语提示')
   ok(!/readFile\(safeName\)\.then\(function \(\) \{ return true; \}, function \(\) \{ return false; \}\)/.test(panel), '没有「任何读失败都当不存在」的探针')
   const shared = readFileSync(new URL('../client/05-shared.js', import.meta.url), 'utf8')
   ok(/function isNotFoundError/.test(shared) && /ENOENT\|no such file\|not exist/.test(shared), 'isNotFoundError 只在共享基元里定义一次，判据是 ENOENT 文案')
-  ok(/function probeRemoteExists/.test(shared) && /result\.ok === false && result\.error/.test(shared), 'probeRemoteExists 同时处理返回值形态与 rejection 形态')
+  ok(/function probeRemoteExists/.test(shared) && /result\.ok === false/.test(shared) && /result\.code/.test(shared) && /result\.error/.test(shared), 'probeRemoteExists 同时处理返回值形态与 rejection 形态（2.2.1 起还认信封外层的结构化 code）')
   const i18n = readFileSync(new URL('../client/55-i18n-memory.js', import.meta.url), 'utf8')
   const zhKeys = (i18n.match(/"notice\.staleHostWrite"/g) || []).length
   const enKeys = zhKeys
