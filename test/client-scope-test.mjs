@@ -83,5 +83,50 @@ group('4. 【反向对照】判据会红')
     '【反向对照】注释里提到不算声明')
 }
 
+group('5. 每个作用域内的顶层声明不许重名（2026-11-03：原 14 名单只覆盖 8.5%）')
+{
+  // 作用域归属是**结构事实**，不是推测：10/11/12/13 在 StarmapRuntime IIFE 内，
+  // 00/05/20..80 在 factory 主体。两者缩进都是 2 tab，所以只能按分片前缀分。
+  // 为什么这条比「14 名单」重要：同一作用域里 `const` 重名会 SyntaxError（安全），
+  // 但 **`function` 重名是静默覆盖**（后者胜出、零报错）—— 那正是最危险的形状。
+  const scopeOf = (rel) => (/^(10|11|12|13)-/.test(rel) ? 'starmap-iife' : 'factory')
+  const DECL = /^\t\t(?:const|let|var|function|class|async function)\s+([A-Za-z0-9_$]+)/gm
+  const collect = (sources) => {
+    const byScope = new Map()
+    for (const [rel, src] of sources) {
+      for (const m of src.matchAll(DECL)) {
+        const sc = scopeOf(rel)
+        if (!byScope.has(sc)) byScope.set(sc, new Map())
+        const map = byScope.get(sc)
+        if (!map.has(m[1])) map.set(m[1], [])
+        map.get(m[1]).push(rel)
+      }
+    }
+    return byScope
+  }
+  const hits = (byScope) => {
+    const out = []
+    for (const [sc, map] of byScope) for (const [name, files] of map) if (files.length > 1) out.push(`${sc}/${name} ← ${files.join(',')}`)
+    return out
+  }
+  const byScope = collect(SOURCES)
+  const total = [...byScope.values()].reduce((n, m) => n + [...m.values()].reduce((a, v) => a + v.length, 0), 0)
+  ok(total > 100, `扫到足够多的顶层声明（实际 ${total}）`)
+  const dupes = hits(byScope)
+  ok(dupes.length === 0, '同一作用域内没有重名顶层声明（function 重名会静默覆盖）', dupes.join(' | '))
+  // 反向对照：同作用域两份同名 function → 必须报出来
+  const fakeDup = hits(collect(new Map([
+    ['50-shared-ui.js', '\t\tfunction dupFn() {}'],
+    ['70-memory-panel.js', '\t\tfunction dupFn() {}'],
+  ])))
+  ok(fakeDup.length === 1, '【反向对照】同作用域两份同名 function → 判据报 1 处', fakeDup.join(','))
+  // 跨作用域同名**不算错**：CSS / TYPERT_REMOTE / listSchema / readSchema 是两处不同作用域的有意声明
+  const crossHits = hits(collect(new Map([
+    ['40-styles.js', '\t\tconst CSS = []'],
+    ['11-starmap-styles.js', '\t\tconst CSS = []'],
+  ])))
+  ok(crossHits.length === 0, '【反向对照】跨作用域同名（CSS）不报')
+}
+
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

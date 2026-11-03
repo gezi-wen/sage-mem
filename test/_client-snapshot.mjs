@@ -8,9 +8,9 @@
  * 纯结构搬移必须保持哈希不变；**有意改界面**的版本用 `--update` 重生成（并把这句写进 CHANGELOG）。
  *
  * ⚠️ 它**不挂进 npm test**：跑一次要再起一遍 client-render-test（几秒），且它的正常状态是
- * 「等一次有意改界面才变」。需要时手动跑：
- *     node test/client-snapshot-test.mjs            # 比对
- *     node test/client-snapshot-test.mjs --update   # 改完界面后重生成
+ * 「等一次有意改界面才变」。它是**发布清单**的一步（`docs/release-checklist.md` 第 2.5 步）：
+ *     node test/_client-snapshot.mjs            # 比对
+ *     node test/_client-snapshot.mjs --update   # 改完界面后重生成
  *
  * 产物来自 client-render-test.mjs 的 `--preview`（与 README 出图共用同一份屏定义）：
  * 只认 manifest 的 id，不按下标取 —— 插一屏不会让别的屏静默换内容。

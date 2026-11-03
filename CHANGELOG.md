@@ -7,6 +7,41 @@
 
 ---
 
+## 2.1.23
+
+**主题：界面快照守卫断链修复 + 客户端作用域重名全量判据 + 死代码清除（纯内部，界面零变化）。**
+
+版本判定：2.1.23（PATCH）｜理由：修「快照守卫的入口文件不存在、基线停在 10-27、3 屏全红」并补两条守卫，删掉从 2026-10-08 起从未执行的 25+53 行死代码；不改 wire 协议、不新增 remote / 参数 / 设置项 / 界面元素｜运行时源文件 2（`client/10-starmap-head.js` / `client/13-starmap-panel.js`，均为删除）｜护栏内
+
+### 行为变更
+
+- **无。** 三屏界面哈希与删除前**逐字节相同**（`files-list` 5a394cbf… / `autodream-settings` 434aee1a… / `audit` ef752c4a…），证明删掉的 78 行从未参与渲染。
+
+### 不变
+
+- wire 协议、typert 契约（39 条 invocation）、remote 方法集、界面与文案全部不变。
+- `StarMap` 的活渲染路径仍是 `client/70-memory-panel.js` 直接 `h(StarmapRuntime.StarMap, { ctx: props.ctx })`；被删的是 `client/13-starmap-panel.js` 里那个**从不被返回**的 `apply` —— 它注册的 `settings.memory.starmap` 槽因此从未被注入过（`70-memory-panel.js:173` 的注释早已承认「本插件改用并列 tab 渲染星图，不再调用它」）。
+
+### 修复
+
+- **快照守卫断链**：`test/_client-snapshot.mjs` 的文档注释指向不存在的 `test/client-snapshot-test.mjs`，且它因 `_` 前缀被 `suite-registry-test` 的登记检查排除 —— 于是「3 屏全红」没有任何守卫能发现。现在：入口名自洽、基线重建（承认 2.1.22 的界面状态）、并在 `docs/release-checklist.md` 新增第 2.5 步强制每次发版跑一次。
+- **死代码**：删 `client/13-starmap-panel.js` 的 `const inject` + `async function apply`（25 行）与 `client/10-starmap-head.js` 的第二套 codec + `TYPERT_REMOTE`（53 行）。
+
+### 新增测试
+
+- `test/suite-registry-test.mjs` 第 4 组（+3 条）：**辅助脚本文档里点名的 `test/*.mjs` 必须存在**，带反向对照。防的是「注释指向一个不存在的入口」这类静默漂移。
+- `test/client-scope-test.mjs` 第 5 组（+4 条）：**每个作用域内的顶层声明不许重名**。作用域按分片前缀划分（`10/11/12/13` = StarmapRuntime IIFE，其余 = factory），实测覆盖 161 个顶层声明（原 14 名单只覆盖 8.5%）。重点守 `function` 重名 —— 它不抛 SyntaxError，是**静默覆盖**。带同作用域 / 跨作用域两组反向对照。
+- `npm test` 断言数 4347 → 4354。
+
+### 实测
+
+- `npm test`：4354 passed / 0 failed（本机）。
+- 删代码前后三屏快照哈希逐字节相同 —— 这是「只删不改」的机器证明。
+- 快照守卫重建后 6 passed / 0 failed。
+- 离线评测：退出码 0，判定「无退化」（`docs/retrieval-diagnostics.md` 本次未变）。
+
+---
+
 ## 2.1.22
 
 **主题：宿主没真正重启时写操作全挂 —— 客户端识别「陈旧宿主」并按旧协议安全降级（issue #10）。**

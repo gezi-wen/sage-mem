@@ -88,6 +88,27 @@ group('3. 约定本身被钉住')
   ok(registered.includes('suite-registry-test.mjs'), '本守卫确实在 SUITES 里')
 }
 
+group('4. 辅助脚本文档里点名的 test 文件必须存在（2026-11-03 快照守卫曾断链）')
+{
+  // `_` 开头的辅助脚本不在 SUITES 里，所以「它还能不能跑」没有任何守卫看着。
+  // 它们的注释里常写「用 node test/xxx.mjs 跑」—— 改名 / 删文件之后字面量会漂，
+  // 而漂了没人报。快照守卫就这样断了约一周：点名的 client-snapshot-test.mjs 根本不存在，
+  // 而它自己（_client-snapshot.mjs）被这里的 isHelper 规则排除在登记检查之外。
+  const REF = /(?:^|[\s`'"(])test\/([A-Za-z0-9_$.-]+\.mjs)/gm
+  const helperFiles = onDisk.filter((n) => isHelper(n) && n !== RUNNER)
+  const broken = []
+  for (const h of helperFiles) {
+    const text = readFileSync(join(HERE, h), 'utf8')
+    for (const m of text.matchAll(REF)) if (!onDisk.includes(m[1])) broken.push(`${h} → ${m[1]}`)
+  }
+  ok(helperFiles.length >= 3, `扫到足够多的辅助脚本（实际 ${helperFiles.length}）`)
+  ok(broken.length === 0, '辅助脚本文档里点名的 test 文件都存在', broken.join('; '))
+  // 反向对照：合成一段指向不存在文件的文本，判据必须命中
+  const fake = '跑一下 node test/ghost-not-here.mjs 就行'
+  const fakeHits = [...fake.matchAll(REF)].map((m) => m[1])
+  ok(fakeHits.length === 1 && !onDisk.includes(fakeHits[0]), '【反向对照】指向不存在的文件会被抓到', fakeHits.join(','))
+}
+
 console.log('')
 console.log(`结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

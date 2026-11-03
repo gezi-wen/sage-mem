@@ -572,32 +572,6 @@
 				body);
 		}
 
-		const inject = ["slots", "remote"];
-
-		/**
-		 * Client 插件：$mount strict remote contribution（第三方 remote 不在
-		 * 宿主的固定 remote 清单里，必须自己挂），再注册星图子槽（B 方案起不再有右缘浮标与全屏 overlay）。
-		 */
-		async function apply(ctx) {
-			appCtx = ctx;
-			try {
-				await ctx.remote.$mount(TYPERT_REMOTE);
-			} catch (e) {
-				// remote 注册失败不拖死 UI：星图打开时再向用户报错
-				console.error("sage-starmap: remote mount failed", e);
-			}
-			injectCss();
-			// B 方案：星图不再占对话主界面（去掉右缘 ✦ 浮标 + 全屏 overlay），
-			// 改为注入 sage-mem 记忆管理页的「星图」子槽（settings.memory.starmap），
-			// 由记忆管理页的标签栏切换渲染，作为并列视图。
-			ctx.slots.inject("settings.memory.starmap", () => {
-				ctx.slots.register(
-					{ name: "settings.memory.starmap", id: "sage-starmap", order: 10, label: "记忆星图" },
-					() => h(StarMap, { ctx: appCtx }),
-				);
-			});
-		}
-
 		injectCss();
 		return { StarMap: StarMap };
 

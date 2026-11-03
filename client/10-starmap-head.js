@@ -1,59 +1,6 @@
 const StarmapRuntime = (function (require, _react) {
 	let react = _react;
 	const h = react.createElement;
-// ── 手写 strict codec（浏览器无 zod，typert 只要求 parse 方法）──
-		// isStr / isNum / strSchema 来自 05-shared.js（这个 IIFE 在 factory 作用域内，看得到）。
-		const starSchema = {
-			parse(v) {
-				if (v === null || typeof v !== "object") throw new Error("invalid star");
-				isStr(v.file); isStr(v.kind); isStr(v.title); isStr(v.desc); isNum(v.bytes); isNum(v.mtimeMs);
-				return v;
-			},
-		};
-		const listSchema = {
-			parse(v) {
-				if (v === null || typeof v !== "object") throw new Error("invalid payload");
-				isNum(v.count);
-				if (!Array.isArray(v.stars)) throw new Error("expected stars array");
-				v.stars.forEach((s) => starSchema.parse(s));
-				return v;
-			},
-		};
-		const readSchema = {
-			parse(v) {
-				if (v === null || typeof v !== "object") throw new Error("invalid payload");
-				isStr(v.name); isStr(v.content);
-				return v;
-			},
-		};
-
-		const TYPERT_REMOTE = {
-			package: "sage-starmap",
-			descriptors: [
-				{
-					id: "sage-starmap#starmap/listStars",
-					service: "starmap",
-					namespace: "starmap",
-					method: "listStars",
-					invocation: { kind: "direct" },
-					parameters: [],
-					result: { mode: "strict", typeSymbol: "sage-starmap/types#StarList", schema: listSchema, create: () => listSchema },
-					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
-				},
-				{
-					id: "sage-starmap#starmap/readFile",
-					service: "starmap",
-					namespace: "starmap",
-					method: "readFile",
-					invocation: { kind: "direct" },
-					parameters: [
-						{ name: "name", wire: "name", source: "json", codec: { mode: "strict", typeSymbol: "sage-starmap/types#FileName", schema: strSchema, create: () => strSchema } },
-					],
-					result: { mode: "strict", typeSymbol: "sage-starmap/types#FileContent", schema: readSchema, create: () => readSchema },
-					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },
-				},
-			],
-		};
 
 		/** 错误详情尽量展开，避免 "[object Object]" 式黑洞。 */
 		function detail(e) {
