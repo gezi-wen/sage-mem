@@ -2207,6 +2207,13 @@ async function main() {
       '星图卡片不再重复「记忆星图 / sage-mem memory」标题')
     ok(!!all(tree, byClass('smap-viewtoggle'))[0] && all(tree, (n) => n.type === 'button' && textOf(n) === '显示档案馆').length === 1,
       '星图的控件（星空/时间线、显示档案馆）都还在')
+    // 2.3.1：视角按钮**顺序**是产品要求（时间线在前），所以钉成断言 —— 否则有人
+    // 顺手换回去，没有任何测试会红。
+    {
+      const vt = all(tree, byClass('smap-vt-btn')).map(textOf)
+      ok(vt.length === 2 && vt[0] === '时间线' && vt[1] === '星空',
+        '视角切换：时间线在前、星空在后', JSON.stringify(vt))
+    }
 
     // 13g 自动做梦：三段 + 两列参数网格（用**新的**运行时：这个 harness 的 hooks 是按
     //     整棵树的调用序扁平记账的，跨 tab 换树会让后面组件的槽位错位 —— 那是量具的限制，
