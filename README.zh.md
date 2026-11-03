@@ -14,7 +14,7 @@
 
 > File-based cross-session memory for DeepSeek Harness — every memory is a plain markdown file you can open, edit and delete. No database, no worker, no port.
 
-**当前发布版本：`2.2.2`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
+**当前发布版本：`2.3.0`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
 [契约冻结](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)。
 
 如果它对你有用，给个 Star 是最直接的反馈。
@@ -79,6 +79,7 @@ sage-mem 补上这一层，做法是：**把该记住的事写成一张张卡片
 | **防膨胀** | 靠规则引导模型判断「值不值得存」：无实质内容的不存，靠读代码 / git 能推出来的不存 |
 | **可整理** | 可选的「自动做梦」把记忆通读一遍：合并重复、修索引与断链，改动前先建回滚点 |
 | **从 Claude Code 迁移** | 人格（`CLAUDE.md` → `AGENTS.md`）照搬；记忆按四类整理成 `.md` 即可（见[下一节](#从-claude-code-迁移)） |
+| **自带使用指南** | 包内携带一份技能（`skills/sage-mem/`）：记忆长什么样、四类怎么分、什么不该存、frontmatter 的坑、检索怎么工作、索引坏了怎么修。装上插件就够了 —— Agent 拿到说明书，不需要手工配置 |
 
 界面上还有四块能力（都可以不用）：记忆管理页、类型与标签筛选、记忆星图、体检与归档。
 

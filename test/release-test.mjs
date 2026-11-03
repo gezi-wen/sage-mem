@@ -75,7 +75,10 @@ const ROOT_FILES = new Set([
   // 1.8.2：品牌图标（package.json 的 `icon` 与 files 白名单一起声明）
   'icon.png',
 ])
-const allowedPath = (p) => p.startsWith('lib/') || ROOT_FILES.has(p)
+// 包内允许的路径。`skills/**` 是 2.3.0 新增的：插件携带自己的使用指南（见 cordis.patch.yml
+// 里的 dsh-skill-filesystem 行）。它必须是**扩展自有文件** —— 别人的技能、profile 配置、
+// memory 一律不进包，所以这里只放行 `skills/` 这棵子树，不是「任何带 skills 的路径」。
+const allowedPath = (p) => p.startsWith('lib/') || p.startsWith('skills/') || ROOT_FILES.has(p)
 
 group('0. npm pack --dry-run 跑得通')
 {
@@ -129,8 +132,13 @@ group('0. npm pack --dry-run 跑得通')
 
   group('4. 反向对照：白名单不是恒真的')
   ok(allowedPath('lib/index.js') && allowedPath('package.json'), '白名单放行真正的包内文件')
+  ok(allowedPath('skills/sage-mem/SKILL.md'), '白名单放行自带的 skills/ 子树')
   ok(!allowedPath('test/release-test.mjs') && !allowedPath('docs/1.0.0-contract.md'),
     '【反向对照】白名单确实会拒绝 test/ 与 docs/')
+  // skills/ 的放行是**子树**，不是「任何看起来像技能的路径」—— 否则有人把
+  // 别的项目的技能塞进 `skills-vendor/` 也会被放行。
+  ok(!allowedPath('skills-vendor/x/SKILL.md') && !allowedPath('my-skills/x.md'),
+    '【反向对照】skills 前缀的近邻路径不被放行')
 }
 
 // ── 2. 版本一致性（DOC-01） ─────────────────────────────────────

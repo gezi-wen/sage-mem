@@ -1,4 +1,21 @@
-# sage-mem bundle patch — injects the memory bridge plugin into the profile tree.
+# sage-mem bundle patch
+#
+# 1) 注入记忆桥插件（sage-mem 本体）
+# 2) 把本包自带的 `skills/` 目录注册成一个**额外的技能根** —— 装上插件就等于
+#    装上了它的使用指南（`skills/sage-mem/SKILL.md`）。
+#
+# `providerName` 必须每个包唯一：技能注册表拒绝同名第二个 provider，用默认值
+# ("filesystem") 会和宿主自己的 provider、以及其它用同一机制的插件撞名。
+# `includeDefaultRoots: false` 让这个 provider 只管自己的目录 —— 宿主已经有默认
+# provider 在扫项目根与用户根，重复扫会产生同名技能的来源歧义。
+
 - insert:
     - id: sage-mem
       name: 'sage-mem'
+    - id: sage-mem-skills
+      name: '@deepseek-ai/dsh-skill-filesystem'
+      config:
+        providerName: sage-mem
+        includeDefaultRoots: false
+        customSkillDirs:
+          - !!js "process.getBuiltinModule('node:url').fileURLToPath(new URL('skills/', baseUrl))"

@@ -158,6 +158,14 @@ group('6. composeRecallText：只有卡时只发卡')
     '有正文时：头部 + 引用纪律 + 正文 + 卡')
   ok(composeRecallText({ parts: [], cardPart: 'CARD', memoryDir: '/m', discipline: 'D' }) === 'CARD',
     '只有卡时：不发头部与引用纪律（不然是假陈述）')
+  // 2.3.0：上限行**现读**传入 —— 随包技能因此不必写死任何数字（写死就是第二份真相）
+  const withLimits = composeRecallText({
+    parts: ['P1'], cardPart: '', memoryDir: '/m', discipline: 'D',
+    limits: { maxResults: 10, maxChars: 1500, maxSessionBytes: 61440, maxFileBytes: 524288 },
+  })
+  ok(/\*\*本轮上限\*\*/.test(withLimits) && withLimits.includes('10 条') && withLimits.includes('1500 字') && withLimits.includes('60 KB') && withLimits.includes('512 KB'),
+    '传 limits 时正文前带上限行（数字来自调用方，不是写死的）', withLimits.slice(0, 160))
+  ok(!/\*\*本轮上限\*\*/.test(withParts), '不传 limits 时不硬塞上限行（兼容旧调用方）')
 }
 
 rmSync(sandbox, { recursive: true, force: true })
