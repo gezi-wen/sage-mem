@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.3.1`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.4.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -376,6 +376,8 @@ Every consolidation leaves a **manifest** behind, in two forms: the human-readab
 
 It records item by item: **file / operation (create · rewrite · archive) / reason / byte change**, plus a structural audit comparison before and after the run.
 
+**Since 2.4.0 the manifest also lists the facts that were deleted, one by one.** A rewrite or an archive can make a few facts that used to be written down stop existing, and the structural audit (dangling links / formatting / index) **cannot see a lost fact** — every check it runs can be green. So whenever something is removed, the manifest gets a section of its own listing the **exact original lines that no longer exist in the active memories**, with their original line numbers (so you can check them against the snapshot), and a rewrite also states the line-count change. Files taken by the auto-archive policy are listed too. The facts are computed by the host by diffing "the body before the write" against "the body written in" — **not self-reported by the model**: a model can miss things, a diff cannot. One real lesson: on 2026-11-05 a consolidation pass compressed away an entry that was still in effect — 「到期 2027-10-03、不自动续费」— and the run reported "audit 2 problems → 0 problems", all green.
+
 - **`reason` should be filled in.** A `write_memory` without `reason` **will not be refused** — the change takes effect all the same, but the manifest marks it as 「未自述」(not self-described) and attaches what the host can trace (which turn / what operation / byte change). The reason: losing an otherwise correct correction over one missing explanation is the greater cost.
 - **`archive_memory`'s `reason` is still required**; without it the action is refused outright, and refused actions get a section of their own, 「未能落地的改动」(changes that could not land), rather than disappearing silently.
 
@@ -517,7 +519,7 @@ Version-by-version compatibility record:
 | 0.2.1-rc.4 | compatible |
 | 0.2.1-rc.5 | compatible |
 
-**How to read `compatible`.** It means this plugin's codec and manifest contract has been checked against that host generation (code-level comparison plus the unit/contract suite), **not** that an end-to-end probe was run on that exact host build. The table is a declaration; how each claim was checked is summarized here. Real-host probes so far: `headless` (2026-10-15), `web` (2026-10-16), `web` on **0.2.1-rc.3** for the 2.0.0 release (2026-10-27: client activation, conflict panel arbitration, injection suppression, rollback to 1.9.2 — 23/23 checks), and the **DSH Go mobile engine on 0.2.1-rc.4** (2026-10-31: installed from the in-app plugin market, sidebar panel and settings section rendered by the app, `sidebar.panellist` island opened); `0.2.1-rc.5` was checked after upgrading the greycloud host the same day (composed config, boot, panel walk-through). The `desktop` profile has **not** been probed yet (see [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b). CI runs on Ubuntu against **Node 18.x / 20.x / 24.x** with the `0.2.0-rc.1` peer generation; macOS and Windows are not CI-covered, and there is no desktop-host probe yet.
+**How to read `compatible`.** It means this plugin's codec and manifest contract has been checked against that host generation (code-level comparison plus the unit/contract suite), **not** that an end-to-end probe was run on that exact host build. The table is a declaration; how each claim was checked is summarized here. Real-host probes so far: `headless` (2026-10-15), `web` (2026-10-16), `web` on **0.2.1-rc.3** for the 2.0.0 release (2026-10-27: client activation, conflict panel arbitration, injection suppression, rollback to 1.9.2 — 23/23 checks), and the **DSH Go mobile engine on 0.2.1-rc.4** (2026-10-31: installed from the in-app plugin market, sidebar panel and settings section rendered by the app, `sidebar.panellist` island opened); `0.2.1-rc.5` was checked on a local web instance the same day (composed config, boot, panel walk-through). The `desktop` profile has **not** been probed yet (see [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b). CI runs on Ubuntu against **Node 18.x / 20.x / 24.x** with the `0.2.0-rc.1` peer generation; macOS and Windows are not CI-covered, and there is no desktop-host probe yet.
 
 Two points worth spelling out:
 

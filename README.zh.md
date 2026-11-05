@@ -14,7 +14,7 @@
 
 > File-based cross-session memory for DeepSeek Harness — every memory is a plain markdown file you can open, edit and delete. No database, no worker, no port.
 
-**当前发布版本：`2.3.1`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
+**当前发布版本：`2.4.0`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
 [契约冻结](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)。
 
 如果它对你有用，给个 Star 是最直接的反馈。
@@ -376,6 +376,8 @@ sage-mem 给记忆目录的写入加了**版本守卫**：写入前记下当前�
 
 逐条记录：**文件 / 操作（新建·改写·归档）/ 缘由 / 字节变化**，外加运行前后的结构审计对比。
 
+**2.4.0 起，声明还会逐条列出「被删掉的事实」**：改写与归档都可能让原来写着的几条事实不再存在，而结构审计（断链 / 格式 / 索引）**看不见事实丢失** —— 它能报的每一项都可能是绿的。所以每次删到东西，声明里单开一节，把**不再存在于活动记忆里的原文**逐条列出来（带原文行号，方便回快照对），改写还会写明行数变化。自动归档策略收走的文件同样列。事实由宿主拿「写之前的正文」与「写进去的新正文」对比算出，**不靠模型自述** —— 模型可以漏报，diff 不会。一处真实教训：2026-11-05 那趟整理把一条仍然生效的「到期 2027-10-03、不自动续费」压掉了，自报「审计 2 问题 → 0 问题」全绿。
+
 - **`reason` 应当填写。** `write_memory` 不带 `reason` **不会被拒绝** —— 改动照样生效，但声明里会把它标成「未自述」并附上宿主能追溯到的信息（第几轮 / 什么操作 / 字节变化）。理由：为了一句解释而丢掉一次本来正确的修正，代价更大。
 - **`archive_memory` 的 `reason` 仍必填**，缺了直接拒绝；被拒的动作单列一节「未能落地的改动」，不会静默消失。
 
@@ -519,7 +521,7 @@ sage-mem 是纯 DSH 插件，用 `package.json` 的 **`engines.dsh`** 声明宿�
 | 0.2.1-rc.4 | compatible |
 | 0.2.1-rc.5 | compatible |
 
-**`compatible` 怎么读**：它表示本插件的 codec / manifest 契约在该宿主代上核对过（代码层比对 + 单元/契约测试），**不表示**在那个确切宿主构建上跑过端到端探针。这张表是声明，核对方式总结在下面。真实宿主探针目前跑过 `headless`（2026-10-15）、`web`（2026-10-16）、**0.2.1-rc.3 上的 `web`**（2026-10-27，2.0.0 发布前：客户端激活、冲突面板裁决、注入抑制、回退到 1.9.2，23/23 项通过），以及 **0.2.1-rc.4 上的 DSH Go 手机引擎**（2026-10-31：App 插件市场安装、侧栏面板与设置分区原生呈现、`sidebar.panellist` 岛屿打开）；`0.2.1-rc.5` 于同日升级灰云月殿后按 dump/启动/面板走查核对；`desktop` profile **还没跑过**（见 [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b）。CI 在 Ubuntu 上覆盖 **Node 18.x / 20.x / 24.x**，peer 钉 `0.2.0-rc.1` 一代；macOS 与 Windows 没有 CI 覆盖，desktop 宿主探针也还没有。
+**`compatible` 怎么读**：它表示本插件的 codec / manifest 契约在该宿主代上核对过（代码层比对 + 单元/契约测试），**不表示**在那个确切宿主构建上跑过端到端探针。这张表是声明，核对方式总结在下面。真实宿主探针目前跑过 `headless`（2026-10-15）、`web`（2026-10-16）、**0.2.1-rc.3 上的 `web`**（2026-10-27，2.0.0 发布前：客户端激活、冲突面板裁决、注入抑制、回退到 1.9.2，23/23 项通过），以及 **0.2.1-rc.4 上的 DSH Go 手机引擎**（2026-10-31：App 插件市场安装、侧栏面板与设置分区原生呈现、`sidebar.panellist` 岛屿打开）；`0.2.1-rc.5` 于同日在本地一个 web 实例上按 dump/启动/面板走查核对；`desktop` profile **还没跑过**（见 [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b）。CI 在 Ubuntu 上覆盖 **Node 18.x / 20.x / 24.x**，peer 钉 `0.2.0-rc.1` 一代；macOS 与 Windows 没有 CI 覆盖，desktop 宿主探针也还没有。
 
 两点值得说明：
 
