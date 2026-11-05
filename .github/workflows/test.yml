@@ -36,13 +36,30 @@ jobs:
       #   - 三个 peer：宿主在真实环境里提供，CI 里得自己顶上
       # peer 的 `latest` 标签停在老版本（0.1.x / 0.0.1），所以**钉住具体版本**，
       # 不用 latest；`--no-save --no-package-lock` 保证 CI 不改仓库里的任何文件。
+      #
+      # ⚠️ 为什么还要先临时摘掉一个 peer（2026-11-05 修）：
+      #   npm 7+ 会**自动补装 package.json 里声明、但下面这行没显式列出的 peer**。
+      #   2.3.0 起多了 `@deepseek-ai/dsh-skill-filesystem`（随包技能的宿主侧依赖），
+      #   它整条 peer 链还在 `0.0.1-rc.x` 那一代（要求 `dsh-typert-protocol@^0.0.1-rc.5`），
+      #   而这里钉的是 `0.2.0-rc.1` —— 同一个槽位放不下两代，npm 当场 ERESOLVE，
+      #   **测试一条都没跑**。这不是产品问题，是「本地 pnpm、CI npm」两套依赖树的分叉：
+      #   pnpm 对 peer 不满足只警告，npm 直接硬失败。
+      #   测试本身不需要它（只在字符串层面核对 `cordis.patch.yml` 的 providerName），
+      #   所以 install 前临时摘、装完还原 —— 测试读到的 package.json 仍是原版。
+      #   账：2026-11-03（v2.3.0）→ 11-05（v2.4.1）连续四个提交 CI 红而没人看。
+      #
+      # 不要用 `--legacy-peer-deps`：它会把**显式列出的**这几个 peer 也一起跳过，
+      # 结果 35 个套件因模块缺失而红（2026-11-05 实测，比原来的错误更难查）。
       - name: 装依赖（peer 用与本机同代的版本顶上）
         run: |
+          cp package.json package.json.ci-backup
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));delete p.peerDependencies['@deepseek-ai/dsh-skill-filesystem'];fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
           npm install --no-save --no-package-lock \
             zod@4.4.3 react@18.3.1 \
             @deepseek-ai/cordis@4.0.4 \
             @deepseek-ai/dsh-typert-protocol@0.2.0-rc.1 \
             @deepseek-ai/dsh-client-locale@0.2.0-rc.1
+          mv package.json.ci-backup package.json
 
       - name: 跑全部断言
         run: npm test
