@@ -112,6 +112,18 @@ async function main() {
 
   let tree = await rt.settle(StarMap, { ctx })
 
+  /**
+   * 2.4.1：这个标签默认打开的是**列表**视角，而 Q15 断言的全部是画布调度
+   * （入场相位、回放时刻、隐藏恢复）。所以先显式切到「星空」——
+   * 默认视角是一个产品决定，依赖它的前提就该在这里写出来，而不是靠「以前恰好默认是星空」。
+   */
+  {
+    const skyBtn = findButton(tree, '星空')
+    ok(!!skyBtn, '星图卡片上有「星空」视角按钮（默认视角变了也不能把这个入口弄丢）')
+    if (skyBtn) await skyBtn.props.onClick()
+    tree = await rt.settle(StarMap, { ctx })
+  }
+
   // ── 1. 入场动画：伪时钟下逐帧推进（修前红：只画一帧、相位是 epoch 级负数）──
   group('1. 入场动画：单调时钟 + 逐帧推进 + 到点收尾')
   {

@@ -941,7 +941,7 @@ const README_HEADLINE = {
   'tools-drawer': '工具抽屉：归档候选 / 保留名编辑 —— 关着时零占位，开了各带状态',
   audit: '体检：硬问题按类报红分节；「指向已归档」只作提示，不计入问题',
   'archive-candidates': '归档候选：每条都写清「为什么建议归档」，确认后才动文件',
-  'starmap-archive': '记忆星图：暗星是已归档的记忆，点开看归档时间、理由与恢复入口',
+  'starmap-archive': '时间线（星空视角）：暗星是已归档的记忆，点开看归档时间、理由与恢复入口',
   'autodream-settings': '自动做梦 · 设置：运行 / 设置 / 记录 二级分组，参数两列并写清「当前 → 重启后」',
 }
 
@@ -1097,18 +1097,36 @@ async function emitPreview() {
     tree = await gotoSeg(rt, C, tree, '记录')
     S('ad-records', null, '', '⑥ 自动做梦 · 记录（回滚点 / 整理记录 / 历史报告）', serHtml(all(tree, byClass('smem-autodream'))[0]))
   }
-  // ⑦ / ⑨ 记忆星图：星空版（docs/starmap.png）与「点中暗星看详情」版（README 展示图）。
+  // ⑦ 时间线 · **默认视角（列表）** —— 打开这个标签第一眼看到的就是这一屏。
+  //    它必须单独出图：拿星空版当「默认界面」展示，是拿一个要用户点一下才出现的东西冒充入口。
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(STAR_DEMO.active, STAR_DEMO.archived)
+    const smap = makeStarmapRemote(mem, STAR_DEMO.meta)
+    const { comp: C } = await loadClient(rt, { memory: mem, starmap: smap })
+    let tree = await rt.settle(C, {})
+    click(btn(tree, '时间线')[0])
+    tree = await rt.settle(C, {})
+    // 出图前先断言「这一屏真的没有画布」——否则这张图不配叫「默认视角」。
+    if (all(tree, byClass('smap-canvas')).length) throw new Error('时间线默认视角里出现了画布，这张图就不能叫「默认」')
+    if (!all(tree, byClass('smap-tl-item')).length) throw new Error('时间线默认视角里没有条目列表，图会是一张空屏')
+    S('starmap-list', 'docs/images/starmap-list.png', '时间线（默认视角）—— 打开这个标签先看见按更新时间倒序的条目列表；星空是右上角可切的第二个视角。', '⑦ 时间线（默认视角：列表）', serHtml(tree))
+  }
+  // ⑧ / ⑩ 时间线（星空视角）：docs/starmap.png 与「点中暗星看详情」版（README 展示图）。
   //    画布不手挑坐标 —— 把**真渲染器**最后一帧画过的星核抓出来回放（见 starReplay）。
   for (const [id, out, caption, clickDim] of [
     ['starmap-sky', 'docs/starmap.png', '', false],
-    ['starmap-archive', 'docs/images/starmap-archive.png', '记忆星图 —— 暗星是已归档的记忆；点开看归档时间、理由与「恢复到活动记忆」。', true],
+    ['starmap-archive', 'docs/images/starmap-archive.png', '时间线（星空视角）—— 暗星是已归档的记忆；点开看归档时间、理由与「恢复到活动记忆」。', true],
   ]) {
     const rt = makeReact()
     const mem = makeMemoryRemote(STAR_DEMO.active, STAR_DEMO.archived)
     const smap = makeStarmapRemote(mem, STAR_DEMO.meta)
     const { comp: C } = await loadClient(rt, { memory: mem, starmap: smap })
     let tree = await rt.settle(C, {})
-    click(btn(tree, '记忆星图')[0])
+    click(btn(tree, '时间线')[0])
+    tree = await rt.settle(C, {})
+    // 这两张 README 展示图都是**星空**视角 —— 2.4.1 起默认是列表，先切过去再抓帧。
+    click(btn(tree, '星空')[0])
     tree = await rt.settle(C, {})
     const replay = starReplay(rt)
     if (clickDim) {
@@ -1129,7 +1147,7 @@ async function emitPreview() {
       })
       tree = await rt.settle(C, {})
     }
-    S(id, out, caption, (id === 'starmap-sky' ? '⑦ 记忆星图（星空 + 显示档案馆开）' : '⑨ 记忆星图（点中暗星看详情）'), serHtml(tree) + replayTag(replay))
+    S(id, out, caption, (id === 'starmap-sky' ? '⑧ 时间线（切到星空 + 显示档案馆开）' : '⑩ 时间线（星空视角 · 点中暗星看详情）'), serHtml(tree) + replayTag(replay))
   }
   // ⑧ 保留名「将新建」（走抽屉的回归）
   {
@@ -1437,7 +1455,11 @@ async function main() {
     const { comp: C } = await loadClient(rt, { memory: mem, starmap: smap })
     const props = {}
     let tree = await rt.settle(C, props)
-    click(btn(tree, '记忆星图')[0])
+    click(btn(tree, '时间线')[0])
+    tree = await rt.settle(C, props)
+    // 这一组断言的是**画布上的几何**，只在空间视角成立 —— 2.4.1 起默认是列表视角，
+    // 所以先显式切到「星空」。不是给测试开后门：默认视角是产品决定，依赖它的前提就该写出来。
+    click(btn(tree, '星空')[0])
     tree = await rt.settle(C, props)
 
     ok(smap.st.calls.length >= 1 && smap.st.calls.every((c) => c === true),
@@ -1554,7 +1576,7 @@ async function main() {
   }
 
   // ── 5. 时间线视图也认归档 ────────────────────────────────────────────────
-  group('6. 时间线视图：归档星带「已归档」标记')
+  group('6. 时间线（默认视角）：归档星带「已归档」标记 + 视角双向切换')
   {
     const rt = makeReact()
     const mem = makeMemoryRemote([ACTIVE[0], ACTIVE[1]], [ARCHIVED[0]])
@@ -1562,12 +1584,21 @@ async function main() {
     const { comp: C } = await loadClient(rt, { memory: mem, starmap: smap })
     const props = {}
     let tree = await rt.settle(C, props)
-    click(btn(tree, '记忆星图')[0])
-    tree = await rt.settle(C, props)
     click(btn(tree, '时间线')[0])
     tree = await rt.settle(C, props)
+    // 2.4.1 的产品决定：这个标签**默认**打开列表视角，不再需要点一次内部按钮。
+    // 这两条就是那个决定的守卫 —— 谁把默认值改回 "sky"，这里立刻红。
+    ok(all(tree, byClass('smap-canvas')).length === 0, '进入这个标签默认是列表视角（没有画布）')
     ok(all(tree, byClass('smap-tl-item--arch')).length === 1, '时间线里归档条带 --arch 类（视觉上更轻）')
     ok(findText(tree, '已归档') !== null, '时间线里归档条打「已归档」标记')
+    // 内部按钮「列表 | 星空」双向可用（星图不是只剩一半功能）
+    click(btn(tree, '星空')[0])
+    tree = await rt.settle(C, props)
+    ok(all(tree, byClass('smap-canvas')).length === 1, '点「星空」切到空间视角（画布出现）')
+    click(btn(tree, '列表')[0])
+    tree = await rt.settle(C, props)
+    ok(all(tree, byClass('smap-canvas')).length === 0 && all(tree, byClass('smap-tl-item--arch')).length === 1,
+      '点「列表」切回列表视角（归档标记也回来）')
   }
 
   // ── 6. WebGL 主路径（真执行）：shader 里的归档档 + 两层几何 ────────────────
@@ -1578,7 +1609,10 @@ async function main() {
     const smap = makeStarmapRemote(mem, STAR_META)
     const { comp: C } = await loadClient(rt, { memory: mem, starmap: smap })
     let tree = await rt.settle(C, {})
-    click(btn(tree, '记忆星图')[0])
+    click(btn(tree, '时间线')[0])
+    tree = await rt.settle(C, {})
+    // WebGL 主路径只在空间视角跑 —— 2.4.1 起默认是列表，先切过去。
+    click(btn(tree, '星空')[0])
     tree = await rt.settle(C, {})
     await new Promise((r) => setTimeout(r, 60))
     rt.flushRaf()
@@ -1619,7 +1653,10 @@ async function main() {
     fakeObservers.length = 0
     const { comp: C } = await loadClient(rt, { memory: mem, starmap: smap })
     let tree = await rt.settle(C, {})
-    click(btn(tree, '记忆星图')[0])
+    click(btn(tree, '时间线')[0])
+    tree = await rt.settle(C, {})
+    // 色板是画布的东西 —— 默认列表视角下根本没有画布，先切到「星空」。
+    click(btn(tree, '星空')[0])
     tree = await rt.settle(C, {})
     await new Promise((r) => setTimeout(r, 60))
     rt.flushRaf()
@@ -1666,7 +1703,7 @@ async function main() {
     // （这里故意**不**给 conflict 面：旧宿主只剩五页签，是 2.0.0 的能力降级路径；
     //  六页签的用例在 8d 与 23a —— 两种宿主两种界面，断言必须分开。）
     const tabLabels = all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n)).map(textOf)
-    ok(JSON.stringify(tabLabels) === JSON.stringify(['文件列表', '记忆星图', '自动做梦', '自动归档', '体检']),
+    ok(JSON.stringify(tabLabels) === JSON.stringify(['文件列表', '时间线', '自动做梦', '自动归档', '体检']),
       `旧宿主（无 conflict 面）：五页签、体检排在自动做梦与自动归档之后（实际：${tabLabels.join(' / ')}）`)
     ok(!all(tree, (n) => n.type === 'button' && byClass('smem-tool-badge')(n) && textOf(n).indexOf('冲突') === 0)[0],
       '旧宿主（无 conflict 面）：凑不出一颗冲突徽标')
@@ -1797,7 +1834,7 @@ async function main() {
 
     const tabBtns = (t) => all(t, (n) => n.type === 'button' && byClass('smem-tab')(n))
     const tabs = tabBtns(tree).map(textOf)
-    ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '记忆星图', '自动做梦', '自动归档', '体检', '冲突']),
+    ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '时间线', '自动做梦', '自动归档', '体检', '冲突']),
       `六页签、冲突排在体检之后（实际：${tabs.join(' / ')}）`)
 
     click(tabBtns(tree).find((b) => textOf(b) === '自动归档'))
@@ -2197,22 +2234,26 @@ async function main() {
     ok(all(tree, byClass('smem-tool-panel')).length === 0, '再选一次同一个工具 → 面板收起')
 
     // 13e 三个 tab 共用一条头部带：切到星图 / 自动做梦，头部带都在
-    click(btn(tree, '记忆星图')[0])
+    click(btn(tree, '时间线')[0])
     tree = await rt.settle(C, {})
     ok(treeText(tree).indexOf('记忆管理') >= 0 && String((all(tree, byClass('smem-dot'))[0] || { props: {} }).props.title || '').indexOf('目录可读') >= 0,
       '星图页也有同一条头部带（目录状态收进了状态点的 title）')
     ok(all(tree, (n) => n.type === 'button' && textOf(n).indexOf('体检 4 个问题') >= 0).length === 1, '星图页头部带里同样有体检徽标')
     // 13f 星图卡片里那行重复标题已经去掉
     ok(all(tree, byClass('smap-title')).length === 0 && treeText(tree).indexOf('sage-mem memory · 每颗星是一条记忆') < 0,
-      '星图卡片不再重复「记忆星图 / sage-mem memory」标题')
+      '星图卡片不再重复标题（标签自己就是「时间线」）')
     ok(!!all(tree, byClass('smap-viewtoggle'))[0] && all(tree, (n) => n.type === 'button' && textOf(n) === '显示档案馆').length === 1,
-      '星图的控件（星空/时间线、显示档案馆）都还在')
-    // 2.3.1：视角按钮**顺序**是产品要求（时间线在前），所以钉成断言 —— 否则有人
-    // 顺手换回去，没有任何测试会红。
+      '星图的控件（列表/星空、显示档案馆）都还在')
+    // 2.4.1：标签叫「时间线」，内部的视角按钮叫「列表 | 星空」—— 不能再出现
+    // 「时间线 ▸ 时间线 | 星空」这种读起来像 bug 的重复。顺序也是产品要求（列表在前），
+    // 所以钉成断言：顺手换回去没有任何测试会红。
     {
       const vt = all(tree, byClass('smap-vt-btn')).map(textOf)
-      ok(vt.length === 2 && vt[0] === '时间线' && vt[1] === '星空',
-        '视角切换：时间线在前、星空在后', JSON.stringify(vt))
+      ok(vt.length === 2 && vt[0] === '列表' && vt[1] === '星空',
+        '视角切换：列表在前、星空在后（内部不复用「时间线」这个名字）', JSON.stringify(vt))
+      const tabs = all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n)).map(textOf)
+      ok(tabs.indexOf('时间线') >= 0 && tabs.indexOf('记忆星图') < 0,
+        '页签叫「时间线」，「记忆星图」这个名字不再出现在导航里', JSON.stringify(tabs))
     }
 
     // 13g 自动做梦：三段 + 两列参数网格（用**新的**运行时：这个 harness 的 hooks 是按
@@ -2457,7 +2498,7 @@ async function main() {
     let tree = await rt.settle(C, {})
     ok(btnHas(tree, '打开记忆文件夹').length === 1, '文件列表头部有一个「打开记忆文件夹」')
     ok(btnHas(tree, '打开记忆文件夹')[0].props.disabled !== true, '目录已知且不忙时按钮可用')
-    click(btn(tree, '记忆星图')[0])
+    click(btn(tree, '时间线')[0])
     tree = await rt.settle(C, {})
     ok(btnHas(tree, '打开记忆文件夹').length === 0, '切到星图页时不出现（只在文件列表）')
   }
@@ -2858,7 +2899,7 @@ async function main() {
       const { rt, C, tree: t0, cf } = await mkRuntimes()
       let tree = t0
       const tabs = all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n)).map(textOf)
-      ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '记忆星图', '自动做梦', '自动归档', '体检', '冲突']),
+      ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '时间线', '自动做梦', '自动归档', '体检', '冲突']),
         `六页签、冲突排在体检之后（实际：${tabs.join(' / ')}）`)
       // 先回文件列表再看徽标（徽标必须每个 tab 下都在，不能只在冲突页上有）
       click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '文件列表')[0])
@@ -3134,7 +3175,7 @@ async function main() {
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad, conflict: cf, locale: makeEnLocale() })
     let tree = await rt.settle(C, {})
     const tabs = all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n)).map(textOf)
-    ok(JSON.stringify(tabs) === JSON.stringify(['Files', 'Star map', 'Autodream', 'Auto-archive', 'Audit', 'Conflicts']),
+    ok(JSON.stringify(tabs) === JSON.stringify(['Files', 'Timeline', 'Autodream', 'Auto-archive', 'Audit', 'Conflicts']),
       `六页签全部是英文（实际：${tabs.join(' / ')}）`)
     const hasCjk = (s) => /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(s)
 

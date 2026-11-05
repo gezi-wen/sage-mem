@@ -14,7 +14,7 @@
 
 > File-based cross-session memory for DeepSeek Harness — every memory is a plain markdown file you can open, edit and delete. No database, no worker, no port.
 
-**当前发布版本：`2.4.0`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
+**当前发布版本：`2.4.1`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
 [契约冻结](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)。
 
 如果它对你有用，给个 Star 是最直接的反馈。
@@ -81,7 +81,7 @@ sage-mem 补上这一层，做法是：**把该记住的事写成一张张卡片
 | **从 Claude Code 迁移** | 人格（`CLAUDE.md` → `AGENTS.md`）照搬；记忆按四类整理成 `.md` 即可（见[下一节](#从-claude-code-迁移)） |
 | **自带使用指南** | 包内携带一份技能（`skills/sage-mem/`）：记忆长什么样、四类怎么分、什么不该存、frontmatter 的坑、检索怎么工作、索引坏了怎么修。装上插件就够了 —— Agent 拿到说明书，不需要手工配置 |
 
-界面上还有四块能力（都可以不用）：记忆管理页、类型与标签筛选、记忆星图、体检与归档。
+界面上还有四块能力（都可以不用）：记忆管理页、类型与标签筛选、时间线（默认是条目列表，可切星空视角）、体检与归档。
 
 **1.8.0 起，记忆管理还能从侧栏直接进**：侧栏多一个「记忆管理」图标，点它把中央主区切到本页（页顶有「返回会话」）。
 设置页「记忆管理 → 自动做梦 → 设置」里可以关掉这个入口（默认开，立即生效、不用重启）；
@@ -165,7 +165,7 @@ SAGE_MEM_DIR=/path/to/your/memory
 
 下面每张图都是**从仓库里的界面代码渲染出来的**（同一份 CSS、同一棵组件树；数据是演示用的假数据，不是真实记忆目录）。
 
-1.9.0 起，记忆管理这一块跟随宿主语言（**设置 → 通用 → 语言**）；记忆内容本身保持它被写下时的语言，2.1.0 起扩展到**自动做梦**（运行 / 设置 / 记录）与**自动归档**两屏；只剩记忆星图仍是中文，等下一批 i18n。
+1.9.0 起，记忆管理这一块跟随宿主语言（**设置 → 通用 → 语言**）；记忆内容本身保持它被写下时的语言，2.1.0 起扩展到**自动做梦**（运行 / 设置 / 记录）与**自动归档**两屏；只剩时间线/星图那一屏仍是中文，等下一批 i18n。
 
 ![文件列表：每条记忆一个 Markdown 文件，灰底的是已归档](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/files-list.png)
 
@@ -191,9 +191,13 @@ SAGE_MEM_DIR=/path/to/your/memory
 
 *归档候选 —— 每条写清「为什么建议归档」（闲置天数 vs 该类型阈值），逐条或全选后确认才动文件。归档是把文件移进 `archive/`，**不删除**；真要删掉一条归档件，得在档案馆里单独点「彻底删除」并再确认一次。*
 
-![记忆星图：暗星是已归档的记忆](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/starmap-archive.png)
+![时间线（默认视角）：按更新时间倒序的条目列表](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/starmap-list.png)
 
-*记忆星图 —— 颜色对应类型、大小对应体积、亮度对应新鲜度；暗星是已归档的记忆，点开可看归档时间与理由。*
+*时间线 —— **打开这个标签先看见的就是这一屏**：按更新时间倒序的条目列表，最近改过的在最上面。想看图，右上角「星空」自己切。*
+
+![时间线 · 星空视角：暗星是已归档的记忆](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/starmap-archive.png)
+
+*切到「星空」之后 —— 颜色对应类型、大小对应体积、亮度对应新鲜度，暗星是已归档的记忆，点开可看归档时间与理由。*
 
 ![自动做梦 · 设置](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/autodream-settings.png)
 
@@ -203,9 +207,9 @@ SAGE_MEM_DIR=/path/to/your/memory
 
 *自动归档 —— 它和自动做梦不是一件事：归档是**确定性规则**（按访问台账的闲置天数算，不调模型），所以单独一页。阈值保存即生效，不用重启。*
 
-![记忆星图](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/starmap.png)
+![时间线 · 星空视角](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/starmap.png)
 
-*记忆星图全貌 —— 画布上只画关系与分布；悬停或点开某颗星时才显示那一条的文件名。渲染是按需重绘，画面静止时不发起任何绘制。*
+*「星空」视角全貌 —— 画布上只画关系与分布；悬停或点开某颗星时才显示那一条的文件名。渲染是按需重绘，画面静止时不发起任何绘制。*
 
 ## 记忆文件格式
 

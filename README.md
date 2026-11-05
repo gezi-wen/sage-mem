@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.4.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.4.1`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -79,7 +79,7 @@ Most memory schemes take the "SQLite + a long-running worker" route: once memori
 | **Migration from Claude Code** | The persona (`CLAUDE.md` → `AGENTS.md`) is copied as-is; memories just need organizing into `.md` files under four types (see [the next section](#migrating-from-claude-code)) |
 | **Ships its own usage guide** | The package carries a skill (`skills/sage-mem/`): what a memory looks like, the four types, what not to store, the frontmatter pitfalls, how retrieval actually works, how to audit and fix a broken index. Installing the plugin is enough — the agent gets the instructions, no manual setup |
 
-The UI also carries four more capabilities (all of them optional): the memory management page, type and tag filtering, the memory star map, and audit & archiving.
+The UI also carries four more capabilities (all of them optional): the memory management page, type and tag filtering, the timeline (an entries list by default, with an optional star-map view), and audit & archiving.
 
 **Since 1.8.0, memory management is also reachable from the sidebar**: a 「记忆管理」(memory management) icon appears in the sidebar and switches the central panel to this page (with a "back to conversation" control at the top).
 It can be turned off in the settings page under 「记忆管理 → 自动做梦 → 设置」(on by default; applies immediately, no restart);
@@ -165,7 +165,7 @@ The state directory (configuration, ledger, rollback points, conflict queue) def
 
 Every image below is **rendered from the UI code in this repository** (the same CSS, the same component tree; the data is demo data for illustration, not a real memory directory).
 
-Since 1.9.0 the memory-management surface follows the harness language (**Settings → General → Language**); memory content itself stays in whatever language it was written in, 2.1.0 extends it to the **Autodream** (run / settings / records) and **Auto-archive** screens; the star map is the only panel still Chinese until the next i18n batch.
+Since 1.9.0 the memory-management surface follows the harness language (**Settings → General → Language**); memory content itself stays in whatever language it was written in, 2.1.0 extends it to the **Autodream** (run / settings / records) and **Auto-archive** screens; the timeline / star-map screen is the only panel still Chinese until the next i18n batch.
 
 ![File list: one Markdown file per memory, greyed rows are archived](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/files-list.png)
 
@@ -191,9 +191,13 @@ Since 1.9.0 the memory-management surface follows the harness language (**Settin
 
 *Archive candidates — each states "why archiving is suggested" (idle days vs the threshold for that type); files are touched only after you confirm one by one or select all. Archiving moves a file into `archive/`, it **does not delete**; to actually delete an archived entry, click 「彻底删除」(delete permanently) in the archive view and confirm once more.*
 
-![Memory star map: dark stars are archived memories](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/starmap-archive.png)
+![Timeline (default view): entries sorted newest-first](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/starmap-list.png)
 
-*Memory star map — colour maps to type, size to volume, brightness to freshness; dark stars are archived memories, and opening one shows the archive time and reason.*
+*Timeline — **this is what the tab opens on**: a list of entries sorted newest-first, most recently changed at the top. Want the picture? Switch to 「星空」(star map) in the top-right corner.*
+
+![Timeline · star-map view: dark stars are archived memories](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/starmap-archive.png)
+
+*After switching to the star-map view — colour maps to type, size to volume, brightness to freshness; dark stars are archived memories, and opening one shows the archive time and reason.*
 
 ![Autodream · settings](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/autodream-settings.png)
 
@@ -203,9 +207,9 @@ Since 1.9.0 the memory-management surface follows the harness language (**Settin
 
 *Auto-archive — it is not the same thing as autodream: archiving is a **deterministic rule** (computed from idle days in the access ledger, no model call), which is why it gets a page of its own. Thresholds take effect on save, no restart needed.*
 
-![Memory star map](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/starmap.png)
+![Timeline · star-map view](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/starmap.png)
 
-*Memory star map in full — the canvas draws only relations and distribution; the file name of a single memory appears only when you hover over or open that star. Rendering is redrawn on demand; no drawing is initiated while the view is static.*
+*The star-map view in full — the canvas draws only relations and distribution; the file name of a single memory appears only when you hover over or open that star. Rendering is redrawn on demand; no drawing is initiated while the view is static.*
 
 ## Memory File Format
 

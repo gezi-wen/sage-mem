@@ -12,7 +12,7 @@
 			"sidebar.label": "记忆管理",
 
 			"tab.files": "文件列表",
-			"tab.star": "记忆星图",
+			"tab.star": "时间线",
 			"tab.autodream": "自动做梦",
 			"tab.archive": "自动归档",
 			"tab.audit": "体检",
@@ -495,7 +495,7 @@
 			"sidebar.label": "Memory management",
 
 			"tab.files": "Files",
-			"tab.star": "Star map",
+			"tab.star": "Timeline",
 			"tab.autodream": "Autodream",
 			"tab.archive": "Auto-archive",
 			"tab.audit": "Audit",
