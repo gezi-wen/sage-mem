@@ -387,8 +387,21 @@ console.log('== 6. 缓存按目录分账：两个目录不互相污染 ==')
 console.log('== 7. 反向对照：真实 watcher 下「改一下再扫」必须不命中 ==')
 {
   zeroCounts()
-  const cached = await scanMemoryFiles(ctx, 'rev-0')
-  ok(opened() === 0 && cached.length === 12, '先证明此刻确实是命中（零打开）', JSON.stringify(counts))
+  // 上一段刚写过文件，watcher 的事件可能还在路上。旧写法直接断言「零打开」，事件晚到一步
+  // 就红 —— 在**未改动的树上**本机实测 2/5 次（Linux CI 上更频繁），与缓存本身无关。
+  // 改成「等到缓存重建成功再断言」，判的仍然是「命中时不打开文件」，只是不为在途事件背锅。
+  let cached = []
+  let hitCached = false
+  const warmDeadline = Date.now() + 1000
+  do {
+    await scanMemoryFiles(ctx, 'rev-0')   // 让在途事件先落地，缓存重建
+    zeroCounts()
+    cached = await scanMemoryFiles(ctx, 'rev-0')
+    hitCached = opened() === 0
+    if (hitCached) break
+    await sleep(20)
+  } while (Date.now() < warmDeadline)
+  ok(hitCached && cached.length === 12, '先证明此刻确实是命中（零打开）', JSON.stringify(counts))
 
   // 7a. 新增文件 —— 兜底判据保证它一定被看见（不依赖事件是否送达）
   mem(memDir, 'zzz-brand-new.md', '新写入的条目')

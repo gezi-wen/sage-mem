@@ -52,6 +52,8 @@ const SUITES = [
   'recall-unit-test.mjs',
   // 1.7.0：注入调试账（开关语义 / 环形缓冲 / 不落盘 / typert 对拍）。
   'recall-debug-test.mjs',
+  // 2.4.2：注入链的短路闸门（同题同目录不重算，换题 / 变目录 / 压缩后必须重算）。
+  'recall-gate-test.mjs',
   'chunks-test.mjs',
   'bm25-test.mjs',
   'search-test.mjs',
