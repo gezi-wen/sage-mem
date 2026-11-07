@@ -129,6 +129,23 @@
 
 			// 根节点带一个稳定的类名（2.5.0）：它现在与「自动做梦」同屏堆叠，
 			// 断言与样式都得能把这一张卡与旁边那张分开 —— 没有类名就只能按整棵树找文本。
+			//
+			// 2.5.0 补（文歌子 2026-11-08 提的结构）：这张卡也要有自己的「运行 / 设置」分段。
+			// 并屏之后两张卡形状必须一样 —— 否则「设置」那一段里出现阈值、档位、说明混在一起，
+			// 读起来像没分过类。分法照自动做梦那张卡：
+			//   运行 = 它做什么 + 现在什么档（要看状态、要改档位的人在这一段）
+			//   设置 = 三个阈值 + 保存（要调「多久算闲置」的人在这一段）
+			// 没有「记录」段：归档产物写进整理记录，那一份列表在自动做梦 → 记录里，
+			// 这里再开一段只是把它复制一遍（旧版那段本来就是一句「与记录共用」的空态）。
+			const sSeg = react.useState("run");
+			const seg = sSeg[0], setSeg = sSeg[1];
+			const subtab = (name, label) => h("button", {
+				type: "button", key: name,
+				className: "smem-subtab" + (seg === name ? " smem-subtab--on" : ""),
+				"aria-current": seg === name ? "true" : "false",
+				onClick: function () { setSeg(name); },
+			}, label);
+
 			return h("div", { className: "smem-archive-settings smem-module-card" }, [
 				// ── ① 模块卡头（2.5.0，D39）：开关 + 标题 + 状态 ──
 				// 开关的真身就是 `autoArchive === 'off'`，没有新增配置键。
@@ -146,68 +163,78 @@
 						busy ? t("archive.action.saving")
 							: (mode === "off" ? t("archive.status.off") : t("archive.status.on", { mode: modeLabel(mode) }))),
 				]),
-				// ── ② 它做什么（这一屏存在的理由写在最前面）──
-				h("div", { className: "smem-autodream-sec", key: "what" }, [
-					h("div", { className: "smem-autodream-row", key: "h" }, [
-						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, t("archive.title")),
-					]),
-					h("div", { className: "smem-autodream-note", key: "p1" }, t("archive.intro1")),
-					h("div", { className: "smem-autodream-note", key: "p2" }, t("archive.intro2")),
-					h("div", { className: "smem-autodream-note", key: "p3" }, t("archive.intro3")),
+				// ── ② 分段（与自动做梦那张卡同一个词：ad.tab.run / ad.tab.settings）──
+				h("div", { className: "smem-subtabs", key: "segs" }, [
+					subtab("run", t("ad.tab.run")),
+					subtab("settings", t("ad.tab.settings")),
 				]),
-				// ── ③ 两档策略（「关闭」已删，见 D39）──
-				h("div", { className: "smem-autodream-sec", key: "mode" }, [
-					mode === "off"
-						? h("div", { className: "smem-modcard-off", key: "offNote" }, t("archive.note.offStop"))
-						: null,
-					h("div", { className: "smem-autodream-row", key: "r" }, [
-						h("span", { className: "smem-autodream-key", key: "k" }, t("archive.modeTitle")),
-						h(Seg, {
-							key: "v", value: mode === "off" ? lastMode : mode,
-							options: [
-								{ value: "report", label: modeLabel("report") },
-								{ value: "auto", label: modeLabel("auto") },
-							],
-							onChange: function (v) { if (v !== mode) saveMode(v); },
-						}),
-						busy ? h("span", { className: "smem-status", key: "s" }, t("archive.action.saving")) : null,
+				seg === "run" ? h("div", { key: "seg-run" }, [
+					// ── 它做什么（这一屏存在的理由写在最前面）──
+					h("div", { className: "smem-autodream-sec", key: "what" }, [
+						h("div", { className: "smem-autodream-row", key: "h" }, [
+							h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, t("archive.title")),
+						]),
+						h("div", { className: "smem-autodream-note", key: "p1" }, t("archive.intro1")),
+						h("div", { className: "smem-autodream-note", key: "p2" }, t("archive.intro2")),
+						h("div", { className: "smem-autodream-note", key: "p3" }, t("archive.intro3")),
 					]),
-					h("div", { className: "smem-autodream-note", key: "cost" }, costText(mode)),
-					mode === "auto" && !c.apply
-						? h("div", { className: "smem-autodream-note smem-ad-warn", key: "deg" }, t("archive.degrade"))
-						: null,
-				]),
-				// ── ③ 三个阈值 ──
-				h("div", { className: "smem-autodream-sec", key: "th" }, [
-					h("div", { className: "smem-autodream-row", key: "h" }, [
-						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, t("archive.th.title")),
+					// ── 两档策略（「关闭」已删，见 D39）──
+					h("div", { className: "smem-autodream-sec", key: "mode" }, [
+						mode === "off"
+							? h("div", { className: "smem-modcard-off", key: "offNote" }, t("archive.note.offStop"))
+							: null,
+						h("div", { className: "smem-autodream-row", key: "r" }, [
+							h("span", { className: "smem-autodream-key", key: "k" }, t("archive.modeTitle")),
+							h(Seg, {
+								key: "v", value: mode === "off" ? lastMode : mode,
+								options: [
+									{ value: "report", label: modeLabel("report") },
+									{ value: "auto", label: modeLabel("auto") },
+								],
+								onChange: function (v) { if (v !== mode) saveMode(v); },
+							}),
+							busy ? h("span", { className: "smem-status", key: "s" }, t("archive.action.saving")) : null,
+						]),
+						h("div", { className: "smem-autodream-note", key: "cost" }, costText(mode)),
+						mode === "auto" && !c.apply
+							? h("div", { className: "smem-autodream-note smem-ad-warn", key: "deg" }, t("archive.degrade"))
+							: null,
 					]),
-					draft
-						? h("div", { key: "rows" }, TH_KEYS.map(function (k) {
-								return h("div", { className: "smem-autodream-row", key: k }, [
-									h("span", { className: "smem-autodream-key", key: "k" }, thLabel(k)),
-									h("input", {
-										className: "smem-input smem-num", key: "i", type: "number", min: 1, max: 3650,
-										value: draft[k],
-										onChange: function (e) {
-											const nx = Object.assign({}, draft);
-											nx[k] = e.target.value;
-											setDraft(nx);
-										},
-									}),
-									h("span", { className: "smem-muted", key: "u" }, thHint(k)),
-								]);
-							}))
-						: h("div", { className: "smem-muted", key: "loading" }, t("archive.loadingConfig")),
-					h("div", { className: "smem-autodream-row", key: "btns" }, [
-						h("button", {
-							type: "button", className: "smem-btn smem-btn-primary", key: "save",
-							disabled: busy || !draft, onClick: saveThresholds,
-						}, busy ? t("archive.action.saving") : t("archive.action.save")),
-						h("span", { className: "smem-muted", key: "n" }, t("archive.note.immediate")),
+				]) : null,
+				seg === "settings" ? h("div", { key: "seg-settings" }, [
+					// ── 三个阈值 ──
+					h("div", { className: "smem-autodream-sec", key: "th" }, [
+						h("div", { className: "smem-autodream-row", key: "h" }, [
+							h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, t("archive.th.title")),
+						]),
+						draft
+							? h("div", { key: "rows" }, TH_KEYS.map(function (k) {
+									return h("div", { className: "smem-autodream-row", key: k }, [
+										h("span", { className: "smem-autodream-key", key: "k" }, thLabel(k)),
+										h("input", {
+											className: "smem-input smem-num", key: "i", type: "number", min: 1, max: 3650,
+											value: draft[k],
+											onChange: function (e) {
+												const nx = Object.assign({}, draft);
+												nx[k] = e.target.value;
+												setDraft(nx);
+											},
+										}),
+										h("span", { className: "smem-muted", key: "u" }, thHint(k)),
+									]);
+								}))
+							: h("div", { className: "smem-muted", key: "loading" }, t("archive.loadingConfig")),
+						h("div", { className: "smem-autodream-row", key: "btns" }, [
+							h("button", {
+								type: "button", className: "smem-btn smem-btn-primary", key: "save",
+								disabled: busy || !draft, onClick: saveThresholds,
+							}, busy ? t("archive.action.saving") : t("archive.action.save")),
+							h("span", { className: "smem-muted", key: "n" }, t("archive.note.immediate")),
+						]),
+						h("div", { className: "smem-autodream-note", key: "note" }, t("archive.note.thresholds")),
 					]),
-					h("div", { className: "smem-autodream-note", key: "note" }, t("archive.note.thresholds")),
-				]),
+				]) : null,
+				// 错误与回执留在分段之外：不管你在哪一段按的，结果都得看得见。
 				err ? h("div", { className: "smem-err", key: "err" }, "⚠ " + err) : null,
 				notice ? h("div", { className: "smem-ok", key: "ok" }, "✓ " + notice) : null,
 			]);

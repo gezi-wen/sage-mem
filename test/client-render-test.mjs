@@ -1049,7 +1049,7 @@ async function emitPreview() {
     let tree = await rt.settle(C, {})
     click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '自动整理')[0])
     tree = await rt.settle(C, {})
-    S('archive-settings', 'docs/images/archive-settings.png', '自动归档 —— 「自动整理」屏上的第二张卡：先说清它做什么（移进 archive/、不删除、随时能恢复），开关 + 两档策略与三个闲置阈值都在这儿；阈值保存即生效，不用重启。', '⑥ 自动归档（自动整理屏上的第二张卡，与自动做梦堆叠）', serHtml(all(tree, byClass('smem-archive-settings'))[0]))
+    S('archive-settings', 'docs/images/archive-settings.png', '自动归档 —— 「自动整理」屏上的第二张卡，自带「运行 / 设置」两段（与自动做梦同一个形状）。运行段说清它做什么（移进 archive/、不删除、随时能恢复）与两档策略；三个闲置阈值在设置段，保存即生效、不用重启。', '⑥ 自动归档 · 运行段（自动整理屏上的第二张卡；阈值在设置段）', serHtml(all(tree, byClass('smem-archive-settings'))[0]))
   }
   // ③d 锁定：卡片按钮排在「编辑」与「归档」之间
   {
@@ -1993,7 +1993,7 @@ async function main() {
     ok(/archive\//.test(pane), '写清归档去哪：移进 archive/')
     ok(/不删|不是删除/.test(pane), '写清「归档不是删除」')
     ok(/恢复/.test(pane), '写清「随时可以恢复」')
-    ok(pane.indexOf('锁定') >= 0, '写明锁定的记忆不会被选中')
+    // 「锁定 / feedback_* 不入选」那句跟随阈值一起挪到了「设置」段（见 ③），这里不再重复断言。
 
     // ② 两档策略留在这张卡里（一处设定）；「关闭」2.5.0 起交给卡头的开关，不再占一档
     const segLabels = all(archivePane(tree), (n) => n.type === 'button').map(textOf)
@@ -2011,7 +2011,15 @@ async function main() {
     ok(treeText(archivePane(tree)).indexOf('这一档会自动降级成只出报告') >= 0, 'auto 档说清只读模式下的降级')
     ok(treeText(tree).indexOf('自动归档已设为「满足条件自动跑」') >= 0, '保存成功有明确反馈')
 
-    // ③ 三个阈值输入框，显示当前生效值
+    // ③ 三个阈值在「设置」段（2.5.0 补：归档卡也有自己的运行 / 设置两段，
+    //    照文歌子 2026-11-08 的要求 —— 设置页只留阈值那一块，其余归运行页）。
+    click(all(archivePane(tree), (n) => n.type === 'button' && textOf(n) === '设置')[0])
+    tree = await rt.settle(C, {})
+    ok(all(archivePane(tree), (n) => n.type === 'button' && textOf(n) === '保存归档条件')[0],
+      '切到「设置」段才看到阈值与保存按钮')
+    ok(treeText(archivePane(tree)).indexOf('锁定') >= 0, '写明锁定的记忆不会被选中（在设置段里，与阈值同屏）')
+    ok(treeText(archivePane(tree)).indexOf('三个阈值') < 0 && treeText(archivePane(tree)).indexOf('只出报告：候选写进整理报告') < 0,
+      '运行段的档位与代价说明不在设置段里（两段真的分开）')
     const nums = all(archivePane(tree), (n) => n.type === 'input' && String((n.props || {}).className || '').indexOf('smem-num') >= 0)
     ok(nums.length === 3, `三个阈值输入框（实际 ${nums.length}）`)
     const vals = nums.map((n) => String(n.props.value))
@@ -2455,7 +2463,8 @@ async function main() {
     let t2 = await rt2.settle(r2.comp, {})
     click(btn(t2, '自动整理')[0])
     t2 = await rt2.settle(r2.comp, {})
-    ok(all(t2, byClass('smem-subtab')).length === 3, '三个分段按钮都在')
+    // 2.5.0：一屏两张模块卡，各自 3 + 2 段（归档没有「记录」段：归档产物就写在整理记录里）。
+    ok(all(t2, byClass('smem-subtab')).length === 5, `两卡共 5 个分段按钮（实际 ${all(t2, byClass('smem-subtab')).length}）`)
     ok(treeText(t2).indexOf('立即整理') >= 0, '「运行」段里有立即整理')
     t2 = await gotoSeg(rt2, r2.comp, t2, '设置')
     const grid = all(t2, byClass('smem-ad-grid2'))[0]
@@ -3394,15 +3403,21 @@ async function main() {
       '记录段是英文（回滚点 / 整理记录 / 历史报告）')
     ok(t3.indexOf('回滚点') < 0 && t3.indexOf('整理记录') < 0 && t3.indexOf('历史报告') < 0, '记录段没有残留中文文案')
 
-    // 25d 自动归档卡：2.5.0 起它与自动做梦同屏（同一页签），所以直接在这一张卡里验
-    const t4 = treeText(all(tree, byClass('smem-archive-settings'))[0])
-    ok(t4.indexOf('What auto-archive does') >= 0 && t4.indexOf('Save archive conditions') >= 0,
-      '自动归档卡是英文（标题 / 保存按钮）')
-    ok(t4.indexOf('Project') >= 0 && t4.indexOf('Reference') >= 0 && t4.indexOf('User') >= 0,
+    // 25d 自动归档卡：2.5.0 起它与自动做梦同屏（同一页签），且自带「运行 / 设置」两段 ——
+    // 两段都要在英文环境下验：语言回归最常漏的就是「只切换了默认那一段」。
+    const cardOf = () => all(tree, byClass('smem-archive-settings'))[0]
+    const t4 = treeText(cardOf())
+    ok(t4.indexOf('What auto-archive does') >= 0, '自动归档卡 · 运行段是英文（标题）')
+    ok(!hasCjk(t4), '自动归档卡 · 运行段整段无中文')
+    click(all(cardOf(), (n) => n.type === 'button' && textOf(n) === 'Settings')[0])
+    tree = await rt.settle(C, {})
+    const t5 = treeText(all(tree, byClass('smem-archive-settings'))[0])
+    ok(t5.indexOf('Save archive conditions') >= 0, '自动归档卡 · 设置段是英文（保存按钮）')
+    ok(t5.indexOf('Project') >= 0 && t5.indexOf('Reference') >= 0 && t5.indexOf('User') >= 0,
       '三个阈值标题是英文（Project / Reference / User）')
-    ok(t4.indexOf('自动归档做什么') < 0 && t4.indexOf('保存归档条件') < 0 && t4.indexOf('闲置多少天算可以归档') < 0,
-      '自动归档卡没有残留中文文案')
-    ok(!hasCjk(t4), '自动归档卡整张无中文')
+    ok(t5.indexOf('保存归档条件') < 0 && t5.indexOf('闲置多少天算可以归档') < 0,
+      '自动归档卡 · 设置段没有残留中文文案')
+    ok(!hasCjk(t5), '自动归档卡 · 设置段整段无中文')
   }
 
   console.log(`\n结果：${pass} passed, ${fail} failed`)

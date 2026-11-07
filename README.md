@@ -205,9 +205,9 @@ Since 1.9.0 the memory-management surface follows the harness language (**Settin
 
 *Autodream · settings — run / settings / history as secondary groups; the five injection parameters laid out in two columns, with both 「当前生效」(currently in effect) and 「重启后」(after restart) written out.*
 
-![Auto-archive: the second card on the Automation screen — one switch, two modes, three idle thresholds](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/archive-settings.png)
+![Auto-archive: the second card on the Automation screen — its own run / settings segments, one switch, two modes](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/archive-settings.png)
 
-*Auto-archive — it is not the same thing as autodream: archiving is a **deterministic rule** (computed from idle days in the access ledger, no model call), which is why it is its own card. Since 2.5.0 it has a **switch**, and that switch is the only way to turn it off (the old third mode 「关闭」 is gone); the mode is either 「只出报告」(report only) or 「满足条件自动跑」(run when the threshold is hit). Turning it off stops the running, not the settings — thresholds and history stay editable. Thresholds take effect on save, no restart needed.*
+*Auto-archive — it is not the same thing as autodream: archiving is a **deterministic rule** (computed from idle days in the access ledger, no model call), which is why it is its own card. Since 2.5.0 it has a **switch**, and that switch is the only way to turn it off (the old third mode 「关闭」 is gone); the mode is either 「只出报告」(report only) or 「满足条件自动跑」(run when the threshold is hit). The card has its own 「运行 / 设置」 segments, same shape as autodream: the run segment explains what it does and holds the mode, the settings segment holds the three idle thresholds. Turning it off stops the running, not the settings — thresholds and history stay editable. Thresholds take effect on save, no restart needed.*
 
 ![Timeline · star-map view](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/starmap.png)
 
