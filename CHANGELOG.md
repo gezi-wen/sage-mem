@@ -7,6 +7,38 @@
 
 ---
 
+## 2.4.2
+
+**主题：注入段声明自己「是数据、不是模板」—— 记忆正文里出现一双双大括号，不再让整轮对话在模型开跑前就失败。**
+
+版本判定：2.4.2（PATCH）｜理由：修的是一个崩溃缺陷，注入文本、记忆文件格式、wire 协议、remote 方法集全部不变｜运行时源文件 1（`lib/recall/injector.js`，+1 个字段 +1 段注释）｜PATCH 一版一件事：「记忆正文按纯文本进入上下文」
+
+### 行为变更
+
+- 宿主组装 system prompt 时会**对每个 context 做提示词变量解析**（`{{变量}}`）。此前注入段没有声明豁免，于是记忆正文里只要出现过一双大括号 —— `{{ }}`（空名）、`{{foo_bar}}`（名字合法但宿主没注册）、`{{#if x}}`（带符号）都算 —— 解析就在**模型还没开跑**时抛 `malformed prompt variable reference … in context "sage-mem:recall"`，整轮对话直接失败。症状是「有时能聊、有时一提问就失败」，取决于这次召回到了哪几条记忆。
+- 现在注入段显式带 `interpolate: false`：正文逐字进入上下文，不再经过模板解析。用户写什么是合法的 Markdown，插件把用户数据塞进 `contexts` 就自己负责声明这一点。
+- **只对读这个字段的宿主有效**：`0.2.1-rc.1` 起的 context 渲染会读它（本机实测 `0.2.1-rc.3` 与 `0.2.2-rc.1` 都是 `context.interpolate === false ? context.text : interpolate(…)`）。`0.1.x` / `0.2.0` 只有 section 层支持，多一个未知属性不报错、行为与修复前一致 —— 也就是说**老宿主上这个崩溃仍在**，属于宿主侧能力缺失，因此没有抬 `engines.dsh`。
+
+### 不变
+
+- 注入文本逐字节不变：`recall-golden-test` 12 个场景照旧全绿；段落命中、行号、引用纪律全都仍按字面文本走。
+- wire 协议、typert 契约、remote 方法集、记忆文件格式、设置项全部未动。
+- 没有替用户扫描历史记忆里的同类写法，也没有在写入侧拦 `{{` —— 用户写什么都是合法的 Markdown（D37）。
+
+### 新增测试
+
+- `recall-context-literal-test.mjs` **13 条**：三种形态（空名 / 合法未注册 / 带符号）在注入文本里原样保留；`interpolate === false`、`order` 契约不变、第二轮注入同样带标记、sage-mem 产出的所有 context 都带标记。
+- 其中一条是**反向对照**：同一段正文走宿主默认插值必须抛错。为此在测试里按宿主规则复刻了一个微型插值器，并先自检它「确实会红」—— 否则「正文被原样保留」可能只是因为夹具里根本没有危险形态。
+- `contract-binding-test` 66 → **67**（契约新增 2.17）。
+- `npm test` 断言数 4453 → **4467**。
+
+### 实测
+
+- `npm test`：**4467 passed / 0 failed**（Windows，Node 24.22.1）。CI 的 18 / 20 / 24 矩阵全绿。
+- 宿主源码核对（不是文档、不是类型声明）：`@deepseek-ai/dsh-system-prompt` 的 `renderContextSections()` 就是 `text: context.interpolate === false ? context.text : interpolate(context, assembled.variables, "context")`。
+
+---
+
 ## 2.4.1
 
 **主题：导航改名 —— 「记忆星图」页签叫「时间线」，点开先看见按时间排的条目。**
