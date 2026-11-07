@@ -1,128 +1,128 @@
-# sage-mem · file-based memory for DeepSeek Harness _(sage-mem)_
+# sage-mem · DSH 的文件式记忆插件 _(sage-mem)_
 
-> 中文版见 [README.zh.md](https://github.com/gezi-wen/sage-mem/blob/main/README.zh.md)
+> English · [README.en.md](https://github.com/gezi-wen/sage-mem/blob/main/README.en.md)
 
 [![npm version](https://img.shields.io/npm/v/sage-mem?color=blue)](https://www.npmjs.com/package/sage-mem)
 [![npm downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fgezi-wen%2Fsage-mem%2Fbadges%2Fnpm-downloads.json)](https://www.npmjs.com/package/sage-mem)
 [![tests](https://img.shields.io/github/actions/workflow/status/gezi-wen/sage-mem/test.yml?label=tests)](https://github.com/gezi-wen/sage-mem/actions/workflows/test.yml)
-[![node](https://img.shields.io/badge/node-%E2%89%A5%2018-3c873a)](#compatibility)
-[![DSH](https://img.shields.io/badge/DSH-%E2%89%A5%200.1.2--rc.1-8a2be2)](#compatibility)
+[![node](https://img.shields.io/badge/node-%E2%89%A5%2018-3c873a)](#兼容性)
+[![DSH](https://img.shields.io/badge/DSH-%E2%89%A5%200.1.2--rc.1-8a2be2)](#兼容性)
 [![license](https://img.shields.io/npm/l/sage-mem)](https://github.com/gezi-wen/sage-mem/blob/main/LICENSE)
 [![guarantees](https://img.shields.io/badge/guarantees-assertion--backed-2ea44f)](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)
 
-**Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
+**给 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）装上跨会话记忆：每条记忆都是本地的一个 Markdown 文件。**
 
-**Current release: `2.5.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
-[frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
+> File-based cross-session memory for DeepSeek Harness — every memory is a plain markdown file you can open, edit and delete. No database, no worker, no port.
 
-If it is useful to you, a Star is the most direct feedback.
+**当前发布版本：`2.5.0`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
+[契约冻结](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)。
 
-## Table of Contents
+如果它对你有用，给个 Star 是最直接的反馈。
 
-- [What This Is](#what-this-is)
-- [Why Files, Not a Database](#why-files-not-a-database)
-- [Core Features](#core-features)
-- [Quick Start](#quick-start)
-- [UI Preview](#ui-preview)
-- [Memory File Format](#memory-file-format)
-- [Retrieval and Injection](#retrieval-and-injection)
-- [Write Safety](#write-safety)
-- [Autodream](#autodream)
-- [Migrating from Claude Code](#migrating-from-claude-code)
-- [Configuration Reference](#configuration-reference)
-- [Stability and Versioning Policy](#stability-and-versioning-policy)
-- [Permissions and Privacy](#permissions-and-privacy)
-- [Compatibility](#compatibility)
-- [Architecture](#architecture)
-- [Contributing](#contributing)
-- [FAQ](#faq)
-- [Uninstall](#uninstall)
-- [Maintainer](#maintainer)
-- [Credits](#credits)
-- [Related Projects](#related-projects)
-- [Legacy](#legacy)
+## 目录
+
+- [这是什么](#这是什么)
+- [为什么是文件，不是数据库](#为什么是文件不是数据库)
+- [核心特性](#核心特性)
+- [快速开始](#快速开始)
+- [界面预览](#界面预览)
+- [记忆文件格式](#记忆文件格式)
+- [检索与注入](#检索与注入)
+- [写入安全](#写入安全)
+- [自动做梦](#自动做梦)
+- [从 Claude Code 迁移](#从-claude-code-迁移)
+- [配置参考](#配置参考)
+- [稳定性与版本策略](#稳定性与版本策略)
+- [权限与隐私](#权限与隐私)
+- [兼容性](#兼容性)
+- [架构](#架构)
+- [参与开发](#参与开发)
+- [常见问题](#常见问题)
+- [卸载](#卸载)
+- [维护者](#维护者)
+- [致谢](#致谢)
+- [相关项目](#相关项目)
+- [旧版](#旧版)
 - [License](#license)
 
-## What This Is
+## 这是什么
 
-DSH has no native memory system. Every new session is a blank sheet: it does not remember who you are, where you got to yesterday, or what stage the project is at, so you have to brief it again every time.
+DSH 原生没有记忆系统。每开一个新会话都是一张白纸：不记得你是谁、不记得昨天做到哪、不记得项目进行到哪一步，于是你每次都要重新交代一遍。
 
-sage-mem adds that layer, like this: **write down the things worth remembering as cards, and store them on your own computer**. Before DSH hands the question to the model, the plugin picks out the few most relevant cards and **puts them in front of the model**.
+sage-mem 补上这一层，做法是：**把该记住的事写成一张张卡片，存在你自己电脑上**。在 DSH 把问题交给模型之前，插件按问题挑出最相关的几张、**贴在模型眼前**。
 
-So the accurate statement is not "the model remembers you", but "**before it opens its mouth, somebody has handed it the relevant slips of paper**". Take the slips away and it is that amnesiac colleague again.
+所以准确的说法不是「模型记得你」，而是「**在它开口之前，有人把相关的纸条递进了它手里**」。撤走纸条，它又是那个失忆的同事。
 
-A memory takes the form of one `.md` file per memory (YAML frontmatter + body): openable, editable and deletable in an editor, and manageable with git directly. **This memory stays in your own hands the whole time, not in some database.**
+记忆的形态是一条记忆一个 `.md` 文件（YAML frontmatter + 正文）：用编辑器就能打开、能改、能删，也能直接拿 git 管。**这份记忆始终在你自己手里，不在某个数据库里。**
 
-## Why Files, Not a Database
+## 为什么是文件，不是数据库
 
-Most memory schemes take the "SQLite + a long-running worker" route: once memories are written into a database they are **opaque** (to see what is stored you have to go query tables), capturing every event **inflates** the store (even "the user said hello" counts as a row), and you have to keep an extra process and an extra port alive.
+大多数记忆方案走「SQLite + 常驻 worker」：记忆写进数据库就**不透明**（想看看存了什么得去查表），事件全捕获又会让库**膨胀**（「用户打了个招呼」也算一条），还要额外养一个进程和一个端口。
 
-| | File-based (sage-mem) | Database + worker |
+| | 文件式（sage-mem） | 数据库 + worker |
 |---|---|---|
-| Seeing what is stored | Open the directory | Query tables / write a script |
-| Editing one by hand | Edit it in an editor | Go through an API or SQL |
-| Migration / backup | Copy the directory (travels with git) | Export tooling |
-| Extra process and port | None | Usually yes |
-| Who decides what gets stored | The agent judges by rules | Commonly indiscriminate capture of everything |
+| 看一眼存了什么 | 打开目录 | 查表 / 写脚本 |
+| 手工改一条 | 编辑器直接改 | 走 API 或 SQL |
+| 迁移 / 备份 | 拷目录（能跟 git 走） | 导出工具 |
+| 额外进程与端口 | 无 | 通常有 |
+| 存不存谁决定 | 由 agent 按规则判断 | 常见做法是无差别全捕获 |
 
-## Core Features
+## 核心特性
 
-| Feature | Description |
+| 特性 | 说明 |
 |---|---|
-| **File-based storage** | One `.md` per memory: frontmatter holds metadata, the body holds content. No database, no hidden format |
-| **Automatic injection** | Every new question rescans the memory directory and re-picks the most relevant few for that question, injecting them into context before the model speaks — no file reading needed |
-| **The model can look things up too** | Two retrieval tools are also given to the model (`search_memory` / `read_memory`), so it can go through memories on its own and read the original text by line |
-| **Writes are not overwritten** | While you are editing and the model is changing things at the same time, the later write does not silently clobber the earlier one; the conflict is left as a pending record for you to decide which side to keep |
-| **Zero extra services** | No worker, no SQLite, no port, no long-running process, and no extra API key or cloud service (the only runtime dependency is the ordinary npm library `zod`) |
-| **Anti-bloat** | Rules guide the model in judging "is this worth storing": nothing without substance is stored, nothing derivable by reading the code / git is stored |
-| **Tidyable** | The optional "autodream" reads your memories through once: merges duplicates, fixes the index and broken links, and creates a rollback point before changing anything |
-| **Migration from Claude Code** | The persona (`CLAUDE.md` → `AGENTS.md`) is copied as-is; memories just need organizing into `.md` files under four types (see [the next section](#migrating-from-claude-code)) |
-| **Ships its own usage guide** | The package carries a skill (`skills/sage-mem/`): what a memory looks like, the four types, what not to store, the frontmatter pitfalls, how retrieval actually works, how to audit and fix a broken index. Installing the plugin is enough — the agent gets the instructions, no manual setup |
+| **文件式存储** | 每条记忆一个 `.md`：frontmatter 存元数据，正文存内容。无数据库、无隐藏格式 |
+| **自动注入** | 每条新问题都会重新扫一遍记忆目录，按这条问题挑出最相关的几条，在模型开口之前拼进上下文 —— 不用模型自己去翻文件 |
+| **模型也能自己查** | 另给模型两个检索工具（`search_memory` / `read_memory`），它可以主动翻记忆、按行读原文 |
+| **写入不被覆盖** | 你正在编辑、模型同时在改的时候，后写的不会静默盖掉先写的；冲突留成待处理记录，由你决定保留哪边 |
+| **零额外服务** | 无 worker、无 SQLite、无端口、无常驻进程，不需要额外的 API key 或云服务（运行时唯一的依赖是普通 npm 库 `zod`） |
+| **防膨胀** | 靠规则引导模型判断「值不值得存」：无实质内容的不存，靠读代码 / git 能推出来的不存 |
+| **可整理** | 可选的「自动做梦」把记忆通读一遍：合并重复、修索引与断链，改动前先建回滚点 |
+| **从 Claude Code 迁移** | 人格（`CLAUDE.md` → `AGENTS.md`）照搬；记忆按四类整理成 `.md` 即可（见[下一节](#从-claude-code-迁移)） |
+| **自带使用指南** | 包内携带一份技能（`skills/sage-mem/`）：记忆长什么样、四类怎么分、什么不该存、frontmatter 的坑、检索怎么工作、索引坏了怎么修。装上插件就够了 —— Agent 拿到说明书，不需要手工配置 |
 
-The UI also carries four more capabilities (all of them optional): the memory management page, type and tag filtering, the timeline (an entries list by default, with an optional star-map view), and audit & archiving.
+界面上还有四块能力（都可以不用）：记忆管理页、类型与标签筛选、时间线（默认是条目列表，可切星空视角）、体检与归档。
 
-**Since 1.8.0, memory management is also reachable from the sidebar**: a 「记忆管理」(memory management) icon appears in the sidebar and switches the central panel to this page (with a "back to conversation" control at the top).
-It can be turned off in the settings page under 「记忆管理 → 自动做梦 → 设置」(on by default; applies immediately, no restart);
-**since 1.8.2 the same toggle also lives on the plugin's detail page** (「插件 → sage-mem」card) and applies immediately too;
-**turning it off only removes the sidebar icon — the 「设置 → 记忆管理」 entry always stays**.
-Since 1.8.2 the plugin also ships its own icon (a golden stack of memory cards) instead of the generic square.
+**1.8.0 起，记忆管理还能从侧栏直接进**：侧栏多一个「记忆管理」图标，点它把中央主区切到本页（页顶有「返回会话」）。
+设置页「记忆管理 → 自动做梦 → 设置」里可以关掉这个入口（默认开，立即生效、不用重启）；
+**1.8.2 起，插件详情页也有同一个开关**（「插件 → sage-mem」那张卡），改完立即生效；
+**关掉只影响侧栏图标，「设置 → 记忆管理」这个入口永远保留**。
+从 1.8.2 开始，sage-mem 在插件列表里有了自己的图标（金色记忆卡片），不再是默认的通用方图标。
 
-The memory management page's file list also has an **Open memory folder** button: it opens the
-memory directory in the system file manager (Explorer / Finder / the Linux file manager) through a
-detached host-side process and returns without waiting for the window.
+记忆管理页的「文件列表」头部还有一个「打开记忆文件夹」按钮：用系统文件管理器打开当前记忆目录
+（Windows Explorer / macOS Finder / Linux 文件管理器）。host 侧起一个 detached 进程就返回，不等窗口。
 
-While the memory directory is empty, the empty state carries a **Create index skeleton** button: one
-click writes a starter `MEMORY.md` (index format plus the four memory categories). When `MEMORY.md`
-already exists it only says so and changes nothing; it uses the existing reserved-file read/write
-calls rather than a new remote.
+记忆目录还是空的时候，空态里有一个「建立索引骨架」按钮：一键写入 `MEMORY.md` 的引导文件
+（索引格式 + 四类记忆说明）。**已经存在 `MEMORY.md` 时只提示、不覆盖**；它不走新的 remote，
+用的是原有的保留名读取 / 写入接口。
 
-## Quick Start
+## 快速开始
 
-Requires **DSH `0.1.2-rc.1` or higher** (see [Compatibility](#compatibility)) and **Node.js `>= 18`**.
+需要 **DSH `0.1.2-rc.1` 或更高**（见[兼容性](#兼容性)）、**Node.js `>= 18`**。
 
 ```bash
-# replace web with your own profile name
+# 把 web 换成你自己的 profile 名
 dsh plugin --profile web add sage-mem
 ```
 
-`dsh plugin add` puts the package into this profile and registers its bundle — no hand-editing `package.json` (manual install below).
+`dsh plugin add` 会把包装进这个 profile 并登记它的 bundle —— 不用手改 `package.json`（手动装法见下）。
 
-After installing, restart DSH and confirm it is in:
+装完重启 DSH，确认装上了：
 
 ```bash
 dsh plugin --profile web list
 ```
 
-Then **open a new session** and try three steps:
+然后**开一个新会话**试三步：
 
-1. Tell the model "remember: my cat is called Zhima, and it likes sunbathing" — it writes this into the memory directory by its rules
-2. Open another **new session** and ask "what is my cat called"
-3. Its first reply should answer "Zhima" — the memory was retrieved and injected automatically by the plugin; the model did not go and read files itself
+1. 跟模型说「记住：我的猫叫芝麻，它喜欢晒太阳」—— 它按规则把这条写进记忆目录
+2. 再开一个**新会话**，问「我的猫叫什么」
+3. 它的第一个回答就该答出「芝麻」—— 记忆由插件自动检索并注入，模型没有主动去翻文件
 
 <details>
-<summary>Manual install (if you do not want the CLI, or want to install a local development build)</summary>
+<summary>手动安装（不想用 CLI，或要装本地开发版本）</summary>
 
-Add the dependency to the profile's `package.json` and write the package name into `dsh.profile.bundles`:
+在 profile 的 `package.json` 里加依赖，并把包名写进 `dsh.profile.bundles`：
 
 ```json
 {
@@ -137,7 +137,7 @@ Add the dependency to the profile's `package.json` and write the package name in
 }
 ```
 
-For local development, use the cloned source:
+本地开发用 clone 出来的源码：
 
 ```json
 {
@@ -147,368 +147,378 @@ For local development, use the cloned source:
 }
 ```
 
-Then run `pnpm install` and restart DSH.
+改完跑 `pnpm install`，再重启 DSH。
 
 </details>
 
-### Where Memory Lives
+### 记忆放在哪
 
-By default `~/.sage-mem/memory`. To put it somewhere else (inside a project repository, so it travels with git, for example), set the environment variable:
+默认在 `~/.sage-mem/memory`。想放到别处（比如放进项目仓库、跟着 git 走）就设环境变量：
 
 ```bash
 SAGE_MEM_DIR=/path/to/your/memory
 ```
 
-The state directory (configuration, ledger, rollback points, conflict queue) defaults to the parent of the memory directory: `<memory directory>/.sage-mem`. All environment variables are in [Configuration Reference](#configuration-reference).
+状态目录（配置、台账、回滚点、冲突队列）默认在记忆目录的上一层：`<记忆目录>/.sage-mem`。全部环境变量见[配置参考](#配置参考)。
 
-## UI Preview
+## 界面预览
 
-Every image below is **rendered from the UI code in this repository** (the same CSS, the same component tree; the data is demo data for illustration, not a real memory directory).
+下面每张图都是**从仓库里的界面代码渲染出来的**（同一份 CSS、同一棵组件树；数据是演示用的假数据，不是真实记忆目录）。
 
-Since 2.5.0 the panel has **four tabs: Files | Timeline | Automation | Health** — split by what you want to do, not by which data source feeds it: autodream and auto-archive are two cards on one "Automation" screen, conflicts and the audit are two cards on one "Health" screen. Editing opens a right-hand drawer, and every action that touches a file on disk asks in a modal dialog.
+2.5.0 起面板是**四个页签：文件列表 ｜ 时间线 ｜ 自动整理 ｜ 库健康** —— 按「我要干什么」切，不按「数据从哪来」切：自动做梦与自动归档并成一屏的两张卡，冲突与体检也并成一屏的两张卡。编辑走右侧抽屉，凡是会动盘上文件的动作都先弹模态框问一句。
 
-Since 1.9.0 the memory-management surface follows the harness language (**Settings → General → Language**); memory content itself stays in whatever language it was written in, 2.1.0 extended that to the autodream (run / settings / records) and auto-archive cards; the timeline / star-map screen is the only panel still Chinese until the next i18n batch.
+1.9.0 起，记忆管理这一块跟随宿主语言（**设置 → 通用 → 语言**）；记忆内容本身保持它被写下时的语言，2.1.0 起扩展到自动做梦（运行 / 设置 / 记录）与自动归档两张卡；只剩时间线/星图那一屏仍是中文，等下一批 i18n。
 
-![File list: one Markdown file per memory, greyed rows are archived](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/files-list.png)
+![文件列表：每条记忆一个 Markdown 文件，灰底的是已归档](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/files-list.png)
 
-*File list — the header always shows 「体检 N 个问题」(audit: N issues) and 「待重启生效」(restart to apply), so you know whether you should deal with it without opening anything; greyed rows are archived and can be restored at any time, or deleted for good with 「彻底删除」(irreversible, asks once more).*
+*文件列表 —— 头部常显「体检 N 个问题」与「待重启生效」，不用点开就知道该不该处理；灰底条目是已归档，随时可以恢复，也可以点「彻底删除」真的删掉（不可恢复，要再确认一次）。*
 
-![Tools drawer: archive candidates / reserved-name editing, zero footprint when closed](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/tools-drawer.png)
+![工具抽屉：归档候选 / 保留名编辑，关着时零占位](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/tools-drawer.png)
 
-*Tools drawer — closed it takes up a single button; expanded, each of the two items carries its own status.*
+*工具抽屉 —— 关着时只占一个按钮，展开后两项各带状态。*
 
-![Lock: the button sits between 「编辑」(edit) and 「归档」(archive), archiving is disabled once locked](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/lock-card.png)
+![锁定：按钮在「编辑」与「归档」之间，锁上后归档被禁用](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/lock-card.png)
 
-*Lock — one click locks an important memory: **it no longer appears among the automatic archive candidates; the archive button in the UI is disabled, and even if you bypass the UI, the archive implementation refuses explicitly with `locked`**. The lock lives in the state directory and is not written into the memory's own frontmatter — that would be rewritten by automatic consolidation, and once the lock is lost it would be back among the candidates.*
+*锁定 —— 重要记忆点一下就锁上：**自动归档的候选里不再出现它；界面上的归档按钮被禁用，即便绕过界面，归档实现也会以 `locked` 明确拒绝**。锁存在状态目录里、不写进记忆自己的 frontmatter —— 那会被自动整理重写掉，锁一丢它又会回到候选里。*
 
-![Health: conflicts that need your call on top, machine-scanned structural problems below](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/audit.png)
+![编辑记忆：右侧抽屉，列表不再被顶下去](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/edit-drawer.png)
 
-*Health — one screen answers "is anything wrong with this library": the **conflict queue on top** (a finite list that needs your decision: which of two contradictory statements is void) and the **audit below** (dangling index entries, missing index entries, broken links and the rest, reported in red by category). "Points to an archived memory" is only a hint — it does not count as a problem, and there is no one-click fix: which one to change is your call. The audit only reports and never modifies.*
+*编辑记忆 —— 编辑走右侧抽屉，字段与校验跟以前一样，只是不再把列表顶下去；「取消」「点遮罩」「Esc」三条出口都能关掉它。*
 
-![Update notice: a single banner, only when there really is a new version](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/update-banner.png)
+![危险动作：统一模态确认，两段式不变](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/confirm-modal.png)
 
-*Update notice — a single banner appears only when there **really is a new version**, naming the new version and the current one; 「看更新内容」(see what's new) opens a new tab, and "×" just means not this time.*
+*危险动作确认 —— 归档、彻底删除、删除记忆、回滚、归档候选（逐条 / 批量）、标失效、撤销失效、删除冲突记录，九处一律先弹这一张卡。**两段式没变**：那颗触发按钮是第一段，模态是第二段，永远不合并。*
 
-![Archive candidates: each states "why archiving is suggested", executed only after confirmation](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/archive-candidates.png)
+![体检：独立一页，硬问题按类报红分节](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/audit.png)
 
-*Archive candidates — each states "why archiving is suggested" (idle days vs the threshold for that type); files are touched only after you confirm one by one or select all. Archiving moves a file into `archive/`, it **does not delete**; to actually delete an archived entry, click 「彻底删除」(delete permanently) in the archive view and confirm once more.*
+*库健康 —— 一屏回答「这个库有没有事」：**冲突队列在上**（要你裁决的有限队列：两条说法互斥，选哪一方作废），**体检在下**（索引悬空、漏索引、双链断链等结构问题按类报红）。「指向已归档」只作提示、不计入问题；也不提供一键修补 —— 改哪条由你决定。体检只报告、不修改。*
 
-![Timeline (default view): entries sorted newest-first](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/starmap-list.png)
+![更新提示：只在真有新版本时出现一条横幅](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/update-banner.png)
 
-*Timeline — **this is what the tab opens on**: a list of entries sorted newest-first, most recently changed at the top. Want the picture? Switch to 「星空」(star map) in the top-right corner.*
+*更新提示 —— 只在**真有新版本**时出现一条横幅，写明新版本与当前版本；「看更新内容」开新标签页，「×」只是这次不看。*
 
-![Timeline · star-map view: dark stars are archived memories](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/starmap-archive.png)
+![归档候选：每条写清「为什么建议归档」，确认后才执行](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/archive-candidates.png)
 
-*After switching to the star-map view — colour maps to type, size to volume, brightness to freshness; dark stars are archived memories, and opening one shows the archive time and reason.*
+*归档候选 —— 每条写清「为什么建议归档」（闲置天数 vs 该类型阈值），逐条或全选后确认才动文件。归档是把文件移进 `archive/`，**不删除**；真要删掉一条归档件，得在档案馆里单独点「彻底删除」并再确认一次。*
 
-![Autodream · settings](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/autodream-settings.png)
+![时间线（默认视角）：按更新时间倒序的条目列表](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/starmap-list.png)
 
-*Autodream · settings — run / settings / history as secondary groups; the five injection parameters laid out in two columns, with both 「当前生效」(currently in effect) and 「重启后」(after restart) written out.*
+*时间线 —— **打开这个标签先看见的就是这一屏**：按更新时间倒序的条目列表，最近改过的在最上面。想看图，右上角「星空」自己切。*
 
-![Auto-archive: the second card on the Automation screen — its own run / settings segments, one switch, two modes](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/archive-settings.png)
+![时间线 · 星空视角：暗星是已归档的记忆](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/starmap-archive.png)
 
-*Auto-archive — it is not the same thing as autodream: archiving is a **deterministic rule** (computed from idle days in the access ledger, no model call), which is why it is its own card. Since 2.5.0 it has a **switch**, and that switch is the only way to turn it off (the old third mode 「关闭」 is gone); the mode is either 「只出报告」(report only) or 「满足条件自动跑」(run when the threshold is hit). The card has its own 「运行 / 设置」 segments, same shape as autodream: the run segment explains what it does and holds the mode, the settings segment holds the three idle thresholds. Turning it off stops the running, not the settings — thresholds and history stay editable. Thresholds take effect on save, no restart needed.*
+*切到「星空」之后 —— 颜色对应类型、大小对应体积、亮度对应新鲜度，暗星是已归档的记忆，点开可看归档时间与理由。*
 
-![Timeline · star-map view](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/starmap.png)
+![自动做梦 · 设置](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/autodream-settings.png)
 
-*The star-map view in full — the canvas draws only relations and distribution; the file name of a single memory appears only when you hover over or open that star. Rendering is redrawn on demand; no drawing is initiated while the view is static.*
+*自动做梦 · 设置 —— 运行 / 设置 / 记录 二级分组；五个注入参数两列排开，并写清「当前生效」与「重启后」。*
 
-## Memory File Format
+![自动归档：自动整理屏上的第二张卡 —— 自带运行 / 设置两段，一个开关、两档策略](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/archive-settings.png)
+
+*自动归档 —— 它和自动做梦不是一件事：归档是**确定性规则**（按访问台账的闲置天数算，不调模型），所以单独一张卡。2.5.0 起它和自动做梦同一个形状（自带「运行 / 设置」两段：运行段说清它做什么并放档位，设置段放三个闲置阈值），还有一个**开关** —— 开关是唯一的关闭入口（原来的第三档「关闭」已拿掉），档位只剩「只出报告」与「满足条件自动跑」。关掉只停运行、不藏设置：阈值与记录照常可改。阈值保存即生效，不用重启。*
+
+![时间线 · 星空视角](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/starmap.png)
+
+*「星空」视角全貌 —— 画布上只画关系与分布；悬停或点开某颗星时才显示那一条的文件名。渲染是按需重绘，画面静止时不发起任何绘制。*
+
+## 记忆文件格式
 
 ````markdown
 ---
-name: optional short name
-description: one sentence saying exactly what this memory is (retrieval depends on it, so write it accurately)
+name: 可选的短名
+description: 一句话说清这条记忆是什么（检索靠它，务必写准）
 metadata:
   type: user        # user / feedback / project / reference
-tags: [project, todo]   # optional, for filtering on the list page (at most 20, 40 characters each)
-aliases: [todo, backlog] # optional: an alternative wording that also retrieves it
-baseline: true      # optional: injected unconditionally on a new session's first step (limit 8)
-baselinePriority: 10 # optional: among several baseline memories, which is injected first (higher = earlier)
+tags: [项目, 待办]   # 可选，供列表页筛选（最多 20 个、每个 40 字符）
+aliases: [待办, todo] # 可选：换一种说法也能被检索到
+baseline: true      # 可选：新会话第一步无条件注入（上限 8 条）
+baselinePriority: 10 # 可选：多条 baseline 之间谁先注入（越大越前）
 ---
 
-The memory body.
+记忆正文。
 ````
 
-The four memory types:
+四类记忆：
 
-| Type | What it stores |
+| 类型 | 存什么 |
 |---|---|
-| `user` | who the user is |
-| `feedback` | guidance on how to work (recommended to carry `**Why:**` and `**How to apply:**` lines, to make the boundaries easy to judge) |
-| `project` | work in progress and its state |
-| `reference` | pointers to where external information can be found |
+| `user` | 用户是谁 |
+| `feedback` | 工作方式指导（建议带 `**Why:**` 与 `**How to apply:**` 两行，方便判断边界） |
+| `project` | 进行中的工作与状态 |
+| `reference` | 外部信息在哪找的指针 |
 
-Single-file limit 512 KB, **validated on both the read and the write side** (on reading, the size is checked first; if it is over, the file is not read in).
+单文件上限 512 KB，**读写两侧都校验**（读的时候先看体积，超了就不读进来）。
 
-## Retrieval and Injection
+## 检索与注入
 
-Something transparent deserves a clear account of how it selects its material, because that directly determines how many tokens get injected.
+透明的东西值得说清楚它怎么选料，因为这直接决定注入多少 token。
 
-**Two-stage retrieval: summary first, then body.** The first stage scores by `description` + file name + `aliases`, taking at most **10 candidates**; the second stage runs **body paragraph retrieval** over those candidates (BM25, with Chinese tokenized as two-character units) and injects the most relevant paragraph. What is compared is a **paragraph**, not a whole file, so one file contributes at most one paragraph, and a long file cannot hog candidate slots through sheer paragraph count.
+**两段式检索：先摘要，再正文。** 第一段用 `description` + 文件名 + `aliases` 打分，最多取 **10 条**候选；第二段对这些候选做**正文段落检索**（BM25，中文按双字词元），把最相关的那一段注入。比的是**段落**而不是整份文件，所以一份文件最多贡献一段，长文不会靠段数多霸占候选位。
 
-**What the summary does not cover, the body can find again.** The summary is one precise sentence, at the cost that body details are inherently unretrievable by it; when not a single summary hits, body retrieval takes over as the fallback. Body retrieval only runs when the question is **at least 4 characters** long — a two-character question like `继续` ("continue") fed into body matching hits nothing but the word `继续` itself.
+**摘要没写到的，正文能找回来。** 摘要是精准的一句话，代价是正文细节天生检索不到；摘要一条都没命中时改由正文检索兜底。正文检索只在问题**至少 4 个字符**时才跑 —— `继续` 这种两个字的问题拿去做正文匹配，命中的全是「继续」这个词本身。
 
-**A different wording hits too:** scoring is **lexical overlap**, not semantic — ask "我有什么待办" ("what todos do I have") while the file says "代办清单" ("todo list") and one differing character means no hit at all. Adding a line `aliases: [待办, todo]` to such a memory covers it.
+**换个说法也能命中：** 打分是**词面重合**，不是语义的 —— 问「我有什么待办」而文件里写的是「代办清单」，差一个字就完全不命中。给这类记忆加一行 `aliases: [待办, todo]` 就能补上。
 
-**What gets injected is the matching paragraph, not the start of the file.** A matching paragraph is labelled `### 项目_部署.md:40-52`, so the model can jump straight to those lines to check the source; a line with that memory's `description` is prepended, saying which memory the passage was cut from. `baseline` memories and files with no body hit are still injected from the start; a single body over the character limit (1500 characters by default) is truncated and marked `…（截断）`.
+**注入的是命中段落，不是文件开头。** 命中段落标成 `### 项目_部署.md:40-52`，模型据此能直接跳到那几行核对来源；段落前补一句该记忆的 `description`，说明这段是从哪条记忆切出来的。`baseline` 与没命中正文的文件仍注入开头；单条正文超过字数上限（默认 1500 字符）会截断并标 `…（截断）`。
 
-**Adjacent repeated questions are not injected twice** (only one signature is kept per session), so asking twice in a row does not append it again. Note that this is **not** "the same question is given once for the whole session": ask A → ask B → ask A, and the third one injects again — when recall is requested again, supplying the evidence again is not necessarily a bad thing.
+**相邻的重复问题不会重复注入**（按会话只留一个签名），连着问两遍不会又追加一遍。注意这**不是**「整个会话同题只给一次」：问 A → 问 B → 再问 A，第三次会重新注入 —— 再次要求回忆时重新给证据未必是坏事。
 
-**A single session has a budget cap** (60 KB by default), split into two ledgers: the **body pool** = the total cap − the **status-card reservation** (5%, clamped between 1 and 4 KB). Hitting the top does not mean "not a single character is injected"; the body is simply not injected as before while the gap status card is still sent, telling you what was left out and how to look it up next. **After the context is compacted or cleared, both ledgers and the card signatures reset to zero together**, and injection can happen again.
+**单场会话有预算上限**（默认 60 KB），拆成两本账：**正文池** = 总上限 − **状态卡预留**（5%，夹在 1–4 KB）。到顶之后不是「一个字都不注」，而是正文照旧不注、缺口状态卡照发，告诉你漏了什么、下一步怎么查。**压缩或清空上下文之后两本账与卡的签名一起归零**，又能注进来。
 
-> ⚠️ **This cap is soft, not a hard gate.** `baseline` memories matched by the question are injected regardless and take no part in the degradation, so the cumulative body over one session **may exceed the body pool** (9.6% overrun was measured in evaluation, all of it from this kind of memory). This is a deliberate tradeoff: the semantics of that kind of memory are "it should be present every session". Do not read it as "a clean cut-off at 60 KB".
+> ⚠️ **这个上限是软的，不是硬闸门。** `baseline` 记忆被问句命中时会照注不误、不参与降级，所以单场累计正文**可能超出正文池**（评测里量到 9.6% 的超支，全部来自这类记忆）。这是有意的取舍：那类记忆的语义就是「每场都该在场」。别把它当成「到 60 KB 就一刀切断」。
 
-**The gap status card speaks only when there really is a gap**: it appears only when there are candidates that were not read, or candidates omitted by the budget, and it states the scope, the count, the best clue and **one action you can take**; when not a single thing matched, it speaks only if you **asked about your own history**, or this task **has a checkpoint** (otherwise the hint would be ignored as noise). A single card is capped at 512 bytes and deduplicated by content signature.
+**缺口状态卡只在真有缺口时说话**：有候选没读、或有候选被预算省略时才出现，说清范围、条数、最佳线索和**一个可做的动作**；一条都没命中时，只有在你**问自己的历史**、或这条任务**有检查点**时才说（否则提示会被当噪音忽略）。单张卡上限 512 字节，且按内容签名去重。
 
-**"This claim no longer holds" becomes a fact you can check in the file (from 2.0.0).** A memory's frontmatter may carry three optional fields: `valid_at` (when the claim starts to hold), `invalid_at` (when it stops counting), and `superseded_by` (which memory holds the current wording). **The injection side reads them**: a memory whose `invalid_at` has passed is no longer injected as body text (reason `expired_source`); an **unresolved contradiction** (an open record with `kind: contradiction`) keeps **both sides** out of the body (`conflict_pending`) until you resolve it on the 「记忆管理 → 冲突」(Memory management → Conflicts) tab. **Write-failure conflicts are not suppressed** (stale version / the file was changed elsewhere / a half-finished merge) — what is on disk is still the current content, and hiding it too would report "this write did not land" as "this memory is untrustworthy".
+**「这条已经不作数了」会变成文件里可核对的事实（2.0.0 起）。** 记忆的 frontmatter 可以带三个可选字段：`valid_at`（说法从什么时候成立）、`invalid_at`（从什么时候起不再作数）、`superseded_by`（现行口径在哪条记忆里）。**注入侧会读它们**：`invalid_at` 已经到点的那条不再进正文（理由是 `expired_source`）；一对**未经裁决的矛盾**（`kind: contradiction` 的 open 记录）**两方都不进正文**（`conflict_pending`），直到你在「记忆管理 → 冲突」页签里裁决。**写失败型的冲突不抑制**（版本过期 / 文件在别处被改过 / 合并到一半）—— 盘上那份仍然是现行内容，把它们也藏起来等于把「这次没写进去」误报成「记忆不可信」。
 
-**Suppression is never silent.** While contradictions are pending, the status card adds a line — "另有 N 条矛盾待裁决，相关记忆本轮未注入正文" (N contradictions are pending; the related memories were not injected this round) — with the concrete count, so a change in the count can send a fresh card, and the panel header carries a permanent badge. **The tools are unaffected**: `search_memory` / `read_memory` still find and read invalid memories, marking them "已失效" and carrying `invalidAt` / `supersededBy` — when you ask about history, the old wording is evidence, not noise. To go back to the old behaviour temporarily, set `SAGE_MEM_VALIDITY=0` (that disables only this filter; the rest of this release stays).
+**抑制绝不静默。** 有矛盾待裁决时，状态卡会多一句「另有 N 条矛盾待裁决，相关记忆本轮未注入正文」（带具体条数，所以条数一变就能再发一次），面板头部也有一个常显徽标。**工具不受影响**：`search_memory` / `read_memory` 照旧能搜到、读到失效记忆，结果里会标「已失效」并带 `invalidAt` / `supersededBy` —— 问历史时旧口径是证据，不是噪音。想临时回到旧行为，把 `SAGE_MEM_VALIDITY` 设成 `0`（只关这一层过滤，本版其它修复都还在）。
 
-**There is a relevance threshold on the summary side too.** In Chinese, units like "怎么" and "什么" appear in a great many `description`s, so an unrelated "今天天气怎么样" can hit a dozen memories off a single "怎么". The threshold is normalized against **the corpus's own IDF scale**, which brings the candidate count for unrelated questions down to about one seventh; what gets cleared out is mainly the weak summary candidates that should have lost anyway.
+**摘要侧也有相关性门槛。** 中文里「怎么」「什么」这类词元在大量 `description` 里都有，一句无关的「今天天气怎么样」可能靠一个「怎么」命中十几份记忆。门槛按**语料自身的 IDF 尺度**归一，无关问题的候选数因此降到约七分之一；被清掉的主要是本就该落选的弱摘要候选。
 
-The comparison on the offline evaluation set (before and after the threshold): **Recall@5 84.1% → 87.0%, spurious injection (memories injected that are unrelated to the question) 14.1% → 5.6%**.
+离线评测集上的对照（门槛前后）：**Recall@5 84.1% → 87.0%、误注入（注入了与问题无关的记忆）14.1% → 5.6%**。
 
-> ⚠️ **These are measurements, not promises**: what transfers is the **relative improvement**; the absolute level **cannot be extrapolated** to a real memory directory — the summaries of that 30-item corpus were written by hand precisely so as to "be retrievable", whereas real memories' summaries are often written casually or are missing entirely. Method and limitations are in the [evaluation report](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-eval-report.md).
+> ⚠️ **这些是测量，不是承诺**：可迁移的是**相对改进**，绝对水平**不可外推**到真实记忆目录 —— 那 30 份语料的摘要本来就是照着「能被检索到」手写的，真实记忆的摘要往往写得很随意甚至缺失。方法与局限见[评测报告](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-eval-report.md)。
 
-**Intent detection never suppresses repetition on three kinds of explicit request**: "we settled on A last time, right?" (verification), "we are not using A any more" (correction), "why did we not pick A before" (asking for the basis) must be given the original text; if it cannot be judged, it does not judge, and it does not guess.
+**意图识别绝不在三类显式请求上抑制重复**：「上次决定用 A 对吧」（核实）、「不用 A 了」（更正）、「之前为什么没选 A」（问依据）必须给原文；判不出来就不判，不猜。
 
-### The Model Can Browse Memories Too: Two Tools
+### 模型也能自己翻：两个工具
 
-The trigger right for retrieval is split in two: half with the plugin (automatic injection — it guesses what you want to see), half with the model (the two tools below — it looks things up on its own).
+检索的触发权分两半：一半在插件（自动注入，它猜你想看什么），一半在模型（下面这两个工具，它主动查）。
 
-| Tool | Purpose |
+| 工具 | 用途 |
 |---|---|
-| `search_memory(query, scope?, limit?, cursor?)` | Compares summaries first, then searches bodies by paragraph; returns candidates, matching passages, line numbers, and **coverage information** (how many files were scanned, how many paragraphs were filtered out for insufficient relevance, whether there is a next page) |
-| `read_memory(name, startLine?, startByte?, maxBytes?, revision?)` | Reads the body by line, paginated. Pass the `revision` you last read, and if the content has been changed by someone it returns `revision_changed`, **and does not return the content** — otherwise you would read the wrong thing with stale line numbers |
+| `search_memory(query, scope?, limit?, cursor?)` | 先比摘要、再按段落查正文；返回候选、命中片段、行号，以及**覆盖情况**（扫了几份、几段因相关性不够被滤掉、有没有下一页） |
+| `read_memory(name, startLine?, startByte?, maxBytes?, revision?)` | 按行分页读正文。带上你上次读到的 `revision`，内容被人改过时会回 `revision_changed`，**并且不返回内容** —— 否则你会拿着过期行号读错东西 |
 
-Both tools go through **the same** safe read path (file name checks → symlink and reserved-name identity checks → size gate); no separate entrance that bypasses the gate was opened for the tools. They register through the tool service the host provides — that is **not a hard dependency**: when the host does not provide that service, the plugin works as normal, only the status card switches to a "read the memory directory directly" wording.
+两个工具走的是**同一条**安全读路径（文件名检查 → 符号链接与保留名身份检查 → 体积闸门），没有为工具另开一条绕过闸门的入口。它们通过宿主提供的工具服务注册 —— **不是硬依赖**：宿主不提供这个服务时，插件照常工作，只是状态卡换一套「直接读记忆目录」的说法。
 
-### Relaying the Baton on Long Tasks: Task Checkpoints
+### 长任务的接力棒：任务检查点
 
-When the host compacts context is not something the plugin controls — so it **does not promise "save before compaction"**. What it can do is: if `<state directory>/tasks/<task id>/WORKING.md` exists, a short handle is appended to the injection, stating the task, the revision and where to read it. **After compaction the ledgers reset to zero and that clears the deduplication along with them**, so the handle reappears — that is the recovery path.
+宿主什么时候压缩上下文，插件控制不了 —— 所以**不承诺「压缩前保存」**。能做的是：如果 `<状态目录>/tasks/<任务 id>/WORKING.md` 存在，注入末尾会给一条短句柄，说清任务、revision 与去哪读。**压缩后账本归零会连去重一起清掉**，句柄因此重新出现 —— 这就是恢复路径。
 
-The task id comes from `SAGE_MEM_TASK_ID` (for the same task across sessions), otherwise the session id is used. **Your raw question text is never used to decide which directory to read.** If a "done" item in a checkpoint carries no evidence marker at all (path, command, test result), parsing reports it as such — handover material that is perfectly formatted but factually wrong is still wrong.
+任务 id 取 `SAGE_MEM_TASK_ID`（给跨会话的同一条任务用），否则用会话 id。**绝不用你的问题原文去决定读哪个目录。** 检查点里「已完成」的条目如果没有任何证据标记（路径、命令、测试结果），解析时会如实报出来 —— 格式完美、内容错误的交接材料仍然是错的。
 
-## Write Safety
+## 写入安全
 
-Memories are **files**, so "you are editing" and "the model is changing things" can perfectly well happen at the same time. The default behaviour is **the later write wins and the earlier one quietly disappears** — the worst kind, because you never find out.
+记忆是**文件**，所以「你正在编辑」和「模型正在改」完全可能同时发生。默认行为是**后写的赢、先写的悄悄消失** —— 那是最糟的一种，因为你不会发现。
 
-sage-mem adds a **version guard** to writes into the memory directory: the current version is noted before writing, and the write requires that the version has not changed. If it has, the write is **explicitly refused** instead of being clobbered — turning "a silent bad result" into "an explicit failure".
+sage-mem 给记忆目录的写入加了**版本守卫**：写入前记下当前版本，写入时要求版本没变过。变了就**明确拒绝**，而不是盖掉 —— 把「静默的坏结果」变成「显式的失败」。
 
-The guard has two paths, with **different** coverage, spelled out:
+守卫分两条路，覆盖面**不一样**，说清楚：
 
-| Who is writing | How it is protected | When refused |
+| 谁在写 | 怎么保护 | 被拒时 |
 |---|---|---|
-| The model changing a memory with the **built-in `write` / `edit`** | The plugin supplies the "current version" in a pre-event, and the host refuses stale overwrites on that basis | The host refuses outright (reporting `FS_STALE_VERSION`). **A refusal on this path leaves no conflict record** — the write gate only supplies the version, it does not perform refusals |
-| **The plugin itself** writing (autodream consolidation) | The caller passes the version it read at write time | A pending record `<state directory>/conflicts/<id>.json` is written, keeping **the version on disk** and **the version it wanted to write** — with only one side there is nothing to judge |
+| 模型用**内置 `write` / `edit`** 改记忆 | 插件在前置事件里给出「当前版本」，宿主据此拒绝过期覆盖 | 宿主直接拒绝（报 `FS_STALE_VERSION`）。**这条路的拒绝不留冲突记录** —— 写门只提供版本，不做拒绝动作 |
+| **插件自己**写（自动做梦的整理） | 调用方在写入时带上读到的版本 | 落一条待处理记录 `<状态目录>/conflicts/<id>.json`，里面留着**盘上那一版**和**想要写的那一版** —— 只有一边等于没得判 |
 
-- **Conflicts are not merged automatically**; which side to keep is your decision (the record is JSON, open it directly when you need to). Silent retry and silent abandonment both decide on your behalf.
-- **From 2.0.0 the injection side does read this queue**: only the **two sides of a `contradiction`** (status `open`) are suppressed; the three write-failure kinds (`stale_version` / `external_change` / `unresolved_merge`) are still injected — what is on disk there is the current content. The resolution entry and the suppression ship together, so there is no longer a state where "suppression is wired but there is no entry point".
-- **Resolution lives on the 「记忆管理 → 库健康」(Memory management → Health) tab** (the conflict queue sits at the top of that screen, with a permanent badge in the panel header): you look at both bodies one by one, and the actions are "mark this one invalid", "undo invalidation" and "delete record", with two-step confirmation for the dangerous ones. "Mark invalid" only adds one line `invalid_at` to the memory's frontmatter (optionally plus `superseded_by`) — **the file stays in place, the body does not change by a single byte, and `updated` is not touched**; the write is idempotent (clicking twice does not rewrite), it can be undone, and a failure returns an explicit error while the record stays pending.
-- **Conflict records only ever gain fields**: 2.0.0 appends `otherFile` / `decision` / `decidedAt` / `appliedVersion` / `invalidatedFile` at the tail, and the record version stays 1; 1.9.x readers ignore keys they do not know, so no migration is needed in either direction.
-- **Manual edits are outside the guard**: editing the file directly takes effect too (delete `invalid_at` and the memory is injected again); the plugin does not police hand edits — that is the tradeoff of file-based memory, see boundary C11.
-- **The same conflict is not duplicated**: if a failure matches an unresolved record field for field (same file, both bodies, both versions), no extra copy is appended.
-- **The host file sandbox**: autodream runs **outside any session**, so it cannot inherit a session workspace. On a `workspace-write` host the plugin passes a per-call sandbox policy **narrowed to the memory directory** (narrower than the fallback root); on a `read-only` host it passes nothing, the write is still refused, and the run is recorded as a **failure** (not "success, nothing changed").
-- Known boundary: **editing memories in a shell does not go through this path**. The write gate guards "memory writes that go through the tools", not "all modifications to files"; redirection and the like inside `pwsh` are not recognized. If it cannot be sure, it does not claim it — so that "cannot see it" is not mistakenly recorded as fact.
+- **冲突不会自动合并**，保留哪边由你决定（记录是 JSON，需要时直接打开看）。静默重试和静默放弃都是在替你决定。
+- **2.0.0 起注入侧会读这个队列**：只有 `kind: contradiction` 且 `status: open` 的**矛盾型**两方被抑制；另外三种写失败型（`stale_version` / `external_change` / `unresolved_merge`）照常注入 —— 盘上那份才是现行内容。裁决入口与抑制是同一次交付，不再有「只接抑制、没有入口」的状态。
+- **裁决在「记忆管理 → 库健康」页签的冲突卡**（一屏两张卡里在上面的那张，面板头部另有常显徽标）：逐条看两份正文，动作是「标此条失效」「撤销失效」「删除记录」，危险动作两段式确认。「标失效」只往记忆 frontmatter 加一行 `invalid_at`（可选再写 `superseded_by`）—— **文件留在原位、正文一个字节不动、不改 `updated`**；写盘幂等（连点两次不重写）、可撤销，失败时明确返回错误、记录保持待裁决。
+- **冲突记录字段只增不改**：2.0.0 在尾部追加 `otherFile` / `decision` / `decidedAt` / `appliedVersion` / `invalidatedFile` 五个，记录版本仍是 1；1.9.x 读端忽略不认识的键，双向都不用迁移。
+- **手工编辑不在看守范围**：直接改文件也生效（删掉 `invalid_at` 就恢复注入），插件不拦手改 —— 这是文件式记忆的取舍，见能力边界表 C11。
+- **同一件事不会越积越多**：一次失败如果与队列里某条未裁决记录逐字段相同（同一文件、两份正文、两个版本），不再追加副本。
+- **宿主的文件沙箱**：自动做梦在**会话外**运行，拿不到会话工作区。宿主用 `workspace-write` 时，插件给每次写入带上**收窄到记忆目录**的逐次沙箱策略（比回退根更窄）；宿主是 `read-only` 时不传策略、写入照旧被拒，且这一趟会被记成**失败**（不是「成功，没改什么」）。
+- 已知边界：**在 shell 里改记忆不走这条路**。写门守的是「经过工具的记忆写入」，不是「所有对文件的修改」；`pwsh` 里的重定向之类认不出来。认不准就不认，免得把「看不到」误记成事实。
 
-### Access Ledger: Three Kinds of "Used" Recorded Separately
+### 访问台账：三种「用过」分开记
 
-`<state directory>/access.json` records three things:
+`<状态目录>/access.json` 记三件事：
 
-| Field | Meaning |
+| 字段 | 含义 |
 |---|---|
-| `injected` | the plugin **passively** injected this memory |
-| `read` | the model **actively** read it |
-| `use` | the number of times it was explicitly adopted (self-reported) |
+| `injected` | 插件**被动**注入了这份记忆 |
+| `read` | 模型**主动**读了它 |
+| `use` | 明确被采用的次数（自报） |
 
-They are recorded separately because the three mean completely different things: **being injected** only says the plugin thought it was relevant, **being actively read** only says the model picked it, and neither means the content was useful, let alone that it was correct. Merge them into one "heat" score and they can never be separated again.
+分开记是因为这三件事的含义完全不同：**被注入**只说明插件觉得相关，**被主动读**只说明模型选了它，都不等于内容有用、更不等于内容正确。混成一个「热度」就再也分不开了。
 
-**This ledger is currently used only for diagnostics and the auto-archive threshold; it takes no part in retrieval ranking.** The observation has known blind spots: reading memories in a shell is not recognized, so it is not claimed.
+**这张台账目前只用于诊断与自动归档阈值，不参与检索排序。** 观测有已知盲区：在 shell 里读记忆认不出来，那就不认。
 
-### Freshness and Citation Discipline
+### 记忆的新鲜度与引用纪律
 
-Every memory's heading carries its freshness: `（保存于 N 天前）`, and **the frontmatter's `updated:` takes priority, falling back to the file mtime only when it is missing** — a hand-written timestamp is authoritative; filesystem times get changed wholesale by copying / restoring from a backup / checkout.
+每条记忆的标题带新鲜度：`（保存于 N 天前）`，**优先读 frontmatter 的 `updated:`，缺失才回落文件 mtime** —— 手写的时间戳是权威，文件系统时间会被复制 / 备份还原 / checkout 整批改掉。
 
-The reason is: when a stale memory is cited as fact, the act of "citing" itself makes it look more authoritative rather than more suspect. So the injected text also opens with a **citation discipline** section (confirm a path exists before mentioning it, grep before mentioning a function, verify the current code before acting), and it is **a section of its own** — what it constrains is how this batch of content is to be used, and compressing it into one list item makes it easy to skip over together with the content.
+理由是：陈旧记忆被当事实引用时，「引用」这个动作本身会让它显得更权威而不是更可疑。所以注入文本开头还带一节**引用纪律**（提到路径先确认存在、提到函数先 grep、要动手先核实当前代码），而且它**独立成节**——它约束的是这一批内容怎么用，压成一条列表项容易和内容混在一起被跳过。
 
-**Memories with `baseline: true` are injected unconditionally on the first step of every session**, at most 8 — for memories like "who you are" and "the todo list" that ought to be present at every opening. ⚠️ **"Not subject to paragraph replacement" does not mean the whole file**: it is equally truncated by the single-item character limit (1500 characters by default), **so key content that falls at the tail will not be seen**. baseline suits short summaries; leave the full body for the tools to read. The order among several baseline memories is decided by `baselinePriority` (higher number = earlier, default 0), not by file name.
+**`baseline: true` 的记忆每场会话第一步无条件注入**，最多 8 条 —— 给「你是谁」「待办清单」这类每次开场都该在场的记忆用。⚠️ **「不吃段落替换」不等于整份**：它同样受单条字数上限（默认 1500 字符）截断，**关键内容若落在尾部会看不到**。baseline 适合放短摘要，完整正文留给工具去读。多条 baseline 之间的先后由 `baselinePriority` 决定（数字越大越前，缺省 0），不按文件名排。
 
-If the memory directory cannot be read, or permissions are wrong → **it degrades to no injection and writes a log**; it does not fail silently. Broken frontmatter is **handled leniently**: fields that cannot be parsed fall back to defaults (`type` missing is recorded as `reference`), and the file itself is still readable — one wrong line does not make a whole memory disappear.
+记忆目录读不到、权限错 → **降级为不注入并写日志**，不会静默失效。frontmatter 坏掉则**宽容处理**：解析不出来的字段回落默认（`type` 缺失按 `reference` 记），文件本身照样能被读到 —— 不会因为一行写错就让整条记忆消失。
 
-## Autodream
+## 自动做梦
 
-The optional memory-consolidation feature (identifier `autodream`): it reads through the memory directory once — merging duplicates, deleting the overturned, fixing the index and broken links, converting relative dates into absolute dates — so that the next session can find its bearings quickly.
+可选的记忆整理功能（标识 `autodream`）：把记忆目录通读一遍 —— 合并重复的、删掉被推翻的、修索引与断链、把相对日期换成绝对日期，让下一次会话能快速对上位置。
 
-**Off by default**; turn it on in the settings page under 「记忆管理 → 自动做梦」(Memory management → Autodream). Three things are each optional:
+**默认关闭**，在设置页「记忆管理 → 自动做梦」里开。三件事各自可选：
 
-| Option | Values | Description |
+| 选项 | 取值 | 说明 |
 |---|---|---|
-| Trigger | Manual only / run automatically when conditions are met | Automatic mode goes through three levels of gating, **checking the cheapest first**: time gate (≥ N hours since last time, one read/write) → session gate (≥ M sessions with updates in between, one directory scan) → lock (against concurrency). A 10-minute scan throttle is sandwiched in between, so that while "the time gate passed but the session gate did not" it does not rescan for nothing every turn |
-| Mode of change | Report only / rewrite directly | In "report only" mode **the write tools are simply not attached for the model at all** — it is not constrained by a sentence saying "please do not write", it has no hands |
-| Input source | Memory directory only / memory + session records | The latter decompresses session records (zstd) for targeted keyword search; the cost is that private conversations enter the model context, and the token cost is higher too |
+| 触发 | 只手动 / 满足条件自动跑 | 自动模式走三级门控，**最便宜的先查**：时间门（距上次 ≥ N 小时，一次读写）→ 会话门（期间 ≥ M 个会话有更新，一次目录扫描）→ 锁（防并发）。中间夹一层 10 分钟扫描节流，免得「时间门过了、会话门没过」时每轮白扫 |
+| 改动方式 | 只出报告 / 直接改写 | 「只出报告」模式下**写工具根本不会挂给模型** —— 不是靠一句「请不要写」约束，是它没有手 |
+| 输入源 | 仅记忆目录 / 记忆 + 会话记录 | 后者会解压会话记录（zstd）做定向关键词搜索；代价是私密对话会进入模型上下文，token 成本也更高 |
 
-Automatic triggering runs on the plugin's own timer (checks the gates every 30 minutes by default). Consolidation **deliberately does not run through your session** — the tool set is given by the plugin, the step count is capped, and it is not written into your session records.
+自动触发走插件自己的定时器（默认 30 分钟查一次门控）。整理**刻意不走会话** —— 工具集由插件给、步数有上限、不写进你的会话记录。
 
-### The Consolidation Model Can Be Specified Separately
+### 整理用的模型可以单独指定
 
-Consolidation is a background batch job and need not be the same model as the one used for chatting. The settings page under 「高级设置 → 模型」(Advanced settings → Model) lets you pick one from **the model routes currently configured** (the options come from the same catalog as in 「模型选择」/ model selection).
+整理是后台批量任务，跟聊天用的不一定是同一个模型。设置页「高级设置 → 模型」可以从**当前已配置的模型路线**里挑一条（选项与「模型选择」里的目录同源）。
 
-- Once chosen, **only that one is accepted**: if the route does not exist in the host, **it errors before starting work** (it compares only against the host's registered catalog and sends no request at all), so it does not fail halfway through, and it **does not silently fall back to the default model**.
-- The panel always shows **which one is actually in effect**; if the route named in the configuration happens to disappear from the catalog, the dropdown still shows it rather than quietly jumping back to the default.
-- When the model catalog cannot be obtained (host differences), it degrades to typing `provider` and `model` by hand.
+- 选了就**只认它**：路线在宿主里不存在时**开工前就报错**（只比对宿主已注册的目录、不发任何请求），不会跑到一半才失败，也**不会静默回落到默认模型**。
+- 面板下方始终显示**实际生效的是哪条**；配置里那条路线万一从目录里消失了，下拉框也会把它显示出来而不是悄悄跳回默认。
+- 拿不到模型目录时（宿主差异），退化成手填 `provider` 与 `model`。
 
-### When the Report Does Not Fit
+### 报告写不完的时候
 
-The consolidation report is written by the model in one go, and a single output has a length cap. **The cap, the retry and the truncated label** all have defined behaviour:
+整理报告由模型一口气写完，而单次输出有长度上限。**上限、重试、残篇标注**三件事都有明确行为：
 
-- **The single-output cap is configurable**: Settings → Autodream → Settings → Advanced → "single output cap" (default 32768 tokens, range 1024–131072). For reasoning models the reasoning and the body **share** that budget; when the closing turn spends it all on reasoning, no body is left — raise the cap and run again.
-- **Retry when the body is empty**: if an output hits the cap with **no body at all** (reasoning only), one retry asks for "the body directly, do not re-analyse"; up to 2 times, and only then is the report marked truncated. When there is a partial body, the loop asks it to continue from where it stopped (up to 3 rounds).
-- **Truncation is stated**: the report's first screen, the consolidation manifest, the machine-readable record and the Settings → Autodream "last run" line all say "report truncated (fragment)" — a half report is never reported as "success". If the closing step produced no text, the report says "the model gave no textual summary" instead of reusing narration from an earlier step.
+- **单次输出上限可配**：设置页「自动做梦 → 设置 → 高级设置 → 单次输出上限」（默认 32768 token，范围 1024–131072）。思考型模型的思考与正文**共用**这份额度；收尾那轮思考吃满时正文会一个字不剩 —— 这类报告先把上限调大再跑。
+- **零正文先重试**：一轮额度用尽却**没有任何正文**（只剩思考）时，先要求它「直接输出正文、不要重新分析」重试；最多 2 次，仍为零才标残篇。撞上限但**有正文**的，按「从中断处继续写」续写（最多 3 轮）。
+- **残篇会被指出来**：报告首屏、整理声明、机读记录与设置页「上次运行」那一行都会标「报告被截断（残篇）」—— 不会再把半篇报成「成功」。收尾那一步没写文字时，报告写「模型没有给出文字说明」，**不拿中途旁白顶替**。
 
-### Rollback Points
+### 回滚点
 
-**Whenever this run is a "direct rewrite", a rollback point is created before work starts** (a full snapshot of the top-level `.md` files in the memory directory, each with a sha256), and after the run you can see it in the settings page and roll back to it in one click.
+**只要这次是「直接改写」，开工前就先建一个回滚点**（记忆目录顶层 `.md` 全量快照，每条带 sha256），跑完之后能在设置页看到它、也能一键退回去。
 
-- The rollback point is **bound** to that run: the report carries the runId, the rollback directory has the same name, and the two match up.
-- **A rollback can itself be rolled back**: before acting, it first saves "now" once more as a **protection snapshot** (not part of the normal snapshot rotation).
-- **Scope is selectable**: restore only the files that run touched, or take the whole directory back to that point in time.
-- **No file is deleted at any point**: files that "should not exist" during a rollback are all moved into `archive/`, recoverable by hand; on a name collision it skips and counts, and never overwrites.
-- Every rollback leaves a trace: a rollback report is written into the report directory, and a record is appended to the state directory.
+- 回滚点与这次运行**绑定**：报告里写着 runId，回滚点目录同名，两边对得上。
+- **回滚本身也能退**：动手之前会先把「现在」再存一份**保护快照**（不参与普通快照的轮转淘汰）。
+- **范围可选**：只恢复这次运行动过的文件，或整目录回到该时点。
+- **全程不删文件**：回滚中「不该存在」的文件一律移进 `archive/`，人工可捞回；有同名冲突就跳过并计数，绝不覆盖。
+- 每次回滚都留痕：报告目录里写一份回滚报告，并在状态目录里追加一条记录。
 
-### Consolidation Manifest: What Changed and Why
+### 整理声明：改了什么、为什么
 
-Every consolidation leaves a **manifest** behind, in two forms: the human-readable `memory/autodream/<runId>.md` (embedded in the report) and the machine-readable `.sage-mem/autodream/runs/<runId>/manifest.json`.
+每一次整理都留下一份**声明**，两种形态：人读的 `memory/autodream/<runId>.md`（报告里内嵌）、机读的 `.sage-mem/autodream/runs/<runId>/manifest.json`。
 
-It records item by item: **file / operation (create · rewrite · archive) / reason / byte change**, plus a structural audit comparison before and after the run.
+逐条记录：**文件 / 操作（新建·改写·归档）/ 缘由 / 字节变化**，外加运行前后的结构审计对比。
 
-**Since 2.4.0 the manifest also lists the facts that were deleted, one by one.** A rewrite or an archive can make a few facts that used to be written down stop existing, and the structural audit (dangling links / formatting / index) **cannot see a lost fact** — every check it runs can be green. So whenever something is removed, the manifest gets a section of its own listing the **exact original lines that no longer exist in the active memories**, with their original line numbers (so you can check them against the snapshot), and a rewrite also states the line-count change. Files taken by the auto-archive policy are listed too. The facts are computed by the host by diffing "the body before the write" against "the body written in" — **not self-reported by the model**: a model can miss things, a diff cannot. One real lesson: on 2026-11-05 a consolidation pass compressed away an entry that was still in effect — 「到期 2027-10-03、不自动续费」— and the run reported "audit 2 problems → 0 problems", all green.
+**2.4.0 起，声明还会逐条列出「被删掉的事实」**：改写与归档都可能让原来写着的几条事实不再存在，而结构审计（断链 / 格式 / 索引）**看不见事实丢失** —— 它能报的每一项都可能是绿的。所以每次删到东西，声明里单开一节，把**不再存在于活动记忆里的原文**逐条列出来（带原文行号，方便回快照对），改写还会写明行数变化。自动归档策略收走的文件同样列。事实由宿主拿「写之前的正文」与「写进去的新正文」对比算出，**不靠模型自述** —— 模型可以漏报，diff 不会。一处真实教训：2026-11-05 那趟整理把一条仍然生效的「到期 2027-10-03、不自动续费」压掉了，自报「审计 2 问题 → 0 问题」全绿。
 
-- **`reason` should be filled in.** A `write_memory` without `reason` **will not be refused** — the change takes effect all the same, but the manifest marks it as 「未自述」(not self-described) and attaches what the host can trace (which turn / what operation / byte change). The reason: losing an otherwise correct correction over one missing explanation is the greater cost.
-- **`archive_memory`'s `reason` is still required**; without it the action is refused outright, and refused actions get a section of their own, 「未能落地的改动」(changes that could not land), rather than disappearing silently.
+- **`reason` 应当填写。** `write_memory` 不带 `reason` **不会被拒绝** —— 改动照样生效，但声明里会把它标成「未自述」并附上宿主能追溯到的信息（第几轮 / 什么操作 / 字节变化）。理由：为了一句解释而丢掉一次本来正确的修正，代价更大。
+- **`archive_memory` 的 `reason` 仍必填**，缺了直接拒绝；被拒的动作单列一节「未能落地的改动」，不会静默消失。
 
-### Three Safety Nets
+### 三道安全网
 
-1. **The safety boundary is in the tool set, not in the prompt** — during autodream the host gives the model only read-only tools, and only rewrite mode adds the rewriting tools; and **there is no "delete" capability at all** — archiving moves a file into `archive/`, recoverable by hand.
-2. **A rollback point is created automatically before rewriting**, under `<parent of the memory directory>/.sage-mem/autodream/snapshots/<runId>/`, keeping the most recent N. The reason: the memory directory is **not under any version control** and deletion has no recycle bin, so "rollback-ability" has to be built by hand.
-3. **An audit runs automatically at the end** — dangling index entries, missing index entries, `type` disagreeing with the file name prefix, CRLF, broken wikilinks, "space + #" swallowed as a YAML comment inside frontmatter, missing frontmatter, temporary files left behind by an interrupted archive, plus "unreadable" as a category of its own, and the result and the before/after comparison are written into the report. It **only reports, it does not change**. The index `MEMORY.md` is a list, not a memory, so it takes part in **neither** the "type vs prefix" check nor the "missing frontmatter" check (since 1.9.1).
+1. **安全边界在工具集上，不在提示词里** —— 自动做梦时宿主只把只读工具交给模型，改写模式才多给改写工具；而且**没有「删除」这个能力**，归档是把文件移进 `archive/`，可以人工捞回。
+2. **改写前自动建回滚点**，落在 `<记忆目录的上一层>/.sage-mem/autodream/snapshots/<runId>/`，保留最近 N 份。理由是记忆目录**不在任何版本控制下**、删除没有回收站，「可回滚」得自己造。
+3. **跑完自动审计** —— 索引悬空、漏索引、`type` 与文件名前缀不一致、CRLF、双链断链、frontmatter 里被 YAML 当注释吞掉的「空格 + #」、无 frontmatter、归档中途残留的临时文件，外加「读不动」单列一类，结果与前后对比写进报告。它**只报不改**。索引 `MEMORY.md` 是清单而不是一条记忆，因此**不参与**「type 与前缀」和「无 frontmatter」这两项（1.9.1 起）。
 
-### Rename Note
+### 改名说明
 
-This feature was originally called "dream" (identifier `dream`) and has been called **autodream** since 0.7.0. Old data is not dropped: the old configuration `.sage-mem/dream.json` is read out and migrated to `.sage-mem/autodream.json` (**the old file is left untouched**), old reports under `memory/dream/` are still listed in the panel and marked 「旧版」(legacy), and old snapshots can still be rolled back to.
+本功能原名「做梦」（标识 `dream`），0.7.0 起叫 **自动做梦（autodream）**。旧数据不会被丢：老的配置 `.sage-mem/dream.json` 会被读出来并迁移到 `.sage-mem/autodream.json`（**旧文件保留不动**），老报告 `memory/dream/` 仍在面板里列出并标「旧版」，老快照也仍可回滚。
 
-## Migrating from Claude Code
+## 从 Claude Code 迁移
 
-If you have already raised an agent in Claude Code (CC), sage-mem is part of a "CC → DSH" migration path. **Our own memories were migrated exactly this way** — at the time the memories on both sides were already Markdown files, so they could simply be copied over.
+如果你已经在 Claude Code（CC）里养了一个 agent，sage-mem 是「CC → DSH」迁移方案的一部分。**我们自己的记忆就是这么迁过来的** —— 当时两边的记忆都已经是 Markdown 文件，直接拷过来就能用。
 
-The two things are moved **differently**, spelled out:
+两样东西的搬法**不一样**，说清楚：
 
-| What | From | To | How |
+| 搬什么 | 从 | 到 | 怎么搬 |
 |---|---|---|---|
-| **Persona** | CC's `CLAUDE.md` | DSH's `AGENTS.md` | Both are plain text loaded natively by DSH; copy the content as-is |
-| **Memories** | cross-session material accumulated in CC | sage-mem's `memory/` directory | One `.md` per memory, with frontmatter, filed under the four types `user` / `feedback` / `project` / `reference` |
+| **人格** | CC 的 `CLAUDE.md` | DSH 的 `AGENTS.md` | 都是纯文本、DSH 原生加载，内容照搬即可 |
+| **记忆** | CC 里沉淀的跨会话语料 | sage-mem 的 `memory/` 目录 | 一条记忆一个 `.md`，带 frontmatter，按 `user` / `feedback` / `project` / `reference` 四类归位 |
 
-⚠️ **The premise is that the shape matches.** The four-type division and the frontmatter are sage-mem's own conventions: if your memories in CC were already "one Markdown file per memory + frontmatter" (which is what ours were at the time), just copy them over; **if they were not** (if they were all piled into a single `CLAUDE.md`, say), you need to organize them first — and that job can perfectly well be handed to an agent: have it read the old material and lay it out as files under the four types.
+⚠️ **前提是形状对得上。** 四类划分与 frontmatter 是 sage-mem 自己的约定：如果你在 CC 里的记忆本来就是「一条一个 Markdown + frontmatter」（我们当时是这种），拷过来即可；**如果不是**（比如都堆在一个 `CLAUDE.md` 里），需要先整理一遍 —— 这活儿正好可以交给一个 agent 做：让它读旧语料，按四类落成文件。
 
-## Configuration Reference
+## 配置参考
 
-### Environment Variables
+### 环境变量
 
-| Variable | Default | Description |
+| 变量 | 默认 | 说明 |
 |---|---|---|
-| `SAGE_MEM_DIR` | `~/.sage-mem/memory` | memory directory |
-| `SAGE_MEM_STATE_DIR` | `<parent of the memory directory>/.sage-mem` | state directory (configuration, ledger, locks, conflict queue, rollback points) |
-| `SAGE_MEM_MAX_SESSION_BYTES` | `61440` (60 KiB, 4096–524288) | total injection cap per session |
-| `SAGE_MEM_MAX_RESULTS` | `10` (1–30) | cap on the number of candidate items injected per turn |
-| `SAGE_MEM_MAX_CHARS` | `1500` (200–20000) | character cap for a single memory's injection |
-| `SAGE_MEM_MAX_BASELINE` | `8` (1–50) | number of `baseline` slots |
-| `SAGE_MEM_STALE_DAYS` | `1` (0–365) | threshold for marking a heading 「保存于 N 天前」(saved N days ago); 0 = mark every one |
-| `SAGE_MEM_TASK_ID` | empty | scope of task checkpoints; empty falls back to the session id |
-| `SAGE_MEM_DEBUG` | off | debug logging; when on, the panel's **工具 ▾ → 注入调试** shows the last 8 injection attempts (read-only, never written to disk; it also lists any memory kept out of the body by an expired `invalid_at` or an unresolved contradiction, with the reason and the conflict id) |
-| `SAGE_MEM_VALIDITY` | on | master switch for invalidity filtering and contradiction suppression. **Only `0` / `false` / `off` turn it off** (empty or misspelled values count as on); off restores the 1.9.x injection behaviour |
+| `SAGE_MEM_DIR` | `~/.sage-mem/memory` | 记忆目录 |
+| `SAGE_MEM_STATE_DIR` | `<记忆目录的上一层>/.sage-mem` | 状态目录（配置、台账、锁、冲突队列、回滚点） |
+| `SAGE_MEM_MAX_SESSION_BYTES` | `61440`（60 KiB，4096–524288） | 单场会话注入总量上限 |
+| `SAGE_MEM_MAX_RESULTS` | `10`（1–30） | 每轮注入的候选条数上限 |
+| `SAGE_MEM_MAX_CHARS` | `1500`（200–20000） | 单条记忆注入的字符上限 |
+| `SAGE_MEM_MAX_BASELINE` | `8`（1–50） | `baseline` 名额 |
+| `SAGE_MEM_STALE_DAYS` | `1`（0–365） | 标题标「保存于 N 天前」的门槛；0 = 每条都标 |
+| `SAGE_MEM_TASK_ID` | 空 | 任务检查点的作用域；空则回落会话 id |
+| `SAGE_MEM_DEBUG` | 关 | 调试日志；打开后面板「工具 ▾ → 注入调试」显示最近 8 次注入的账（只读、不落盘；同时列出被已失效标注 / 未裁决矛盾挡在正文外的记忆与理由，矛盾还带冲突 id） |
+| `SAGE_MEM_VALIDITY` | 开 | 失效过滤与矛盾抑制的总开关。**只认 `0` / `false` / `off` 为关闭**（空值、拼错都按开启）；关掉后回到 1.9.x 的注入行为 |
 
-Value semantics: **out-of-range values are clamped to the boundary, illegal values (including pure whitespace) fall back to the default.**
+取值语义：**越界夹到边界，非法值（含纯空格）回落默认。**
 
-**Scope of the state root, and migration (spelled out since 2.1.13).** `SAGE_MEM_STATE_DIR` is the **single** state root: settings, autodream configuration and reports, the lock table, the access ledger, the conflict queue, task checkpoints, rollback snapshots and its index all live under it, and every module (including the autodream engine and the lock table) resolves it from the same value instead of re-deriving `<parent of the memory directory>/.sage-mem`. **Changing the state root does not migrate old data**: the new root wins, the old `.sage-mem` is left untouched but no longer read, and startup prints one line naming what is still in the old root. Move it by hand if you want to keep it.
+**状态根的范围与迁移（2.1.13 起写清）**：`SAGE_MEM_STATE_DIR` 是**唯一的状态根** —— 设置、自动做梦配置与报告、锁表、访问台账、冲突队列、任务检查点、回滚快照、台账都在它下面，插件内所有模块（含自动做梦引擎与锁表）都从同一个值解析，不再各自按记忆目录的父目录去拼。**更改状态根不会自动迁移旧数据**：新根优先、旧的 `.sage-mem` 原样保留但不再读取，启动时会打印一行提示点名旧根里还有哪些数据；要保留请手动移动。
 
-### What the Settings Page Can Change
+### 设置页里能改的
 
-The panel can change the five caps above (written to `<state directory>/settings.json`, precedence **settings page > environment variable > built-in default**), as well as reserved names (file names that are protected and that the settings page may not write or delete, written to `<state directory>/reserved.json`). **Some items take effect only after restarting DSH**, and the panel writes out both the value in effect now and the value after restart.
+面板可改上面五个上限（写入 `<状态目录>/settings.json`，优先级 **设置页 > 环境变量 > 内置默认**），以及保留名（受保护、设置页不许写删的文件名，写入 `<状态目录>/reserved.json`）。**部分项要重启 DSH 才生效**，面板上会写清「当前生效 / 重启后」。
 
-### Files in the State Directory
+### 状态目录里的文件
 
-| File | Purpose |
+| 文件 | 用途 |
 |---|---|
-| `access.json` | access ledger (`injected` / `read` / `use`) |
-| `conflicts/<id>.json` | pending conflicts: a failed write, or a pair of contradictions awaiting resolution |
-| `tasks/<task id>/WORKING.md` | task checkpoints |
-| `settings.json` / `reserved.json` / `locked.json` | settings, reserved names, locks |
-| `autodream.json`, `autodream/` | autodream configuration, snapshots, run records |
-| `dream.json` | the legacy name, read once only during migration |
+| `access.json` | 访问台账（`injected` / `read` / `use`） |
+| `conflicts/<id>.json` | 待处理的冲突：写入失败，或一对等待裁决的矛盾 |
+| `tasks/<任务 id>/WORKING.md` | 任务检查点 |
+| `settings.json` / `reserved.json` / `locked.json` | 设置、保留名、锁定 |
+| `autodream.json`、`autodream/` | 自动做梦的配置、快照、运行记录 |
+| `dream.json` | 旧版名字，只在迁移时读一次 |
 
-Apart from `access.json`, `conflicts/` and `tasks/`, the rest is internal implementation state, and its **format may change in minor versions**; do not depend on it.
+除 `access.json`、`conflicts/`、`tasks/` 之外，其余是实现内部状态，**格式可能在小版本里变**，别依赖。
 
-## Stability and Versioning Policy
+## 稳定性与版本策略
 
-**1.0.0 is this project's stability line.** From this version on, "what you can rely on" is no longer a piece of self-assessment but **a list that can be refuted by a machine**:
+**1.0.0 是这个项目的稳定线。** 从这一版起，「你可以依赖什么」不再是一段自我评价，而是**可被机器推翻的清单**：
 
-- **[Frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)** — the public surface is characterized item by item, with only four wordings: **guaranteed** (backed by an assertion; regressions go red) / **best-effort** (designed that way with empirical basis, but with no regression assertion that would go red) / **explicitly cannot do** (a capability boundary, a tradeoff rather than a defect) / **unverified** (we do not know).
-- **Every "guaranteed" item can point to one concrete assertion** (one entry in some test suite), and `test/contract-binding-test.mjs` checks on every `npm test` that "this assertion really ran". A commitment that cannot point to an assertion can only be marked "best-effort" or "unverified".
-- The **[capability boundaries table](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-boundaries.md)** is **cross-referenced line by line** with the contract, and `test/doc-consistency-test.mjs` checks that both sides characterize things the same way.
+- **[契约冻结](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)** —— 公开面逐条写清定性，只有四种措辞：**保证**（有断言支撑，回归会红）/ **尽力**（设计如此、有实测依据，但没有会红的回归断言）/ **明确做不到**（能力边界，是取舍不是缺陷）/ **未验证**（我们不知道）。
+- **每条「保证」都指得出一条具体断言**（某个测试套件里的一项），并在每次 `npm test` 里由 `test/contract-binding-test.mjs` 核对「这条断言真的跑过」。指不出断言的承诺，只能标「尽力」或「未验证」。
+- **[能力边界表](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-boundaries.md)** 与契约**逐行交叉引用**，由 `test/doc-consistency-test.mjs` 核对两边定性相同。
 
-**How version numbers go up** (semantic versioning):
+**版本号怎么涨**（语义化版本）：
 
-| Change | Version |
+| 改动 | 版本 |
 |---|---|
-| Changing any item marked "guaranteed" in the contract, changing a tool name or a required parameter, dropping read compatibility with the old ledger format, changing an injection section name | **major** |
-| Changing wording, changing ordering details, changing internal state file formats, changing the panel, adding a new environment variable, changing performance | minor / patch |
+| 改契约里标「保证」的任何一条、改工具名或必填参数、去掉老格式台账的读兼容、改注入段名 | **大版本** |
+| 改措辞、改排序细节、改内部状态文件格式、改面板、加新的环境变量、改性能 | 小版本 / 补丁 |
 
-**Upgrading from 0.9.x to 1.0.0**: **there are no breaking changes** — not one of the tool names, parameters, environment variable names and defaults, injection section names, or ledger format changed. The only **behaviour change** is: an integer environment variable filled with **pure whitespace** now falls back to the default (previously it was treated as 0 and clamped to the lower bound). The item-by-item list is in the 1.0.0 section of the [CHANGELOG](https://github.com/gezi-wen/sage-mem/blob/main/CHANGELOG.md).
+**从 0.9.x 升到 1.0.0**：**没有破坏性变更** —— 工具名、参数、环境变量名与默认值、注入段名、台账格式一个都没改。唯一的**行为变更**是：整数型环境变量填**纯空格**时，现在回落默认值（此前会被当成 0 而夹到下限）。逐条清单见 [CHANGELOG](https://github.com/gezi-wen/sage-mem/blob/main/CHANGELOG.md) 的 1.0.0 一节。
 
-**Review material** (for those who want to dig in):
+**审查材料**（给愿意深挖的人）：
 
-| File | Content |
+| 文件 | 内容 |
 |---|---|
-| [1.0.0-contract.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md) | public commitments characterized item by item + the assertion each guarantee points to |
-| [1.0.0-boundaries.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-boundaries.md) | 38 capabilities characterized item by item (with basis and means of verification) |
-| [1.0.0-eval-report.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-eval-report.md) | quantified results for retrieval quality and budget, and what these numbers **cannot** measure |
-| [review-findings.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/review-findings.md) | the permanent ledger of what external review found: each finding, its disposition, and **which assertion watches over it** |
-| [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) | release discipline (the four sanitization checks, evaluation exit codes, probes, the four anchors) |
+| [1.0.0-contract.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md) | 公开承诺逐条定性 + 每条保证指向的断言 |
+| [1.0.0-boundaries.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-boundaries.md) | 38 条能力逐条定性（含依据与验证手段） |
+| [1.0.0-eval-report.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-eval-report.md) | 检索质量与预算的量化结果，以及这些数字**测不到**什么 |
+| [review-findings.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/review-findings.md) | 外部复审发现的永久账：每条发现、处置、**由哪条断言看着** |
+| [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) | 发版纪律（脱敏四查、评测退出码、探针、四锚点） |
 
-## Permissions and Privacy
+## 权限与隐私
 
-sage-mem does three things only, all of them on your own machine:
+sage-mem 只做三件事，全都在你本机：
 
-| What it does | Concrete scope |
+| 它做什么 | 具体范围 |
 |---|---|
-| **Reading memories** | reads only the top-level `*.md` under `SAGE_MEM_DIR` (default `~/.sage-mem/memory`), 512 KB per file |
-| **Writing memories** | writes to the same directory through the model's file tools or the settings page; reserved names such as `MEMORY.md` and `session-log.md` are protected and the settings page cannot touch them |
-| **Injection** | hands the selected memories to the model as context (at most 10 relevant + 8 `baseline`, 60 KB cumulative per session — ⚠️ this cap is **soft**, see [Retrieval and Injection](#retrieval-and-injection)) |
+| **读记忆** | 只读 `SAGE_MEM_DIR`（默认 `~/.sage-mem/memory`）下的顶层 `*.md`，单文件上限 512 KB |
+| **写记忆** | 经模型的文件工具或设置页写同一个目录；`MEMORY.md`、`session-log.md` 等保留名受保护，设置页碰不到 |
+| **注入** | 把选中的记忆作为上下文交给模型（最多 10 条相关 + 8 条 `baseline`，单场会话累计 60 KB —— ⚠️ 这个上限是**软的**，见[检索与注入](#检索与注入)） |
 
-**What it does not do**: it opens no port, starts no long-running process, and needs no API key; it **does not capture every event** (whether to store is judged by the model according to rules; it is not "everything you say gets recorded").
+**它不做什么**：不开端口、不起常驻进程、不需要任何 API key；**不做事件全捕获**（存不存由模型按规则判断，不是「你说了什么都记」）。
 
-**Two places where it goes out to the network / reads beyond its bounds, spelled out**:
+**两处出网 / 越界读，说清楚**：
 
-1. **Version check**: opening the 「记忆管理」(Memory management) page silently makes one request to
-   `https://api.github.com/repos/gezi-wen/sage-mem/releases/latest` (10-second timeout; any failure is reported nowhere).
-   The request carries only the plugin's own `User-Agent`; **it contains no memory content, file path or usage statistics**. When `GITHUB_TOKEN` / `GH_TOKEN` is present in the environment it is attached (raising GitHub's unauthenticated 60/hour to 5000). This is the **only** network request.
-2. **Session records**: when "autodream"'s input source is set to "memory + session records", it additionally **reads** the session records under `$DSH_HOME/sessions` for targeted search — that decompresses your raw conversation text (including private content) and sends it into the model context. **Off by default**.
+1. **版本检查**：打开「记忆管理」页时会静默请求一次
+   `https://api.github.com/repos/gezi-wen/sage-mem/releases/latest`（10 秒超时，失败一律不提示）。
+   请求里只有插件自己的 `User-Agent`；**不含任何记忆内容、文件路径或使用统计**。环境里有
+   `GITHUB_TOKEN` / `GH_TOKEN` 时会带上它（把 GitHub 未认证的 60 次/小时提到 5000）。这是**唯一**的出网请求。
+2. **会话记录**：「自动做梦」的输入源选「记忆 + 会话记录」时，它会额外**读** `$DSH_HOME/sessions`
+   下的会话记录做定向搜索 —— 那会解压你的对话原文（含私密内容）并送进模型上下文。**默认关闭**。
 
-**The only feature that calls a model is "autodream", and it is off by default.** Its model follows the current session's default model by default, and can also be specified separately in the settings page — once specified, only that one is accepted, with no silent fallback.
+**唯一会调用模型的功能是「自动做梦」，默认关闭。** 它的模型默认跟随当前会话默认模型，也可以在设置页单独指定一条 —— 指定了就只认它，不会静默回落。
 
-Your memories are the files in that directory, openable at any time for confirmation — which is also why file-based was chosen.
+记忆就是那个目录里的文件，随时可以打开确认 —— 这也是选文件式的原因。
 
-**Trust boundary for the memory directory.** Anyone who can write the memory directory can change what gets injected into the model — that is **inside** the trust model, not a vulnerability in the plugin. The read path rejects symlinks, reserved-name aliases and files over 512 KB at check time, and re-verifies file identity when reading (a file swapped in after the check is refused instead of injected); it cannot defend against a writer who is already allowed to modify your memories. Keep the directory's permissions to your own account.
+**记忆目录的信任边界**：能写记忆目录的人就能改变注入给模型的内容 —— 这属于**信任模型内部**，不是插件的漏洞。读路径在检查时会拒绝符号链接、保留名别名与超过 512 KB 的文件，读取时还会复核文件身份（检查之后被换掉的文件会被拒绝，而不是照读）；但它防不住一个已经被允许修改你记忆的人。把目录权限收到你自己的账号。
 
-## Compatibility
+## 兼容性
 
-sage-mem is a pure DSH plugin and declares its host requirement through **`engines.dsh`** in `package.json`: `>=0.1.2-rc.1` — **a one-sided open interval with no upper bound**, so no future DSH version will be blocked by this declaration. `engines.node` requires `>= 18`.
+sage-mem 是纯 DSH 插件，用 `package.json` 的 **`engines.dsh`** 声明宿主要求：`>=0.1.2-rc.1` —— **单边开区间、不设上界**，所以任何未来的 DSH 版本都不会被这道声明挡住。`engines.node` 要求 `>= 18`。
 
-**Verified on DSH Go (the Android client).** After installing from the in-app plugin market, the settings section and sidebar panel render normally and the `sidebar.panellist` island opens; the memory directory keeps sage-mem's default `~/.sage-mem/memory`, no extra adaptation needed. 2.1.1 fixes the invisible primary-button label on the phone host (foreground token fallback).
+**已在 DSH Go（Android 客户端）上验证可用**：从 App 内插件市场安装后，设置分区与侧栏面板正常、`sidebar.panellist` 岛屿可打开；记忆目录用 `SAGE_MEM_DIR` 默认的 `~/.sage-mem/memory` 即可，不需要额外适配。2.1.1 修掉了手机宿主上主按钮文字不可见的问题（前景令牌兜底）。
 
-Version-by-version compatibility record:
+逐版本兼容记录：
 
-| DSH version | Status |
+| DSH 版本 | 状态 |
 | --- | --- |
 | 0.1.2-rc.1 | compatible |
 | 0.1.3-alpha.1 | compatible |
@@ -525,114 +535,119 @@ Version-by-version compatibility record:
 | 0.2.1-rc.4 | compatible |
 | 0.2.1-rc.5 | compatible |
 
-**How to read `compatible`.** It means this plugin's codec and manifest contract has been checked against that host generation (code-level comparison plus the unit/contract suite), **not** that an end-to-end probe was run on that exact host build. The table is a declaration; how each claim was checked is summarized here. Real-host probes so far: `headless` (2026-10-15), `web` (2026-10-16), `web` on **0.2.1-rc.3** for the 2.0.0 release (2026-10-27: client activation, conflict panel arbitration, injection suppression, rollback to 1.9.2 — 23/23 checks), and the **DSH Go mobile engine on 0.2.1-rc.4** (2026-10-31: installed from the in-app plugin market, sidebar panel and settings section rendered by the app, `sidebar.panellist` island opened); `0.2.1-rc.5` was checked on a local web instance the same day (composed config, boot, panel walk-through). The `desktop` profile has **not** been probed yet (see [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b). CI runs on Ubuntu against **Node 18.x / 20.x / 24.x** with the `0.2.0-rc.1` peer generation; macOS and Windows are not CI-covered, and there is no desktop-host probe yet.
+**`compatible` 怎么读**：它表示本插件的 codec / manifest 契约在该宿主代上核对过（代码层比对 + 单元/契约测试），**不表示**在那个确切宿主构建上跑过端到端探针。这张表是声明，核对方式总结在下面。真实宿主探针目前跑过 `headless`（2026-10-15）、`web`（2026-10-16）、**0.2.1-rc.3 上的 `web`**（2026-10-27，2.0.0 发布前：客户端激活、冲突面板裁决、注入抑制、回退到 1.9.2，23/23 项通过），以及 **0.2.1-rc.4 上的 DSH Go 手机引擎**（2026-10-31：App 插件市场安装、侧栏面板与设置分区原生呈现、`sidebar.panellist` 岛屿打开）；`0.2.1-rc.5` 于同日在本地一个 web 实例上按 dump/启动/面板走查核对；`desktop` profile **还没跑过**（见 [release-checklist.md](https://github.com/gezi-wen/sage-mem/blob/main/docs/release-checklist.md) §4b）。CI 在 Ubuntu 上覆盖 **Node 18.x / 20.x / 24.x**，peer 钉 `0.2.0-rc.1` 一代；macOS 与 Windows 没有 CI 覆盖，desktop 宿主探针也还没有。
 
-Two points worth spelling out:
+两点值得说明：
 
-- **A single build covers both the `0.1.x` and the `0.2.x` line.** Since DSH `0.1.6-alpha.2` the TypertCodec contract changed from "read `schema`" to "read the `create()` factory", and a plugin that still writes only `schema:` throws directly during registration and drags down the whole plugin tree. Every codec in this plugin carries both `schema` and `create: () => schema`, so DSH from both eras can load it. The ranges of the peer dependencies `@deepseek-ai/dsh-typert-protocol` and `@deepseek-ai/dsh-client-locale` drop their upper bound, so that some future major version is not mistakenly blocked by this declaration (between `0.1.7-rc.2` and `0.2.0-rc.1` these two packages added and removed zero exported symbols; compared byte by byte).
-- **One layer of defensive tracing is included.** The event names and fields the injection chain depends on have been very stable across everyday upgrades; if DSH ever changes them to asynchronous or renames them, the plugin will **raise an alarm in the log**, rather than silently stopping injecting memories.
+- **同一份构建同时覆盖 `0.1.x` 与 `0.2.x` 两条线。** 自 DSH `0.1.6-alpha.2` 起 TypertCodec 契约从「读 `schema`」改为「读 `create()` 工厂」，仍只写 `schema:` 的插件会在注册阶段直接抛错、把整棵插件树拖垮。本插件的每个 codec 同时带 `schema` 与 `create: () => schema`，两个时代的 DSH 都能加载。peer 依赖 `@deepseek-ai/dsh-typert-protocol` 与 `@deepseek-ai/dsh-client-locale` 的范围去掉上界，避免以后某个大版本被这道声明误挡（这两个包在 `0.1.7-rc.2` 与 `0.2.0-rc.1` 之间导出符号零增删，逐字节比对过）。
+- **带一层防御留痕。** 注入链依赖的事件名与字段在日常升级中很稳定；如果哪天 DSH 把它们改成异步或改了名，插件会在**日志里报警**，而不是静默地不再注入记忆。
 
-## Architecture
+## 架构
 
 ```
-DSH (Cordis plugin host)
-  └─ sage-mem plugin (retrieval by question + injection) ← this repository
-       │  direct Node fs read / write
+DSH（Cordis 插件宿主）
+  └─ sage-mem 插件（按问题检索 + 注入）← 本仓库
+       │  Node fs 直读 / 直写
        ▼
-memory/ directory (markdown files, 4 types)
+memory/ 目录（markdown 文件，4 类）
   ├── user_*.md
   ├── feedback_*.md
   ├── project_*.md
   ├── reference_*.md
-  └── MEMORY.md          ← index
+  └── MEMORY.md          ← 索引
 ```
 
-No worker, no SQLite, no HTTP port, no long-running process.
+没有 worker、没有 SQLite、没有 HTTP 端口、没有常驻进程。
 
-Module boundaries (since 1.2.0):
+模块边界（1.2.0 起）：
 
-- `lib/index.js` — the **composition root** plus the three gateways. The typert manifest pins `sourceLocation` to this file, so the gateway classes stay here (moving them would be a contract drift)
-- `lib/recall/` — the injection chain: selection (`select`) / rendering and budget (`compose`) / text (`text`) / session state (`state`)
-- `lib/assembly/` — the four mounts: autodream / retrieval tools / observation / write gate
-- `lib/memory/` — pure memory-layer functions and file operations; `lib/autodream/` — the autodream engine
-- `lib/shared/` — zero-dependency cross-layer rules: file-name rule / local timestamps / the two size limits (**exactly one copy each**; `test/duplication-test.mjs` turns red otherwise)
-- UI side: `client/*.js` is split per screen (`05-shared.js` holds the cross-screen primitives and type tables); `npm run build:client` concatenates them into `lib/client.js`
-- Dependency direction: `memory` never imports `autodream`, `recall` depends only on `memory`, `assembly` never imports the composition root (`test/structure-test.mjs` turns red if that changes)
+- `lib/index.js` —— **组合根** + 三个 Gateway。typert manifest 的 `sourceLocation` 钉在这个文件上，所以 Gateway 类不搬走（搬 = 契约漂移）
+- `lib/recall/` —— 注入链：选材（`select`）/ 渲染与预算（`compose`）/ 文本（`text`）/ 会话状态（`state`）
+- `lib/assembly/` —— 四块挂载：autodream / 检索工具 / 观测 / 写入门
+- `lib/memory/` —— 记忆层的纯函数与文件操作；`lib/autodream/` —— 自动做梦引擎
+- `lib/shared/` —— 跨层零依赖的小判据：文件名规则 / 本地时间戳 / 两个体积上限（**只许一份**，`test/duplication-test.mjs` 会红）
+- 界面侧：`client/*.js` 按屏分片（`05-shared.js` 放跨屏小基元与类型词表），`npm run build:client` 拼成 `lib/client.js`
+- 依赖方向：`memory` 不认识 `autodream`，`recall` 只依赖 `memory`，`assembly` 不反向依赖组合根（`test/structure-test.mjs` 会红）
 
-## Contributing
+## 参与开发
 
 ```bash
 git clone https://github.com/gezi-wen/sage-mem
 cd sage-mem
 npm install
-npm test          # all assertions (including the three guards)
+npm test          # 全部断言（含三条守卫）
 ```
 
-- The assertion scripts depend only on `node:` built-in modules and **introduce no test framework**; each script hand-writes `ok()` and ends with a summary line.
-- This repository uses **npm** for install / test / CI. No `pnpm-lock.yaml` is kept: a stale one could not be frozen-installed from a fresh clone (its workspace file was untracked), so it was removed rather than left to mislead.
-- **Three guards** watch over "whether the tests themselves hold up": `suite-registry-test.mjs` (is there a suite that was written but never runs), `contract-binding-test.mjs` (is there a commitment that was made but never verified), `doc-consistency-test.mjs` (do the two documents characterize things identically line by line).
-- CI runs twice on `ubuntu-latest` (the second time with `TZ=UTC`) — a case-sensitive volume catches defects that are invisible on Windows.
-- When you change **user-visible behaviour**, please also update the corresponding line in the [contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md) and the CHANGELOG; a commitment you cannot write an assertion for can only be marked "best-effort".
+- 断言脚本只依赖 `node:` 内置模块，**不引测试框架**，各脚本手写 `ok()` 并以汇总行收尾。
+- 本仓库统一用 **npm** 安装 / 测试 / CI。不留 `pnpm-lock.yaml`：旧的锁在 fresh clone 里 `--frozen-lockfile` 装不动（它依赖的 workspace 文件未入库），留着只会误导。
+- **三条守卫**盯的是「测试本身站不站得住」：`suite-registry-test.mjs`（有没有写了不跑的套件）、
+  `contract-binding-test.mjs`（有没有说了不验的承诺）、`doc-consistency-test.mjs`（两份文档的定性是否逐行一致）。
+- CI 在 `ubuntu-latest` 上跑两遍（第二遍 `TZ=UTC`）—— 区分大小写的卷能逮到 Windows 上看不见的缺陷。
+- 改了**用户可见行为**时，请同时更新 [契约](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md) 的对应行与 CHANGELOG；写不出断言的承诺只能标「尽力」。
 
-**Questions and suggestions**: open an [Issue](https://github.com/gezi-wen/sage-mem/issues). Small, well-defined fixes are welcome as direct PRs; for changes with a larger surface, open an Issue first to align on direction, so that the work is not wasted.
+**问题与建议**：开 [Issue](https://github.com/gezi-wen/sage-mem/issues)。小而明确的修复欢迎直接提 PR；改动面较大的先开 Issue 对齐方向，免得白做。
 
-## FAQ
+## 常见问题
 
-**What changes in injection behaviour after upgrading to 2.0.0?**
-2.0.0 is a **behaviour-changing release** (hence MAJOR): ① a memory whose `invalid_at` has passed is **no longer injected as body text**; ② a memory with an unresolved contradiction keeps **both sides out of the body** until you resolve it on the 「记忆管理 → 冲突」(Memory management → Conflicts) tab; ③ **unlabelled old memories behave exactly as before** — no migration is needed, and there is no migration script. **Downgrading to 1.9.x is safe**: no data is damaged, but the old version ignores the invalid markers (invalid memories are injected again) and the conflicts tab disappears — that is **functionality disappearing, not data corruption**. If you only want to turn this filter off while keeping the rest of this release, use `SAGE_MEM_VALIDITY=0` (only `0` / `false` / `off` count as off).
+**升级到 2.0.0 之后，注入行为变了什么？**
+2.0.0 是**行为变更版**（所以按 MAJOR 发）：① 带 `invalid_at` 且已到点的记忆**不再进正文**；② 有未裁决矛盾的记忆**两方都不进正文**，直到你在「记忆管理 → 库健康」页签里裁决；③ **没有标注的旧记忆行为不变**，不需要迁移，也不会有迁移脚本。**回退到 1.9.x 是安全的**：不会损坏任何数据，但「失效」标记会被旧版本忽略（失效记忆重新注入）、冲突页签消失 —— 那是**功能消失，不是数据损坏**。如果只想关掉这层过滤、保留本版其它修复，用 `SAGE_MEM_VALIDITY=0`（只认 `0` / `false` / `off` 为关闭）。
 
-**What do I do if my memories are not being injected?**
-First confirm the memory directory is right (`SAGE_MEM_DIR`, default `~/.sage-mem/memory`), then check whether the files have frontmatter (broken frontmatter is **handled leniently** — the file is still read, with fields falling back to defaults). The 「体检」(audit) page in the panel reports structural problems such as dangling index entries, missing index entries and broken links.
+**记忆没被注入怎么办？**
+先确认记忆目录对不对（`SAGE_MEM_DIR`，默认 `~/.sage-mem/memory`），再看文件有没有 frontmatter（坏掉的 frontmatter **会被宽容解析**：字段回落默认，文件照样读得到）。面板里的「体检」页会报出索引悬空、漏索引、断链这类结构问题。
 
-**Why can it not find something when I phrase it differently?**
-Retrieval is **lexical overlap**, not semantic. Add a line `aliases: [another wording]` to that memory. This is a deliberate tradeoff, not a defect waiting to be fixed.
+**为什么换个说法就搜不到了？**
+检索是**词面重合**，不是语义的。给这条记忆加一行 `aliases: [另一种说法]` 即可。这是有意的取舍，不是待修的缺陷。
 
-**Will it record every word I say?**
-No. Whether to store is judged by the model according to rules: nothing without substance is stored, nothing derivable by reading the code / git is stored.
+**它会不会把我说的每句话都记下来？**
+不会。存不存由模型按规则判断：无实质内容的不存，靠读代码 / git 能推出来的不存。
 
-**I want to see what it actually stored.**
-Open the memory directory; it is all Markdown. The 「记忆管理」(Memory management) page in the GUI can also browse, edit and delete.
+**我想看看它到底存了什么。**
+打开记忆目录，全是 Markdown。GUI 里的「记忆管理」页也能浏览、编辑、删除。
 
-**Is it safe for several DSH instances to share one memory directory?**
-No. Serialized writes guarantee only **in-process** ordering; there is no file lock across processes — using two instances to write to the same directory at the same time can still lose one write. This is a known boundary.
+**多个 DSH 实例共用同一个记忆目录安全吗？**
+不。写入串行只保证**进程内**，跨进程没有文件锁 —— 同时用两个实例写同一目录仍可能丢一次。这是已知边界。
 
-**Can I do without autodream?**
-Yes, it is off by default. It and archiving are two different things: archiving is a deterministic rule (by idle days), calls no model and costs nothing.
+**能不用自动做梦吗？**
+能，它默认就是关闭的。它和归档是两件事：归档是确定性规则（按闲置天数），不调模型、不花钱。
 
-**The plugin market says "the registry's latest is older than the installed version, updating would downgrade"?**
-That is a **stale `/latest` cache on the download-region mirror**, not a mis-published package: the mirror's full metadata (the document pnpm reads) already has the new version, while the `/<pkg>/latest` shortcut still serves an old one. Retry after a minute or two; if it persists, temporarily switch the market's download region to "Global" (the origin registry, registry.npmjs.org), update, then switch back. To check what is actually published: `npm view sage-mem dist-tags`.
+**插件市场报「registry 上的最新版比已装还旧，更新会降级」？**
+那是**下载地区镜像的 `/latest` 缓存滞后**，不是包发错了：镜像的全量元数据（pnpm 读的那份）已经是新版，但 `/<包>/latest` 这个快捷入口还缓存着旧值。先等一两分钟重试；仍然不行就把插件市场的「下载地区」临时切到「全球」（直连 registry.npmjs.org）更新，完成后再切回。核对实际发布版本：`npm view sage-mem dist-tags`。
 
-**Why is the downloads badge an endpoint badge instead of `npm/dm`?**
-npm's own `downloads/point/last-month` API has returned 0 for every package since July 2026, which made `npm/dm` render a red `0/month`. The badge is now computed from the still-working `downloads/range` API by a daily GitHub Actions job and published to the `badges` branch as a [shields.io endpoint badge](https://shields.io/badges/endpoint-badge). If the number has not moved for more than ~2 days, it is usually a delayed scheduled run (or an npm API outage, in which case the last good value is kept on purpose).
+**顶部「月下载量」为什么改成了 endpoint 徽章？**
+npm 官方的 `downloads/point/last-month` 接口从 2026 年 7 月起对所有包都返回 0，`npm/dm` 徽章因此渲染成红色的 `0/month`；现在这个数字由 GitHub Actions 每天从仍然可用的 `downloads/range` 接口求和，发布到 `badges` 分支，再用 [shields.io endpoint badge](https://shields.io/badges/endpoint-badge) 渲染。若它超过约 2 天没变化，通常只是定时任务延迟（或 npm 接口故障，此时会特意保留上一次的正常值）。
 
-## Uninstall
+## 卸载
 
 ```bash
 dsh plugin --profile web remove sage-mem
 ```
 
-Or manually delete the `sage-mem` dependency from the profile's `package.json` and remove `"sage-mem"` from `dsh.profile.bundles`; then `pnpm install` and restart DSH.
+或手动在 profile 的 `package.json` 里删掉 `sage-mem` 依赖、并从 `dsh.profile.bundles` 移除 `"sage-mem"`；`pnpm install` 后重启 DSH。
 
-**The memory Markdown files stay in their original directory, unaffected.**
+**记忆 Markdown 文件留在原目录，不受影响。**
 
-## Maintainer
+## 维护者
 
 [@gezi-wen](https://github.com/gezi-wen)
 
-## Credits
+## 致谢
 
-- [@bjvgukv25842-cmyk](https://github.com/bjvgukv25842-cmyk) — the earliest Web memory management UI (the starting point of the memory management page).
-- [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — the plugin host and the Cordis plugin system.
+- [@bjvgukv25842-cmyk](https://github.com/bjvgukv25842-cmyk)（LITMUS）—— 最早的 Web 记忆管理界面，记忆管理页从这一版开始。
+- [@miztizm](https://github.com/miztizm)（mjztjzm）—— 记忆管理面板的 i18n：字典分片、`ctx.locale` 接入，三屏跟随宿主语言（1.9.0）。
+- [@DDDMUC](https://github.com/DDDMUC)（暮迟）—— 三处：文件列表的「打开记忆文件夹」入口；注入链的短路闸门（2.4.3，同一个问题不再每一步重算）；注入段声明 `interpolate: false`（2.4.2，记忆里写了双大括号不再让整轮对话崩掉）。
+- [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) —— 插件宿主与 Cordis 插件体系。
 
-## Related Projects
+这个插件活到今天，靠的不只是我一个人。上面按代码进入仓库的顺序排。漏了谁的话开个 issue 骂我，我补上。
 
-- [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — DSH itself, everything is a plugin
-- [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) — a catalog of the DSH plugin ecosystem
+## 相关项目
 
-## Legacy
+- [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — DSH 本体，一切皆插件
+- [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) — DSH 插件生态清单
 
-This repository was originally a SQLite + worker architecture, now archived on the [`sqlite-worker`](https://github.com/gezi-wen/sage-mem/tree/sqlite-worker) branch. The file-based version is the successor implementation.
+## 旧版
+
+本仓库早期是 SQLite + worker 架构，已归档到 [`sqlite-worker`](https://github.com/gezi-wen/sage-mem/tree/sqlite-worker) 分支。文件式是继任实现。
 
 ## License
 
-Apache-2.0 · see [LICENSE](https://github.com/gezi-wen/sage-mem/blob/main/LICENSE)
+Apache-2.0 · 见 [LICENSE](https://github.com/gezi-wen/sage-mem/blob/main/LICENSE)

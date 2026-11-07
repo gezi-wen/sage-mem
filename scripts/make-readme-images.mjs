@@ -167,7 +167,9 @@ function findBrowser() {
 
 // ── 脱敏守卫（不需要在任何地方写死私人词）────────────────────────────────────
 /** 图上出现的每一个 `.md` 名字，都必须是这几类之一：演示数据 / 内置保留名 / 体检用的假条目。 */
-const ALLOWED_MD = /^(demo_[a-z]+_\d\d|user_alpha|project_beta|reference_gamma|feedback_old|project_dead|memory|session-log|project_notes|dangling_one|dangling_two|unlisted_one|not_there)\.md$/i
+// user_note / feedback_note / project_note / reference_note 是编辑抽屉里「文件名」输入框的
+// **占位示例**（`form.fileName` 那句话拼出来的 `{type}_note.md`）—— 它是界面文案，不是记忆名。
+const ALLOWED_MD = /^(demo_[a-z]+_\d\d|user_alpha|project_beta|reference_gamma|feedback_old|project_dead|memory|session-log|project_notes|dangling_one|dangling_two|unlisted_one|not_there|(?:user|feedback|project|reference)_note)\.md$/i
 function desense(html, files, against) {
   const problems = []
   const text = html.replace(/<style[\s\S]*?<\/style>/g, ' ').replace(/<script[\s\S]*?<\/script>/g, ' ').replace(/<[^>]*>/g, '\n')

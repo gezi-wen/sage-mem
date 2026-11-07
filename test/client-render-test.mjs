@@ -967,6 +967,8 @@ function replayTag(replay) {
  */
 const README_HEADLINE = {
   'files-list': '文件列表：每条记忆是一个 Markdown 文件；灰底的那几条是已归档',
+  'edit-drawer': '编辑记忆：右侧抽屉 —— 字段没变，列表不再被顶下去',
+  'confirm-modal': '危险动作统一模态：按钮是第一段、模态是第二段，两段永不合并；按第一下不写盘',
   'tools-drawer': '工具抽屉：归档候选 / 保留名编辑 —— 关着时零占位，开了各带状态',
   audit: '库健康：要你裁决的冲突在上，机器扫出的结构问题在下 —— 一屏回答「这个库有没有事」',
   'archive-candidates': '归档候选：每条都写清「为什么建议归档」，确认后才动文件',
@@ -1060,6 +1062,44 @@ async function emitPreview() {
     const { comp: C } = await loadClient(rt, { memory: mem })
     const tree = await rt.settle(C, {})
     S('lock-card', 'docs/images/lock-card.png', '锁定 —— 按钮排在「编辑」与「归档」之间；锁上的那条显示「已锁定」且「归档」被禁用，自动归档的候选也不再选它。', '⑤ 文件列表 · 锁定一条记忆（拒绝归档）', serHtml(tree))
+  }
+  // ③h 编辑记忆（2.5.0，D39）：页面内联表单 → 右侧抽屉。
+  //    字段、校验、保存路径一个字没动，换的只是它挂在哪 —— 这张图要证明的正是「列表没被顶下去」，
+  //    所以底层列表必须**在**（遮罩压暗它，不替换它）。
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    // 抽屉里显示什么由 readFile 决定；公共 fixture 只回一句 `# x`（够断言、不够看图）。
+    // 只在这一屏给它一份像样的正文 —— 不动 fixture，别的屏与断言都不跟着变。
+    mem.readFile = (name) => Promise.resolve({
+      content: '---\nname: "user_alpha"\ndescription: "甲：用户偏好"\nmetadata:\n  node_type: memory\n  type: user\ntags: [用户]\n---\n\n# 甲\n\n偏好：先给结论，再补细节；代码示例要能直接跑。\n',
+      revision: '9f8e7d6c5b4a3210@sha256:0123456789ab',
+    })
+    const { comp: C } = await loadClient(rt, { memory: mem })
+    let tree = await rt.settle(C, {})
+    // 默认就落在「文件列表」页签上（tab 初值 files），不必再点页签；
+    // 点第一张卡的「编辑」（卡片动作按钮在 .smem-actions 里）→ 右侧抽屉打开。
+    click(btn(all(tree, byClass('smem-card'))[0], '编辑')[0])
+    tree = await rt.settle(C, {})
+    if (!all(tree, byClass('smem-drawer-panel')).length) {
+      throw new Error('编辑抽屉没打开（这张图会出成一张没有抽屉的文件列表）')
+    }
+    S('edit-drawer', 'docs/images/edit-drawer.png', '编辑 —— 这一版把页面里的编辑表单搬进右侧抽屉：类型 / 文件名 / 描述 / 标签 / 正文五个字段一个没变，校验与保存路径也没变；变的是它不再把列表顶下去，取消 / 点遮罩 / Esc 三条出口都能关，关掉等于放弃草稿。', '④ 编辑记忆（右侧抽屉：取消 / 点遮罩 / Esc 三条出口）', serHtml(tree))
+  }
+  // ③i 危险动作的确认（2.5.0，D39）：就地确认条 → 模态。
+  //    触发按钮留在原地（第一段），模态是第二段 —— 两段永不合一，按第一下不写盘。
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const { comp: C } = await loadClient(rt, { memory: mem })
+    let tree = await rt.settle(C, {})
+    // 第一张活动卡（user_alpha.md）的「删除」：危险色按钮 + 默认不是焦点，问句写在模态标题里。
+    click(btn(all(tree, byClass('smem-card'))[0], '删除')[0])
+    tree = await rt.settle(C, {})
+    if (!all(tree, byClass('smem-modal-host')).length) {
+      throw new Error('删除确认的模态没打开（这张图会出成一张没有确认框的文件列表）')
+    }
+    S('confirm-modal', 'docs/images/confirm-modal.png', '危险动作统一模态 —— 动文件的九个动作（归档 / 彻底删除 / 删除 / 回滚 / 归档候选单条与批量 / 冲突失效、撤销、删记录）全部改成「先点按钮、再在模态里确认」；触发按钮原地不动，两段式没有合并成一段，按第一下不写盘。', '⑤ 危险动作统一模态：两段式不变（按钮是第一段，模态是第二段）', serHtml(tree))
   }
   // ③c 更新提示（有新版本时的一条横幅）
   {

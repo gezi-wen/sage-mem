@@ -71,7 +71,8 @@ function dryRun() {
 
 // ── 1. 打包白名单（REL-01） ─────────────────────────────────────
 const ROOT_FILES = new Set([
-  'package.json', 'README.md', 'README.zh.md', 'LICENSE', 'NOTICE', 'cordis.patch.yml',
+  // 2.5.0：默认 README 是中文（README.md），英文版是 README.en.md —— 两份都进包。
+  'package.json', 'README.md', 'README.en.md', 'LICENSE', 'NOTICE', 'cordis.patch.yml',
   // 1.8.2：品牌图标（package.json 的 `icon` 与 files 白名单一起声明）
   'icon.png',
 ])
@@ -105,7 +106,8 @@ group('0. npm pack --dry-run 跑得通')
 
   group('2. 运行时必需文件一个不少')
   const required = [
-    'package.json', 'README.md', 'README.zh.md', 'LICENSE', 'NOTICE', 'cordis.patch.yml',
+    // 2.5.0：默认 README 是中文（README.md），英文版是 README.en.md —— 两份都进包。
+  'package.json', 'README.md', 'README.en.md', 'LICENSE', 'NOTICE', 'cordis.patch.yml',
     'icon.png',
     'lib/index.js', 'lib/client.js', 'lib/typert.host.js',
   ]
@@ -145,23 +147,23 @@ group('0. npm pack --dry-run 跑得通')
 group('5. 版本一致性：package.json ↔ CHANGELOG ↔ 双语 README')
 {
   const versionOf = (md, re) => (md.match(re) || [])[1] ?? null
-  const en = readRoot('README.md')
-  const zh = readRoot('README.zh.md')
+  const en = readRoot('README.en.md')
+  const zh = readRoot('README.md')
   const changelog = readRoot('CHANGELOG.md')
   const CUR_EN = /\*\*Current release: `([^`]+)`\*\*/
   const CUR_ZH = /\*\*当前发布版本：`([^`]+)`\*\*/
   const CHG = /^##\s+v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\s*$/m
 
   ok(versionOf(en, CUR_EN) === pkg.version,
-    `README.md 的当前发布版本 = package.json.version（读「${versionOf(en, CUR_EN)}」，包「${pkg.version}」）`)
+    `README.en.md 的当前发布版本 = package.json.version（读「${versionOf(en, CUR_EN)}」，包「${pkg.version}」）`)
   ok(versionOf(zh, CUR_ZH) === pkg.version,
-    `README.zh.md 的当前发布版本 = package.json.version（读「${versionOf(zh, CUR_ZH)}」，包「${pkg.version}」）`)
+    `README.md 的当前发布版本 = package.json.version（读「${versionOf(zh, CUR_ZH)}」，包「${pkg.version}」）`)
   ok(versionOf(changelog, CHG) === pkg.version,
     `CHANGELOG 最新一节的版本 = package.json.version（读「${versionOf(changelog, CHG)}」，包「${pkg.version}」）`)
 
   // 1.0.0 是**冻结契约**的版本线，不是当前发布版本；两者必须同时在场、语义分开。
-  ok(/\*\*Contract baseline: `1\.0\.0`\*\*/.test(en), 'README.md 明确区分「当前发布版本」与「契约基线 1.0.0」')
-  ok(/\*\*契约基线：`1\.0\.0`\*\*/.test(zh), 'README.zh.md 明确区分「当前发布版本」与「契约基线 1.0.0」')
+  ok(/\*\*Contract baseline: `1\.0\.0`\*\*/.test(en), 'README.en.md 明确区分「当前发布版本」与「契约基线 1.0.0」')
+  ok(/\*\*契约基线：`1\.0\.0`\*\*/.test(zh), 'README.md 明确区分「当前发布版本」与「契约基线 1.0.0」')
   ok(!/Current version 1\.0\.0/.test(en) && !/当前版本 1\.0\.0/.test(zh),
     '两份 README 不再把 1.0.0 标成「当前版本」（DOC-01 的形态不许回来）')
 
@@ -182,18 +184,18 @@ group('6. 兼容表：双语 README ↔ package.json.dshReleases')
     return out
   }
   const want = new Map(Object.entries(pkg.dsh?.compatibility?.dshReleases ?? {}))
-  const en = readmeRows(readRoot('README.md'))
-  const zh = readmeRows(readRoot('README.zh.md'))
+  const en = readmeRows(readRoot('README.en.md'))
+  const zh = readmeRows(readRoot('README.md'))
   const diff = (a, b) => [...new Set([...a.keys(), ...b.keys()])]
     .filter((k) => a.get(k) !== b.get(k))
     .map((k) => `${k}: ${a.get(k) ?? '—'} / ${b.get(k) ?? '—'}`)
 
   ok(want.size >= 5, `package.json.dshReleases 有足够多的行（实际 ${want.size}）`)
   ok(en.size >= 5 && diff(en, want).length === 0,
-    `README.md 兼容表 = package.json.dsh.compatibility.dshReleases（差 ${diff(en, want).length} 行）`,
+    `README.en.md 兼容表 = package.json.dsh.compatibility.dshReleases（差 ${diff(en, want).length} 行）`,
     diff(en, want).slice(0, 4).join('；'))
   ok(zh.size >= 5 && diff(zh, want).length === 0,
-    `README.zh.md 兼容表 = 同一份声明（差 ${diff(zh, want).length} 行）`,
+    `README.md 兼容表 = 同一份声明（差 ${diff(zh, want).length} 行）`,
     diff(zh, want).slice(0, 4).join('；'))
   ok(diff(en, zh).length === 0, '双语兼容表逐行相同', diff(en, zh).slice(0, 4).join('；'))
 }

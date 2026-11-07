@@ -223,7 +223,8 @@ group('5. README：双语一致性 + 手写徽章 ↔ package.json 的声明')
     return out
   }
 
-  const files = ['README.md', 'README.zh.md']
+  // 2.5.0：**默认 README 是中文**（npm 页面显示的就是它），英文版搬到 README.en.md。
+  const files = ['README.md', 'README.en.md']
   for (const f of files) {
     let md
     try { md = readFileSync(join(HERE, '..', f), 'utf8') } catch { ok(false, `${f} 存在（1.0.0 起中英双份）`); continue }
@@ -249,7 +250,7 @@ group('5. README：双语一致性 + 手写徽章 ↔ package.json 的声明')
   const mutated = norm(realDsh) === norm('>=9.9.9') ? '>=8.8.8' : '>=9.9.9'
   ok(norm(mutated) !== norm(realDsh), '【反向对照】改掉 engines.dsh 后，判据确实会报不一致')
 
-  // ── 双语一致性：`README.md`（英文）与 `README.zh.md`（中文）必须同步演进 ──
+  // ── 双语一致性：`README.md`（中文）与 `README.en.md`（英文）必须同步演进 ──
   // 为什么要有它：1.0.0 起 README 有两份，而**没有任何东西**会告诉你「这一版只改了英文」。
   // 译文逐字比对做不到，但**结构**必须一致 —— 对不齐就说明有一边漏改。
   const read = (f) => readFileSync(join(HERE, '..', f), 'utf8')
@@ -261,7 +262,7 @@ group('5. README：双语一致性 + 手写徽章 ↔ package.json 的声明')
   })
   let en = null
   let zh = null
-  try { en = shape(read('README.md')); zh = shape(read('README.zh.md')) } catch { /* 上面已判过存在性 */ }
+  try { en = shape(read('README.en.md')); zh = shape(read('README.md')) } catch { /* 上面已判过存在性 */ }
   if (en && zh) {
     ok(en.h2 === zh.h2, `两份 README 的二级章节数一致（${en.h2} / ${zh.h2}）`)
     ok(en.h3 === zh.h3, `三级章节数一致（${en.h3} / ${zh.h3}）`)
@@ -269,7 +270,7 @@ group('5. README：双语一致性 + 手写徽章 ↔ package.json 的声明')
     ok(en.images.length === zh.images.length && en.images.every((u, i) => u === zh.images[i]),
       `图片地址逐条相同且顺序一致（${en.images.length} / ${zh.images.length}）`,
       en.images.filter((u, i) => u !== zh.images[i]).slice(0, 2).join(' , '))
-    for (const [f, needle] of [['README.md', 'blob/main/README.zh.md'], ['README.zh.md', 'blob/main/README.md']]) {
+    for (const [f, needle] of [['README.en.md', 'blob/main/README.md'], ['README.md', 'blob/main/README.en.md']]) {
       ok(read(f).includes(needle), `${f} 顶部有语言切换（绝对地址，npm 页面上才点得动）`)
     }
   }
