@@ -361,14 +361,12 @@
 				onClick: function () { if (props.onSeg) props.onSeg(name); },
 			}, [label, note ? h("span", { className: "smem-subtab-n", key: "n" }, note) : null]);
 
-			return h("div", { className: "smem-autodream" }, [
-				h("div", { className: "smem-subtabs", key: "segs" }, [
-					subtab("run", t("ad.tab.run")),
-					subtab("settings", t("ad.tab.settings")),
-					subtab("records", t("ad.tab.records"), String(snaps.length + runs.length + reports.length)),
-				]),
-				segOf === "run" ? h("div", { key: "seg-run" }, [
-				h("div", { className: "smem-autodream-sec", key: "top" }, [
+			return h("div", { className: "smem-autodream smem-module-card" }, [
+				// 模块卡头（2.5.0 修）：开关 + 标题 + 状态**必须活在分段之外**。
+				// 它回答的是「这是哪个模块、现在是开是关」，和「这次看哪一段」是两个维度；
+				// 原先它长在「运行」段里，切到设置 / 记录就一起消失 —— 于是下面那张
+				// 自动归档的卡看起来像是当前这一段的内容（文歌子 2026-11-08 一眼看到的就是这个）。
+				h("div", { className: "smem-autodream-sec smem-module-head", key: "top" }, [
 					h("div", { className: "smem-autodream-row", key: "r" }, [
 						h(Switch, {
 							key: "sw",
@@ -383,6 +381,12 @@
 					]),
 					h("div", { className: "smem-autodream-note", key: "n" }, t("ad.note.what")),
 				]),
+				h("div", { className: "smem-subtabs", key: "segs" }, [
+					subtab("run", t("ad.tab.run")),
+					subtab("settings", t("ad.tab.settings")),
+					subtab("records", t("ad.tab.records"), String(snaps.length + runs.length + reports.length)),
+				]),
+				segOf === "run" ? h("div", { key: "seg-run" }, [
 				h("div", { className: "smem-autodream-sec", key: "mode" }, [
 					h("div", { className: "smem-autodream-row", key: "a" }, [
 						h("span", { className: "smem-autodream-key", key: "k" }, t("ad.row.trigger")),

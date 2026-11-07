@@ -180,7 +180,13 @@
 			'.smem-chip[data-on="1"]{border-color:var(--dsw-alias-brand-primary,#4d76e6);color:var(--dsw-alias-brand-primary,#4d76e6);}',
 			".smem-chips{display:flex;gap:6px;flex-wrap:wrap;}",
 			// ── 模块卡头（2.5.0，D39）────────────────────────────────────────────
-			// 开关本体的样式在下面 `.smem-switch`（2.0 起就有，这里只补语义与卡头排版）。
+			// 一屏两张模块卡，就必须看得出「这张卡到哪儿为止」——
+			// 否则下面那张会被读成「当前这一段的内容」（2026-11-08 文歌子一眼看到的正是这个）。
+			// 所以每张卡自己带边框；卡头（开关 + 标题 + 状态）在分段之外，底下一条线把它和内容分开。
+			".smem-module-card{border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1);padding:14px 16px;}",
+			".smem-module-head{padding-bottom:10px;border-bottom:1px solid var(--dsw-alias-border-l1);margin-bottom:12px;}",
+			".smem-module-card .smem-modcard-head{padding-bottom:10px;border-bottom:1px solid var(--dsw-alias-border-l1);margin-bottom:12px;}",
+			".smem-module-card .smem-subtabs{margin-bottom:12px;}",
 			".smem-modcard-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}",
 			".smem-modcard-title{font-weight:600;font-size:13px;}",
 			".smem-modcard-head .smem-modcard-status{margin-left:auto;color:var(--dsw-alias-label-tertiary);font-size:12px;}",

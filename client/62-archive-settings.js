@@ -129,7 +129,7 @@
 
 			// 根节点带一个稳定的类名（2.5.0）：它现在与「自动做梦」同屏堆叠，
 			// 断言与样式都得能把这一张卡与旁边那张分开 —— 没有类名就只能按整棵树找文本。
-			return h("div", { className: "smem-archive-settings" }, [
+			return h("div", { className: "smem-archive-settings smem-module-card" }, [
 				// ── ① 模块卡头（2.5.0，D39）：开关 + 标题 + 状态 ──
 				// 开关的真身就是 `autoArchive === 'off'`，没有新增配置键。
 				h("div", { className: "smem-modcard-head", key: "head" }, [
