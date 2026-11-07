@@ -61,7 +61,16 @@ function makeReact(nodeFactory = makeFakeNode) {
   let pending = []
 
   const api = {
-    createElement: (type, props, ...children) => ({ type, props: props || {}, children }),
+    // `props.children` 是 React 的语义，宿主的 `h()` 也一样：组件里想拿到「调用方塞进来的
+    // 内容」只有这一个入口（`Confirm` 的正文就是靠它）。早先的假 runtime 只把子节点挂在
+    // 返回的 `element.children` 上，于是任何用 `props.children` 的组件在这里都渲染成空 ——
+    // 不是组件写错了，是假 runtime 少了 React 的这一半。这里补齐。
+    createElement: (type, props, ...children) => {
+      const p = props || {}
+      if (children.length === 1) p.children = children[0]
+      else if (children.length > 1) p.children = children
+      return { type, props: p, children }
+    },
     useState(init) {
       const i = n++
       if (!stateStore.has(i)) stateStore.set(i, typeof init === 'function' ? init() : init)
@@ -364,6 +373,15 @@ function makeMemoryRemote(active, archived, raw) {
       st.archived.splice(i, 1)
       return Promise.resolve({ ok: true, file: name })
     },
+    // 活跃记忆的「删除」（不是彻底删除归档件）：真宿主是 memory.deleteFile，直接抹掉这个文件。
+    // 之前 fixture 里没有它，所以「删除」那条两段式确认一直没人验（2.5.0 补上）。
+    deleteFile(name) {
+      st.calls.push(['deleteFile', name])
+      const i = st.active.findIndex((x) => x.file === name)
+      if (i < 0) return Promise.resolve({ ok: false, error: 'sage-mem: file not found: ' + name })
+      st.active.splice(i, 1)
+      return Promise.resolve({ ok: true, file: name })
+    },
     readFile() { return Promise.resolve({ content: '# x' }) },
   }
 }
@@ -402,7 +420,7 @@ function makeAutodreamRemote() {
     runNow() { return Promise.resolve({ ok: true }) },
     readReport() { return Promise.resolve({ content: '' }) },
     readDeclaration() { return Promise.resolve({ markdown: '' }) },
-    rollback() { return Promise.resolve({ ok: true }) },
+    rollback(p) { st.calls.push(['rollback', p]); return Promise.resolve({ ok: true }) },
   }
 }
 
@@ -776,6 +794,17 @@ const treeText = (root) => textOf(root)
 /** 按 key 找一张卡（自动做梦 / 事实上的稳定锚点）。 */
 const cardByKeyOf = (t, k) => all(t, (n) => n.props && n.props.key === k)[0]
 /**
+ * 打开着的模态确认框（2.5.0 起所有危险动作都走它，行内确认条已全删）。
+ * 返回**对话框卡片本身**（`.smem-modal` 的标题 / 正文 / 两个按钮），不是整层遮罩 ——
+ * 于是「按钮在框里」「文案在框里」这类断言不会误命中页面其他地方的同名文字。
+ */
+const modalOf = (root) => {
+  const host = all(root, byClass('smem-modal-host'))[0]
+  return host ? all(host, (n) => n.props && n.props.role === 'dialog')[0] : undefined
+}
+/** 模态标题那一行的文字（「问的是哪一条」写在这里）。 */
+const modalTitleOf = (root) => textOf(all(modalOf(root) || {}, byClass('smem-modal-title'))[0] || {})
+/**
  * B3 之后三个工具入口都收进了「工具 ▾」抽屉：
  * 关着时零占位（入口不在 DOM 里），点开才出现。这两个小工具函数把这一步收在一处。
  */
@@ -939,7 +968,7 @@ function replayTag(replay) {
 const README_HEADLINE = {
   'files-list': '文件列表：每条记忆是一个 Markdown 文件；灰底的那几条是已归档',
   'tools-drawer': '工具抽屉：归档候选 / 保留名编辑 —— 关着时零占位，开了各带状态',
-  audit: '体检：硬问题按类报红分节；「指向已归档」只作提示，不计入问题',
+  audit: '库健康：要你裁决的冲突在上，机器扫出的结构问题在下 —— 一屏回答「这个库有没有事」',
   'archive-candidates': '归档候选：每条都写清「为什么建议归档」，确认后才动文件',
   'starmap-archive': '时间线（星空视角）：暗星是已归档的记忆，点开看归档时间、理由与恢复入口',
   'autodream-settings': '自动做梦 · 设置：运行 / 设置 / 记录 二级分组，参数两列并写清「当前 → 重启后」',
@@ -983,42 +1012,44 @@ async function emitPreview() {
     tree = await openDrawer(rt, C, tree)
     S('tools-drawer', 'docs/images/tools-drawer.png', '工具抽屉 —— 关着时只占一个按钮，展开后两项各带状态：归档候选 2 条 / 保留名 3 个。（体检不在这里：它自己有一屏。）', '② 文件列表 · 工具抽屉打开（每项带状态；关着时零占位）', serHtml(tree))
   }
-  // ③ 体检 · 独立一屏（排在「自动做梦」之后的第 4 个页签）
+  // ③ 库健康（2.5.0：冲突 + 体检并成一屏）。这张图要**两卡都在** ——
+  //    「两件事一屏回答」正是这一版的结构性变化，只出一张卡等于把变化抹掉。
+  //    顺序固定：冲突（要你裁决的有限队列）在上、体检（长清单）在下。
   {
     const rt = makeReact()
     const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
     mem.st.audit = AUDIT_WITH_PROBLEMS
     mem.st.settings = LIMITS_FIXTURE
-    const cf = makeConflictRemote({ items: CONFLICT_ITEMS })
+    const cf = makeConflictRemote({ items: CONFLICT_ITEMS, records: CONFLICT_BODIES })
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote(), conflict: cf })
     let tree = await rt.settle(C, {})
-    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '体检')[0])
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '库健康')[0])
     tree = await rt.settle(C, {})
-    S('audit', 'docs/images/audit.png', '体检 —— 索引悬空、漏索引、断链这类硬问题按类报红；「指向已归档」只作提示、不计入问题，也不提供一键修补按钮（改哪条由你决定）。', '③ 体检（独立页签，排在自动做梦之后；硬问题红、提示灰）', serHtml(tree))
+    S('audit', 'docs/images/audit.png', '库健康 —— 要你裁决的冲突在上，机器扫出的结构问题在下；「指向已归档」只作提示、不计入问题，也不提供一键修补按钮（改哪条由你决定）。', '③ 库健康（冲突 + 体检同屏；冲突在上、体检在下）', serHtml(tree))
   }
-  // ③f 「冲突」页签（2.0.0 矛盾检测）：待裁决列表 + 两份正文对照 + 只标不删的裁决动作
+  // ③f 「冲突」卡（2.0.0 矛盾检测）：待裁决列表 + 两份正文对照 + 只标不删的裁决动作
   {
     const rt = makeReact()
     const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
     const cf = makeConflictRemote({ items: CONFLICT_ITEMS, records: CONFLICT_BODIES })
     const { comp: C } = await loadClient(rt, { memory: mem, conflict: cf })
     let tree = await rt.settle(C, {})
-    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '冲突')[0])
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '库健康')[0])
     tree = await rt.settle(C, {})
     // 展开第一条的两份正文：预览要能看到「新说法 / 旧说法」对照与「已截断」标记。
     click(btn(all(tree, byClass('smem-conf-item')).find((c) => textOf(c).indexOf('aaaa1111') >= 0), '展开两份正文')[0])
     tree = await rt.settle(C, {})
-    S('conflict', null, '', '⑩ 冲突（2.0.0 矛盾检测）：待裁决列表 + 两份正文对照 + 「只标不删」的裁决动作', serHtml(tree))
+    S('conflict', null, '', '⑩ 冲突（「库健康」一屏里的冲突卡）：待裁决列表 + 两份正文对照 + 「只标不删」的裁决动作', serHtml(tree))
   }
-  // ③e 自动归档：用处说明 + 三档 + 三个阈值
+  // ③e 自动归档卡（2.5.0：它与自动做梦同屏，所以图只出这一张卡）：用处说明 + 两档 + 三个阈值
   {
     const rt = makeReact()
     const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
     let tree = await rt.settle(C, {})
-    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '自动归档')[0])
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '自动整理')[0])
     tree = await rt.settle(C, {})
-    S('archive-settings', 'docs/images/archive-settings.png', '自动归档 —— 独立一页：先说清它做什么（移进 archive/、不删除、随时能恢复），三档策略与三个闲置阈值都在这儿；阈值保存即生效，不用重启。', '⑥ 自动归档（排在自动做梦与体检之间）', serHtml(tree))
+    S('archive-settings', 'docs/images/archive-settings.png', '自动归档 —— 「自动整理」屏上的第二张卡：先说清它做什么（移进 archive/、不删除、随时能恢复），开关 + 两档策略与三个闲置阈值都在这儿；阈值保存即生效，不用重启。', '⑥ 自动归档（自动整理屏上的第二张卡，与自动做梦堆叠）', serHtml(all(tree, byClass('smem-archive-settings'))[0]))
   }
   // ③d 锁定：卡片按钮排在「编辑」与「归档」之间
   {
@@ -1066,7 +1097,7 @@ async function emitPreview() {
     const ad = makeAutodreamRemote()
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad })
     let tree = await rt.settle(C, {})
-    click(btn(tree, '自动做梦')[0])
+    click(btn(tree, '自动整理')[0])
     tree = await rt.settle(C, {})
     S('ad-run', null, '', '④ 自动做梦 · 运行（启用 / 触发 / 改动方式 / 输入源 / 模型 / 立即整理）', serHtml(all(tree, byClass('smem-autodream'))[0]))
   }
@@ -1080,7 +1111,7 @@ async function emitPreview() {
     const cf = makeConflictRemote({ items: CONFLICT_ITEMS })
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad, conflict: cf })
     let tree = await rt.settle(C, {})
-    click(btn(tree, '自动做梦')[0])
+    click(btn(tree, '自动整理')[0])
     tree = await rt.settle(C, {})
     tree = await gotoSeg(rt, C, tree, '设置')
     S('autodream-settings', 'docs/images/autodream-settings.png', '自动做梦 · 设置 —— 运行 / 设置 / 记录 二级分组；五个注入参数两列排开，并写清「当前生效」与「重启后」，不会让人误以为改完立刻生效。', '⑤ 自动做梦 · 设置（自动归档三档 + 两列参数「当前 → 重启后」+ 保留名名单）', serHtml(all(tree, byClass('smem-autodream'))[0]))
@@ -1092,7 +1123,7 @@ async function emitPreview() {
     mem.st.settings = LIMITS_FIXTURE
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
     let tree = await rt.settle(C, {})
-    click(btn(tree, '自动做梦')[0])
+    click(btn(tree, '自动整理')[0])
     tree = await rt.settle(C, {})
     tree = await gotoSeg(rt, C, tree, '记录')
     S('ad-records', null, '', '⑥ 自动做梦 · 记录（回滚点 / 整理记录 / 历史报告）', serHtml(all(tree, byClass('smem-autodream'))[0]))
@@ -1338,25 +1369,27 @@ async function main() {
 
     click(btn(cardOf(tree), '彻底删除')[0])
     tree = await rt.settle(C, {})
-    const confirm = all(tree, byClass('smem-ar-confirm'))[0]
-    ok(!!confirm, '点「彻底删除」只展开确认条，不直接删')
+    const confirm = modalOf(tree)
+    ok(!!confirm, '点「彻底删除」只弹出模态确认框，不直接删')
     ok(!!confirm && textOf(confirm).indexOf('不能恢复') >= 0 && textOf(confirm).indexOf('archive/') >= 0,
-      '确认条写清「从 archive/ 里真的删掉、不能恢复」')
-    ok(!!confirm && textOf(confirm).indexOf('恢复') >= 0, '确认条同时给出退路（要留就先恢复）')
-    ok(mem.st.calls.filter((c) => c[0] === 'deleteArchived').length === 0, '展开确认条时没有发 deleteArchived 请求')
+      '确认框写清「从 archive/ 里真的删掉、不能恢复」')
+    ok(!!confirm && textOf(confirm).indexOf('恢复') >= 0, '确认框同时给出退路（要留就先恢复）')
+    ok(!!confirm && modalTitleOf(tree).indexOf('feedback_old.md') >= 0,
+      `模态标题写明要删的是哪一条（实际：${modalTitleOf(tree)}）`)
+    ok(mem.st.calls.filter((c) => c[0] === 'deleteArchived').length === 0, '弹出确认框时没有发 deleteArchived 请求')
     ok(!!confirm && btn(confirm, '确认彻底删除').length === 1 && btn(confirm, '取消').length === 1,
-      '确认条里是「确认彻底删除 / 取消」两个按钮')
+      '确认框里是「确认彻底删除 / 取消」两个按钮')
 
     const callsBefore = mem.st.calls.length
     click(btn(confirm, '取消')[0])
     tree = await rt.settle(C, {})
-    ok(all(tree, byClass('smem-ar-confirm')).length === 0, '取消后确认条收起')
+    ok(all(tree, byClass('smem-modal-host')).length === 0, '取消后确认框收起（遮罩层一起消失）')
     ok(mem.st.archived.length === 2, '取消后归档区一条都没少')
     ok(mem.st.calls.length === callsBefore, '取消不产生任何写请求')
 
     click(btn(cardOf(tree), '彻底删除')[0])
     tree = await rt.settle(C, {})
-    click(btn(all(tree, byClass('smem-ar-confirm'))[0], '确认彻底删除')[0])
+    click(btn(modalOf(tree), '确认彻底删除')[0])
     tree = await rt.settle(C, {})
     const call = mem.st.calls.find((c) => c[0] === 'deleteArchived')
     ok(!!call && call[1] === 'feedback_old.md', `确认后调了 deleteArchived（${JSON.stringify(call)}）`)
@@ -1379,11 +1412,117 @@ async function main() {
     const card2 = all(t2, byClass('smem-card--archived')).find((c) => textOf(c).indexOf('feedback_old.md') >= 0)
     click(btn(card2, '彻底删除')[0])
     t2 = await rt2.settle(C2, {})
-    click(btn(all(t2, byClass('smem-ar-confirm'))[0], '确认彻底删除')[0])
+    click(btn(modalOf(t2), '确认彻底删除')[0])
     t2 = await rt2.settle(C2, {})
     ok(treeText(t2).indexOf('请在刷新') >= 0 || treeText(t2).indexOf('请刷新列表') >= 0, '宿主拒绝时把理由原样显示出来')
     ok(mem2.st.archived.length === 2, '被拒绝时归档区一条都没少')
     ok(all(t2, byClass('smem-card--archived')).length === 2, '被拒绝时卡片仍在列表里')
+  }
+
+  // ── 2c. 归档 / 删除 / 回滚 三种确认都走模态（2.5.0 起全部就地确认条改成模态）────
+  // 与 2b 同一族：**两段式**没变（第一段是那颗按钮，第二段永远是模态），
+  // 变的只是第二段挂在哪 —— 所以断言问的是「模态里有什么」「点一下有没有写盘」。
+  group('2c. 归档 / 删除 / 回滚：确认都走模态，且「点第一下不写盘」')
+  {
+    const cardOf = (t, file) => all(t, byClass('smem-card')).find((c) => textOf(c).indexOf(file) >= 0)
+
+    // a) 归档：理由输入框必须搬进模态，且理由随请求交给宿主
+    {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      const { comp: C } = await loadClient(rt, { memory: mem })
+      let tree = await rt.settle(C, {})
+      click(btn(cardOf(tree, 'user_alpha.md'), '归档')[0])
+      tree = await rt.settle(C, {})
+      const m = modalOf(tree)
+      ok(!!m, '点「归档」弹出模态确认框（不再在那一行里展开）')
+      ok(modalTitleOf(tree).indexOf('user_alpha.md') >= 0, `标题写明归档哪一条（实际：${modalTitleOf(tree)}）`)
+      ok(!!m && textOf(m).indexOf('随时可以恢复') >= 0, '正文仍写清「随时可以恢复」')
+      ok(!!m && textOf(m).indexOf('归档理由（可留空）') >= 0, '「归档理由（可留空）」跟着输入框一起进了模态')
+      const reasonInput = all(m || {}, (n) => n.type === 'input' && byClass('smem-input')(n))[0]
+      ok(!!reasonInput, '模态里有理由输入框')
+      ok(!mem.st.calls.some((c) => c[0] === 'archive'), '弹出确认框时不发 archive 请求')
+      // Esc 是第三条出口（遮罩与「取消」之外）：document 级 keydown 由面板那一条 effect 统一收
+      ok(fakeDoc.listenerCount('keydown') >= 1, '确认框打开时挂着 Esc 监听')
+      fakeDoc.fire('keydown', { key: 'Escape' })
+      tree = await rt.settle(C, {})
+      ok(all(tree, byClass('smem-modal-host')).length === 0, '按 Esc 关掉确认框')
+      ok(fakeDoc.listenerCount('keydown') === 0, '关掉后监听跟着摘掉（不留悬挂监听）')
+      ok(!mem.st.calls.some((c) => c[0] === 'archive'), 'Esc 关闭同样一个字节都没动')
+
+      click(btn(cardOf(tree, 'user_alpha.md'), '归档')[0])
+      tree = await rt.settle(C, {})
+      const reasonInput2 = all(modalOf(tree), (n) => n.type === 'input' && byClass('smem-input')(n))[0]
+      ok(!!reasonInput2 && reasonInput2.props.value === '', '重新打开时理由框是空的（上次的草稿已清）')
+      typeInto(reasonInput2, '已被新的偏好取代')
+      tree = await rt.settle(C, {})
+      ok(all(modalOf(tree) || {}, (n) => n.type === 'input')[0].props.value === '已被新的偏好取代',
+        '输入框是受控的（打字立刻生效）')
+      click(btn(modalOf(tree), '确认归档')[0])
+      tree = await rt.settle(C, {})
+      const aCall = mem.st.calls.find((c) => c[0] === 'archive')
+      ok(!!aCall && aCall[1] === 'user_alpha.md' && aCall[2] === '已被新的偏好取代',
+        `确认后带着模态里填的理由调 archive（${JSON.stringify(aCall)}）`)
+      ok(all(tree, byClass('smem-modal-host')).length === 0, '归档完成后确认框收起')
+    }
+
+    // c) 删除：模态是危险色，取消一个字节都不动
+    {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      const { comp: C } = await loadClient(rt, { memory: mem })
+      let tree = await rt.settle(C, {})
+      click(btn(cardOf(tree, 'project_beta.md'), '删除')[0])
+      tree = await rt.settle(C, {})
+      const m = modalOf(tree)
+      ok(!!m, '点「删除」弹出模态确认框')
+      ok(modalTitleOf(tree).indexOf('project_beta.md') >= 0, `标题写明删哪一条（实际：${modalTitleOf(tree)}）`)
+      ok(!!m && textOf(m).indexOf('不进档案馆') >= 0, '正文说清删除与归档的区别（不进档案馆）')
+      const okBtn = all(m || {}, (n) => n.type === 'button')[1]
+      ok(!!okBtn && String(okBtn.props.className).indexOf('smem-btn-danger') >= 0, '确认键是危险色')
+      ok(!mem.st.calls.some((c) => c[0] === 'deleteFile'), '弹出确认框时不发 deleteFile')
+      click(btn(m, '取消')[0])
+      tree = await rt.settle(C, {})
+      ok(all(tree, byClass('smem-modal-host')).length === 0 && !mem.st.calls.some((c) => c[0] === 'deleteFile'),
+        '取消后确认框收起、一个字节都没删')
+      click(btn(cardOf(tree, 'project_beta.md'), '删除')[0])
+      tree = await rt.settle(C, {})
+      click(btn(modalOf(tree), '确认删除')[0])
+      tree = await rt.settle(C, {})
+      const dCall = mem.st.calls.find((c) => c[0] === 'deleteFile')
+      ok(!!dCall && dCall[1] === 'project_beta.md', `确认后才调 deleteFile（${JSON.stringify(dCall)}）`)
+      ok(treeText(tree).indexOf('已删除 project_beta.md') >= 0, '删除后有明确反馈')
+    }
+
+    // d) 回滚：模态标题写明哪个回滚点，正文写明作用范围
+    {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      const ad = makeAutodreamRemote()
+      ad.listSnapshots = () => Promise.resolve([{ name: 'snap-a', atHuman: '2026-10-30 12:00', files: 3, runId: 'run-1' }])
+      const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad })
+      let tree = await rt.settle(C, {})
+      click(btn(tree, '自动整理')[0])
+      tree = await rt.settle(C, {})
+      tree = await gotoSeg(rt, C, tree, '记录')
+      click(btn(tree, '回滚')[0])
+      tree = await rt.settle(C, {})
+      const m = modalOf(tree)
+      ok(!!m, '点「回滚」弹出模态确认框')
+      ok(modalTitleOf(tree).indexOf('2026-10-30 12:00') >= 0, `标题写明回滚到哪个点（实际：${modalTitleOf(tree)}）`)
+      ok(!!m && textOf(m).indexOf('范围：') >= 0, '正文写明这次回滚的作用范围')
+      ok(!!m && textOf(m).indexOf('保护快照') >= 0, '正文说明会先存一份保护快照（这一步本身也可退）')
+      ok(!ad.st.calls.some((c) => c[0] === 'rollback'), '弹出确认框时不发 rollback')
+      click(btn(m, '取消')[0])
+      tree = await rt.settle(C, {})
+      ok(all(tree, byClass('smem-modal-host')).length === 0, '取消后确认框收起')
+      click(btn(tree, '回滚')[0])
+      tree = await rt.settle(C, {})
+      click(btn(modalOf(tree), '确认回滚')[0])
+      tree = await rt.settle(C, {})
+      const rb = ad.st.calls.find((c) => c[0] === 'rollback')
+      ok(!!rb && rb[1] && rb[1].snapshotId === 'snap-a', `确认后才调 rollback({snapshotId})（${JSON.stringify(rb)}）`)
+    }
   }
 
   // ── 3. R4：归档编辑 = 原样文本进、原样文本出 ─────────────────────────────
@@ -1699,19 +1838,19 @@ async function main() {
     ok(!!badge && textOf(badge).indexOf('4 个问题') >= 0,
       `任何 tab 下头部都有「体检 4 个问题」徽标（实际：${badge ? textOf(badge) : '没有'}）`)
 
-    // 页签顺序：体检独立成第 4 个，排在「自动做梦」**之后**
-    // （这里故意**不**给 conflict 面：旧宿主只剩五页签，是 2.0.0 的能力降级路径；
-    //  六页签的用例在 8d 与 23a —— 两种宿主两种界面，断言必须分开。）
+    // 页签顺序（2.5.0：六个收成四个）：库里的事只有一屏 —— 「库健康」= 体检（机器扫）＋
+    // 冲突（要人裁决）。这里故意**不**给 conflict 面：旧宿主的能力降级路径只剩体检一张卡，
+    // 页签数量与名字却不变（少一张卡 ≠ 少一个页签）。
     const tabLabels = all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n)).map(textOf)
-    ok(JSON.stringify(tabLabels) === JSON.stringify(['文件列表', '时间线', '自动做梦', '自动归档', '体检']),
-      `旧宿主（无 conflict 面）：五页签、体检排在自动做梦与自动归档之后（实际：${tabLabels.join(' / ')}）`)
+    ok(JSON.stringify(tabLabels) === JSON.stringify(['文件列表', '时间线', '自动整理', '库健康']),
+      `旧宿主（无 conflict 面）：四页签、库健康排在最后（实际：${tabLabels.join(' / ')}）`)
     ok(!all(tree, (n) => n.type === 'button' && byClass('smem-tool-badge')(n) && textOf(n).indexOf('冲突') === 0)[0],
       '旧宿主（无 conflict 面）：凑不出一颗冲突徽标')
 
     // 点徽标就能切过去（徽标是「一直看得见」的那条路）
     click(badge)
     tree = await rt.settle(C, {})
-    ok(mem.st.calls.some((c) => c[0] === 'audit'), '切到体检这一屏会拉一次 audit')
+    ok(mem.st.calls.some((c) => c[0] === 'audit'), '切到库健康这一屏会拉一次 audit')
 
     // 抽屉里不该再有体检：那边只剩两件「要动手」的事。
     // ⚠️ 「工具 ▾」只在文件列表这一屏渲染，所以要先切回去再验。
@@ -1722,8 +1861,8 @@ async function main() {
     ok(!drawerLabels.some((x) => x.indexOf('体检') === 0), `抽屉里不再有「体检」（实际：${drawerLabels.join(' / ')}）`)
     click(btnHas(t2, '工具')[0]) // 收起抽屉
     tree = await rt.settle(C, {})
-    // 再切回体检那一屏看结果
-    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '体检')[0])
+    // 再切回库健康那一屏看结果
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '库健康')[0])
     tree = await rt.settle(C, {})
 
     const panel = all(tree, byClass('smem-tool-panel'))[0]
@@ -1750,9 +1889,13 @@ async function main() {
     ok(all(tree, byClass('smem-card')).length === 0,
       `体检这一屏只有体检，不该再渲染文件列表卡片（实际 ${all(tree, byClass('smem-card')).length} 张）`)
 
-    // 底部一行仓库引流：不占一屏、语气轻、点开是新标签页
-    const star = all(tree, (n) => n.props && n.props.className === 'smem-star')[0]
-    ok(!!star, '面板底部有一行仓库引流')
+    // 底部那颗仓库引流角标：不占一屏、语气轻、点开是新标签页
+    // （2.5.0 从底部一行 `.smem-star` 收成右下角一枚 `.smem-star-corner` 角标）
+    const star = all(tree, (n) => n.props && n.props.className === 'smem-star-corner')[0]
+    ok(!!star, '面板角落有仓库引流角标')
+    ok(!!star && all(star, byClass('smem-star-glyph')).length === 1, '角标里有一颗 ★ 字形')
+    ok(!!star && all(star, (n) => n.type === 'button' && byClass('smem-star-x')(n)).length === 1,
+      '角标带一颗「×」（本次启动不再打扰）')
     const starLink = all(tree, (n) => n.type === 'a' && n.props && String(n.props.href || '').indexOf('github.com/gezi-wen/sage-mem') >= 0)[0]
     ok(!!starLink, '引流链接指向仓库', starLink ? String(starLink.props.href) : '没有链接')
     ok(!!starLink && starLink.props.target === '_blank' && String(starLink.props.rel).indexOf('noreferrer') >= 0,
@@ -1789,7 +1932,7 @@ async function main() {
     click(all(banner, (n) => n.type === 'button')[0])
     const after = await some.rt.settle(some.C, {})
     ok(!all(after, isBanner)[0], '点「×」→ 横幅消失（这次不看）')
-    ok(!!all(after, (n) => n.props && n.props.className === 'smem-star')[0], '底部的仓库引流不受影响')
+    ok(!!all(after, (n) => n.props && n.props.className === 'smem-star-corner')[0], '角落的仓库引流角标不受影响')
   }
 
   // ── 8c. 锁定：按钮排在「编辑」与「归档」之间，锁上就拒绝归档 ──────────────
@@ -1821,25 +1964,30 @@ async function main() {
     ok(String(labels[1]).indexOf('已锁定') < 0, '解锁后按钮回到「锁定」')
   }
 
-  // ── 8d. 「自动归档」独立成页签：写明用处 + 三档策略 + 阈值可改 ──────────────
-  group('8d. 自动归档页签：用处 + 三档策略 + 阈值可改（六页签）')
+  // ── 8d. 「自动整理」一屏里包含「自动归档」：写明用处 + 两档策略 + 阈值可改 ──────
+  group('8d. 自动整理 → 自动归档卡：用处 + 两档策略 + 阈值可改（四页签）')
   {
     const rt = makeReact()
     const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
     const ad = makeAutodreamRemote()
-    // 2.0.0 的宿主有 conflict 面 → 第 6 个页签「冲突」排在体检之后。有意更改的快照断言。
+    // 2.0.0 的宿主有 conflict 面；2.5.0 把冲突并进「库健康」，页签只剩四个（有意更改的快照断言）。
     const cf = makeConflictRemote({ items: CONFLICT_ITEMS })
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad, conflict: cf })
     let tree = await rt.settle(C, {})
 
     const tabBtns = (t) => all(t, (n) => n.type === 'button' && byClass('smem-tab')(n))
     const tabs = tabBtns(tree).map(textOf)
-    ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '时间线', '自动做梦', '自动归档', '体检', '冲突']),
-      `六页签、冲突排在体检之后（实际：${tabs.join(' / ')}）`)
+    ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '时间线', '自动整理', '库健康']),
+      `四页签、库健康排在最后（实际：${tabs.join(' / ')}）`)
 
-    click(tabBtns(tree).find((b) => textOf(b) === '自动归档'))
+    // 自动归档与自动做梦现在同屏（两张模块卡堆叠），断言必须在**这张卡里**找，
+    // 不能拿整棵树找 —— 否则「三个阈值输入框」会被隔壁自动做梦的数字框挤成 8 个。
+    const archivePane = (t) => all(t, byClass('smem-archive-settings'))[0]
+    click(tabBtns(tree).find((b) => textOf(b) === '自动整理'))
     tree = await rt.settle(C, {})
-    const pane = treeText(tree)
+    ok(!!archivePane(tree), '自动整理这一屏里有「自动归档」卡（与自动做梦堆叠）')
+    ok(!!all(tree, byClass('smem-autodream'))[0], '同一屏里也有「自动做梦」卡')
+    const pane = treeText(archivePane(tree))
 
     // ① 写明用处（他点名要求的那条）
     ok(/archive\//.test(pane), '写清归档去哪：移进 archive/')
@@ -1847,21 +1995,24 @@ async function main() {
     ok(/恢复/.test(pane), '写清「随时可以恢复」')
     ok(pane.indexOf('锁定') >= 0, '写明锁定的记忆不会被选中')
 
-    // ② 三档策略搬到这里（一处设定，不再在自动做梦的设置里）
-    const segLabels = all(tree, (n) => n.type === 'button').map(textOf)
-    ok(segLabels.indexOf('关闭') >= 0 && segLabels.indexOf('只出报告') >= 0 && segLabels.indexOf('满足条件自动跑') >= 0,
-      `三档策略都在这一页（${segLabels.filter((x) => /关闭|只出报告|自动跑/.test(x)).join(' / ')}）`)
-    // 代价说明跟着档位走（原来在自动做梦那页，随三档一起挪过来）
+    // ② 两档策略留在这张卡里（一处设定）；「关闭」2.5.0 起交给卡头的开关，不再占一档
+    const segLabels = all(archivePane(tree), (n) => n.type === 'button').map(textOf)
+    ok(segLabels.indexOf('只出报告') >= 0 && segLabels.indexOf('满足条件自动跑') >= 0,
+      `两档策略都在这张卡里（${segLabels.filter((x) => /只出报告|自动跑/.test(x)).join(' / ')}）`)
+    ok(segLabels.indexOf('关闭') < 0, '「关闭」不再是一档（开关是唯一的关闭入口）')
+    const sw = all(archivePane(tree), (n) => n.type === 'button' && byClass('smem-switch')(n))[0]
+    ok(!!sw && sw.props['aria-checked'] === 'true', '卡头开关表达当前是「开」（aria-checked=true）')
+    // 代价说明跟着档位走（原来在自动做梦那页，随两档一起挪过来）
     ok(pane.indexOf('只出报告：候选写进整理报告，一个文件都不动') >= 0, '当前档的代价说明就在开关下面')
-    click(all(tree, (n) => n.type === 'button' && textOf(n) === '满足条件自动跑')[0])
+    click(all(archivePane(tree), (n) => n.type === 'button' && textOf(n) === '满足条件自动跑')[0])
     tree = await rt.settle(C, {})
-    ok(treeText(tree).indexOf('会真的把候选移进 archive/（只移不删，随时可恢复）') >= 0,
+    ok(treeText(archivePane(tree)).indexOf('会真的把候选移进 archive/（只移不删，随时可恢复）') >= 0,
       'auto 档说清「真的移动文件、只移不删」')
-    ok(treeText(tree).indexOf('这一档会自动降级成只出报告') >= 0, 'auto 档说清只读模式下的降级')
+    ok(treeText(archivePane(tree)).indexOf('这一档会自动降级成只出报告') >= 0, 'auto 档说清只读模式下的降级')
     ok(treeText(tree).indexOf('自动归档已设为「满足条件自动跑」') >= 0, '保存成功有明确反馈')
 
     // ③ 三个阈值输入框，显示当前生效值
-    const nums = all(tree, (n) => n.type === 'input' && String((n.props || {}).className || '').indexOf('smem-num') >= 0)
+    const nums = all(archivePane(tree), (n) => n.type === 'input' && String((n.props || {}).className || '').indexOf('smem-num') >= 0)
     ok(nums.length === 3, `三个阈值输入框（实际 ${nums.length}）`)
     const vals = nums.map((n) => String(n.props.value))
     ok(vals.join(',') === '90,180,365', `输入框显示当前阈值（实际 ${vals.join(',')}）`)
@@ -1869,7 +2020,7 @@ async function main() {
     // ④ 改一个 → 保存 → 调 setConfig（带 archiveAfterDays*）
     typeInto(nums[0], '30')
     tree = await rt.settle(C, {})
-    const saveBtn = all(tree, (n) => n.type === 'button' && /保存/.test(textOf(n)))[0]
+    const saveBtn = all(archivePane(tree), (n) => n.type === 'button' && /保存/.test(textOf(n)))[0]
     ok(!!saveBtn, '有保存按钮')
     click(saveBtn)
     tree = await rt.settle(C, {})
@@ -1877,21 +2028,22 @@ async function main() {
       '改阈值会调 setConfig({ archiveAfterDaysProject: 30 })', JSON.stringify(ad.st.calls.filter((c) => c[0] === 'setConfig')))
   }
 
-  // ── 8e. 自动做梦的设置里不再重复放「自动归档」三档（一处设定） ──────────────
-  group('8e. 自动归档三档只在一处（不重复摆放）')
+  // ── 8e. 自动做梦的设置里不再重复放「自动归档」策略（一处设定） ──────────────
+  group('8e. 自动归档策略只在一处（不重复摆放）')
   {
     const rt = makeReact()
     const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
     let tree = await rt.settle(C, {})
-    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '自动做梦')[0])
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '自动整理')[0])
     tree = await rt.settle(C, {})
     const segBtn = all(tree, (n) => n.type === 'button' && byClass('smem-subtab')(n) && textOf(n) === '设置')[0]
     click(segBtn)
     tree = await rt.settle(C, {})
-    const settingsPane = treeText(tree)
-    ok(settingsPane.indexOf('记忆注入参数') >= 0, '（前提）确实在自动做梦的设置页上')
-    ok(settingsPane.indexOf('只出报告') < 0, '自动做梦的设置里不再有三档策略（已挪到「自动归档」页）')
+    // 「设置」这一段属于自动做梦那张卡：只在这张卡里找，别拿整棵树（隔壁归档卡本来就有那两档）
+    const adSettings = treeText(all(tree, byClass('smem-autodream'))[0])
+    ok(adSettings.indexOf('记忆注入参数') >= 0, '（前提）确实在自动做梦的设置页上')
+    ok(adSettings.indexOf('只出报告') < 0, '自动做梦的设置里不再有归档策略（只在隔壁「自动归档」卡里）')
   }
   // ── 8f. 头部带：主操作换行后左顶格（v0.9.10）────────────────────────────
   group('8f. 头部带：主操作换行后左顶格')
@@ -1926,7 +2078,7 @@ async function main() {
     // 真实宿主的 ctx.get 每次返回新对象：effect 若依赖裸 remote，这里就会滚成几百次
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad, unstableRemoteRefs: true })
     let tree = await rt.settle(C, {})
-    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '自动做梦')[0])
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '自动整理')[0])
     tree = await rt.settle(C, {})
     // 再settle 几轮：稳定实现下不该产生新的拉取
     for (let i = 0; i < 4; i++) tree = await rt.settle(C, {})
@@ -1963,8 +2115,10 @@ async function main() {
     click(btn(row, '归档这一条')[0])
     tree = await rt.settle(C, {})
     panel = all(tree, byClass('smem-tool-panel'))[0]
-    ok(textOf(panel).indexOf('确认把「project_beta.md」移进档案馆') >= 0, '逐条执行前要确认')
-    click(btn(all(panel, byClass('smem-cand-confirm'))[0], '确认归档')[0])
+    const candModal = modalOf(tree)
+    ok(!!candModal && textOf(candModal).indexOf('把「project_beta.md」移进档案馆') >= 0, '逐条执行前要确认')
+    ok(!!candModal && textOf(candModal).indexOf('随时可以恢复') >= 0, '确认框说明归档可恢复（不是删除）')
+    click(btn(candModal, '确认归档')[0])
     tree = await rt.settle(C, {})
     const oneCall = mem.st.calls.find((c) => c[0] === 'archive')
     ok(!!oneCall && oneCall[1] === 'project_beta.md' && oneCall[2] === '已 212 天未被注入（project 阈值 90 天）',
@@ -1995,8 +2149,8 @@ async function main() {
     ok(textOf(goOf(t2)) === '执行归档（选中 2 条）', '「全选」把两条都勾上')
     click(goOf(t2))
     t2 = await rt2.settle(r2.comp, {})
-    ok(treeText(t2).indexOf('确认把选中的 2 条一起移进档案馆') >= 0, '批量执行前要确认')
-    click(btnHas(t2, '确认归档')[0])
+    ok(treeText(t2).indexOf('把选中的 2 条一起移进档案馆') >= 0, '批量执行前要确认')
+    click(btnHas(modalOf(t2), '确认归档')[0])
     t2 = await rt2.settle(r2.comp, {})
     const batch = mem2.st.calls.filter((c) => c[0] === 'archive')
     ok(batch.length === 2 && batch.every((c) => c[2].indexOf('未被注入') >= 0),
@@ -2014,6 +2168,32 @@ async function main() {
     ok(treeText(t0).indexOf('按当前阈值没有可归档的') >= 0, '零候选给的是「按当前阈值没有可归档的」')
     ok(all(t0, byClass('smem-cand')).length === 0, '零候选时没有候选行')
     ok(treeText(t0).indexOf('自动归档：关') >= 0, 'autoArchive=off 时写明「关」')
+
+    // 9d 2.5.0（D39）：自动归档关掉时，手动「执行归档」一起置灰 —— 清单照常可看。
+    // 开关是唯一的关闭入口，关掉还说「能手动跑」等于开关只挡住了自动那部分。
+    const rtOff = makeReact()
+    const memOff = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    memOff.st.cand = Object.assign({}, CANDIDATES, { autoArchive: 'off' })
+    const rOff = await loadClient(rtOff, { memory: memOff })
+    let tOff = await rtOff.settle(rOff.comp, {})
+    tOff = await openTool(rtOff, rOff.comp, tOff, '归档候选')
+    const pOff = all(tOff, byClass('smem-tool-panel'))[0]
+    ok(all(pOff, byClass('smem-cand')).length === 2, '（前提）关闭状态下候选清单照常列出 2 条')
+    ok(!!all(pOff, byClass('smem-modcard-off'))[0], '关闭状态下写明「一个文件都不动，候选只列在清单里」')
+    const oneOff = all(pOff, (n) => n.type === 'button' && textOf(n) === '归档这一条')[0]
+    ok(!!oneOff && oneOff.props.disabled === true, '关闭状态下「归档这一条」是禁用的')
+    const goOff = all(pOff, (n) => n.type === 'button' && textOf(n).indexOf('执行归档') === 0)[0]
+    ok(!!goOff && goOff.props.disabled === true, '关闭状态下「执行归档（选中 N 条）」是禁用的')
+    // 【反向对照】把策略换回「只出报告」再点面板里的「刷新」重取一次 —— 按钮必须恢复可用，
+    // 否则上面那两条「禁用」可能只是按钮本身就是坏的。
+    memOff.st.cand = Object.assign({}, CANDIDATES, { autoArchive: 'report' })
+    const againBtn = btnHas(all(tOff, byClass('smem-tool-panel'))[0], '刷新')[0]
+    click(againBtn)
+    tOff = await rtOff.settle(rOff.comp, {})
+    const pBack = all(tOff, byClass('smem-tool-panel'))[0]
+    ok(all(pBack, byClass('smem-modcard-off')).length === 0, '【反向对照】重取到「只出报告」后不再显示关闭说明')
+    const oneBack = all(pBack, (n) => n.type === 'button' && textOf(n) === '归档这一条')[0]
+    ok(!!oneBack && oneBack.props.disabled !== true, '【反向对照】「归档这一条」恢复可用')
   }
 
   // ── 10. 保留名原样编辑：读到的全文 = 交回的全文 ──────────────────────────
@@ -2063,7 +2243,7 @@ async function main() {
     const ad = makeAutodreamRemote()
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad })
     let tree = await rt.settle(C, {})
-    click(btn(tree, '自动做梦')[0])
+    click(btn(tree, '自动整理')[0])
     tree = await rt.settle(C, {})
     const cardByKey = (t, k) => all(t, (n) => n.props && n.props.key === k)[0]
     const chipIn = (t, k, label) => {
@@ -2084,21 +2264,30 @@ async function main() {
     //      那页的断言在 8d/8e；这里不再重复。
 
     // 11b 回读校验：模拟「setConfig 静默忽略」，界面必须报错而不是说已保存。
-    //      这一步改在新页签上做（三档现在住那儿）。
+    //      归档策略与这里同屏（2.5.0：自动整理 = 自动做梦 + 自动归档两张卡），不用切页签。
     ad.st.ignoreAutoArchive = true
     // 先让它处于 auto：这样下面「没生效时仍显示真实值」才有区分度（否则和默认档撞不出差别）
     ad.st.config.autoArchive = 'auto'
-    click(btn(tree, '自动归档')[0])
-    tree = await rt.settle(C, {})
-    const archiveSeg = (t, label) => all(t, (n) => n.type === 'button' && String((n.props || {}).className || '').indexOf('smem-chip') >= 0 && textOf(n) === label)[0]
-    ok(!!archiveSeg(tree, '关闭'), '（前提）「自动归档」页签上能找到三档开关')
-    click(archiveSeg(tree, '关闭'))
+    const archiveCardOf = (t) => all(t, byClass('smem-archive-settings'))[0]
+    const archiveSeg = (t, label) => {
+      const card = archiveCardOf(t)
+      return card && all(card, (n) => n.type === 'button' && String((n.props || {}).className || '').indexOf('smem-chip') >= 0 && textOf(n) === label)[0]
+    }
+    // 「关闭」不再是一档（2.5.0）：关掉它的是卡头那颗开关，真身仍是 autoArchive === 'off'
+    const archiveSwitch = (t) => {
+      const card = archiveCardOf(t)
+      return card && all(card, (n) => n.type === 'button' && byClass('smem-switch')(n))[0]
+    }
+    ok(!!archiveSwitch(tree), '（前提）「自动归档」卡上有启停开关')
+    ok(archiveSwitch(tree).props['aria-checked'] === 'true', '（前提）自动归档当前是开着的（auto）')
+    click(archiveSwitch(tree))
     tree = await rt.settle(C, {})
     ok(ad.st.calls.some((c) => c[0] === 'getConfig'), '保存后会再 getConfig() 回读一次')
     ok(treeText(tree).indexOf('保存没生效') >= 0, '回读发现值没变 → 界面报错')
     ok(treeText(tree).indexOf('自动归档已设为「关闭」') < 0, '值没变时绝不谎报「已保存」')
+    ok(archiveSwitch(tree).props['aria-checked'] === 'true', '没生效时界面仍显示真实值（开关仍是开）')
     ok(archiveSeg(tree, '满足条件自动跑') && archiveSeg(tree, '满足条件自动跑').props['data-on'] === '1',
-      '没生效时界面仍显示真实值（auto）')
+      '没生效时两档里仍高亮真实值（auto）')
 
     // 11c 文件列表的候选区用同一套词（候选区的 autoArchive 来自 archiveCandidates，
     //     与 autodream 配置同源；这里把它设成与上面刚保存的同一个值来对照措辞）
@@ -2108,7 +2297,7 @@ async function main() {
     tree = await openTool(rt, C, tree, '归档候选')
     ok(treeText(tree).indexOf('自动归档：满足条件自动跑') >= 0,
       '候选区与这里用同一套档位措辞（自动归档：满足条件自动跑）')
-    click(btn(tree, '自动做梦')[0])
+    click(btn(tree, '自动整理')[0])
     tree = await rt.settle(C, {})
     tree = await gotoSeg(rt, C, tree, '设置')
 
@@ -2264,7 +2453,7 @@ async function main() {
     mem2.st.settings = LIMITS_FIXTURE
     const r2 = await loadClient(rt2, { memory: mem2, autodream: makeAutodreamRemote() })
     let t2 = await rt2.settle(r2.comp, {})
-    click(btn(t2, '自动做梦')[0])
+    click(btn(t2, '自动整理')[0])
     t2 = await rt2.settle(r2.comp, {})
     ok(all(t2, byClass('smem-subtab')).length === 3, '三个分段按钮都在')
     ok(treeText(t2).indexOf('立即整理') >= 0, '「运行」段里有立即整理')
@@ -2380,7 +2569,7 @@ async function main() {
 
     // 15b tab 语义与分组分隔
     ok((all(tree, byClass('smem-tabs'))[0] || { props: {} }).props.role === 'tablist', 'tab 栏有 role=tablist')
-    ok(all(tree, (n) => n.type === 'button' && n.props.role === 'tab').length === 5, '五个 tab 都带 role=tab')
+    ok(all(tree, (n) => n.type === 'button' && n.props.role === 'tab').length === 4, '四个 tab 都带 role=tab')
     ok(all(tree, byClass('smem-tabs-sep')).length === 1, 'tab 栏恰好一个分组分隔（看 ｜ 设置·自动化）')
 
     // 15c 动作分组：编辑 ｜ 其余；最后一个是危险动作
@@ -2634,10 +2823,10 @@ async function main() {
     const sidebarRegs = (regs) => regs.filter((r) => r.spec && r.spec.name === 'sidebar.panellist')
     const mainRegs = (regs) => regs.filter((r) => r.spec && r.spec.name === 'main')
     const settingsRegs = (regs) => regs.filter((r) => r.spec && r.spec.name === 'settings.section')
-    /** 打开「自动做梦 → 设置」分段（注入参数与侧栏开关都在这里）。 */
+    /** 打开「自动整理 → 自动做梦 → 设置」分段（注入参数与侧栏开关都在这里）。 */
     async function openAdSettings(rt, C) {
       let tree = await rt.settle(C, {})
-      click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '自动做梦')[0])
+      click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '自动整理')[0])
       tree = await rt.settle(C, {})
       click(all(tree, (n) => n.type === 'button' && byClass('smem-subtab')(n) && textOf(n) === '设置')[0])
       return rt.settle(C, {})
@@ -2826,7 +3015,7 @@ async function main() {
     ad.st.config.maxOutputTokens = 32768
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad })
     let tree = await rt.settle(C, {})
-    click(btn(tree, '自动做梦')[0])
+    click(btn(tree, '自动整理')[0])
     tree = await rt.settle(C, {})
     click(all(tree, (n) => n.type === 'button' && byClass('smem-subtab')(n) && textOf(n) === '设置')[0])
     tree = await rt.settle(C, {})
@@ -2853,7 +3042,7 @@ async function main() {
     })
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad })
     let tree = await rt.settle(C, {})
-    click(btn(tree, '自动做梦')[0])
+    click(btn(tree, '自动整理')[0])
     tree = await rt.settle(C, {})
     ok(treeText(tree).indexOf('报告被截断（残篇）') >= 0, '状态行把残篇标出来（不再只写「成功」）', treeText(tree).slice(0, 240))
 
@@ -2869,15 +3058,16 @@ async function main() {
     })
     const { comp: C2 } = await loadClient(rt2, { memory: makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED), autodream: ad2 })
     let t2 = await rt2.settle(C2, {})
-    click(btn(t2, '自动做梦')[0])
+    click(btn(t2, '自动整理')[0])
     t2 = await rt2.settle(C2, {})
     ok(treeText(t2).indexOf('零正文重试 1 次后补齐') >= 0, '重试补齐也写在状态行上', treeText(t2).slice(0, 240))
   }
 
-  // ── 23. 2.0.0「冲突」页签：六页签 + 徽标 + 两份正文 + 两段式裁决 + 能力降级 ──
-  group('23. 2.0.0 冲突页签：六页签 / 徽标 / 两份正文 / 两段式裁决 / 降级')
+  // ── 23. 2.0.0「冲突」并进「库健康」：四页签 + 徽标 + 两份正文 + 两段式裁决 + 能力降级 ──
+  group('23. 冲突（库健康一屏）：四页签 / 徽标 / 两份正文 / 两段式裁决 / 降级')
   {
-    const confTab = (t) => all(t, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '冲突')[0]
+    // 2.5.0：冲突不再单独占一个页签，它和体检并成「库健康」（冲突在前）。
+    const confTab = (t) => all(t, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '库健康')[0]
     const confBadge = (t) => all(t, (n) => n.type === 'button' && byClass('smem-tool-badge')(n) && textOf(n).indexOf('冲突') === 0)[0]
     const itemOf = (t, idNeedle) => all(t, byClass('smem-conf-item')).find((c) => textOf(c).indexOf(idNeedle) >= 0)
     async function openConf(rt, C) {
@@ -2894,13 +3084,13 @@ async function main() {
       return { rt, C, tree, mem, cf }
     }
 
-    // 23a 六页签 + 徽标常显 + 点徽标切页
+    // 23a 四页签 + 徽标常显 + 点徽标切页（2.5.0：冲突并进「库健康」，页签不再是六个）
     {
       const { rt, C, tree: t0, cf } = await mkRuntimes()
       let tree = t0
       const tabs = all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n)).map(textOf)
-      ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '时间线', '自动做梦', '自动归档', '体检', '冲突']),
-        `六页签、冲突排在体检之后（实际：${tabs.join(' / ')}）`)
+      ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '时间线', '自动整理', '库健康']),
+        `四页签、库健康排在最后（实际：${tabs.join(' / ')}）`)
       // 先回文件列表再看徽标（徽标必须每个 tab 下都在，不能只在冲突页上有）
       click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '文件列表')[0])
       tree = await rt.settle(C, {})
@@ -3014,24 +3204,24 @@ async function main() {
       ok(treeText(tree).indexOf('新说法（拟保留）') < 0, '写失败型不会冒充「新说法 / 旧说法」')
     }
 
-    // 23d 标失效：两段式确认 + 可选哪一方作废 + 收据 + 徽标随队列更新
+    // 23d 标失效：两段式（模态确认框）+ 可选哪一方作废 + 收据 + 徽标随队列更新
     {
       const { rt, C, tree: t0, cf } = await mkRuntimes()
       let tree = t0
       click(btn(itemOf(tree, 'aaaa1111'), '标此条失效')[0])
       tree = await rt.settle(C, {})
-      ok(!!all(tree, byClass('smem-conf-confirm'))[0], '标失效先出确认条（两段式）')
+      ok(!!modalOf(tree), '标失效先弹出模态确认框（两段式）')
       ok(!cf.st.calls.some((c) => c[0] === 'invalidate'), '点第一下不写盘（invalidate 还没调）')
-      ok(treeText(tree).indexOf('确认把「project_beta.md」标为失效') >= 0, '确认条写明默认标哪一方')
-      const chips = all(all(tree, byClass('smem-conf-confirm'))[0],
-        (n) => n.type === 'button' && byClass('smem-chip')(n))
+      ok(modalTitleOf(tree).indexOf('project_beta.md') >= 0,
+        `确认框标题写明默认标哪一方（实际：${modalTitleOf(tree)}）`)
+      const chips = all(modalOf(tree), (n) => n.type === 'button' && byClass('smem-chip')(n))
       const other = chips.find((c) => textOf(c) === 'reference_gamma.md')
       ok(chips.length === 2 && !!other, `矛盾记录两方都列成可选 chip（${chips.map(textOf).join(' / ')}）`)
       click(other)
       tree = await rt.settle(C, {})
-      ok(treeText(all(tree, byClass('smem-conf-confirm'))[0]).indexOf('reference_gamma.md') >= 0,
-        '选了另一方，确认条跟着换')
-      click(btn(all(tree, byClass('smem-conf-confirm'))[0], '确认标失效')[0])
+      ok(modalTitleOf(tree).indexOf('reference_gamma.md') >= 0,
+        `选了另一方，确认框的宾语跟着换（实际：${modalTitleOf(tree)}）`)
+      click(btn(modalOf(tree), '确认标失效')[0])
       tree = await rt.settle(C, {})
       const call = cf.st.calls.find((c) => c[0] === 'invalidate')
       ok(call && call[1].id === '20261027-aaaa1111' && call[1].file === 'reference_gamma.md',
@@ -3060,10 +3250,9 @@ async function main() {
       ok(!btn(itemOf(tree, 'bbbb2222'), '撤销失效')[0], 'dismiss 掉的记录没有「撤销失效」（没东西可撤）')
       click(btn(resolved, '撤销失效')[0])
       tree = await rt.settle(C, {})
-      ok(!!all(tree, byClass('smem-conf-confirm'))[0] &&
-        treeText(tree).indexOf('撤销「feedback_old.md」的失效标记') >= 0, '撤销失效走两段式确认')
+      ok(!!modalOf(tree) && modalTitleOf(tree).indexOf('feedback_old.md') >= 0, '撤销失效走两段式确认（模态）')
       ok(!cf.st.calls.some((c) => c[0] === 'undo'), '确认前不调 undo')
-      click(btn(all(tree, byClass('smem-conf-confirm'))[0], '确认撤销')[0])
+      click(btn(modalOf(tree), '确认撤销')[0])
       tree = await rt.settle(C, {})
       ok(cf.st.calls.some((c) => c[0] === 'undo' && c[1].id === '20261025-cccc3333'), '确认后调 undo({id})')
       ok(treeText(tree).indexOf('已撤销 feedback_old.md 的失效标记') >= 0, '撤销成功有反馈')
@@ -3073,9 +3262,9 @@ async function main() {
       const anyCard = all(tree, byClass('smem-conf-item'))[0]
       click(btn(anyCard, '删除记录')[0])
       tree = await rt.settle(C, {})
-      ok(treeText(tree).indexOf('删除这条冲突记录') >= 0, '删除记录走两段式确认')
+      ok(modalTitleOf(tree).indexOf('删除这条冲突记录') >= 0, '删除记录走两段式确认（模态）')
       ok(!cf.st.calls.some((c) => c[0] === 'removeRecord'), '确认前不调 removeRecord')
-      click(btn(all(tree, byClass('smem-conf-confirm'))[0], '确认删除记录')[0])
+      click(btn(modalOf(tree), '确认删除记录')[0])
       tree = await rt.settle(C, {})
       ok(cf.st.calls.some((c) => c[0] === 'removeRecord'), '确认后调 removeRecord({id})')
       ok(treeText(tree).indexOf('已删除冲突记录') >= 0, '删除成功有反馈（并说明记忆文件没动）')
@@ -3093,7 +3282,7 @@ async function main() {
         let tree = t0
         click(btn(itemOf(tree, 'aaaa1111'), '标此条失效')[0])
         tree = await rt.settle(C, {})
-        click(btn(all(tree, byClass('smem-conf-confirm'))[0], '确认标失效')[0])
+        click(btn(modalOf(tree), '确认标失效')[0])
         tree = await rt.settle(C, {})
         const txt = treeText(tree)
         ok(txt.indexOf(needle) >= 0, `失败码 ${code}：有可读文案（${needle}）`)
@@ -3175,12 +3364,12 @@ async function main() {
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad, conflict: cf, locale: makeEnLocale() })
     let tree = await rt.settle(C, {})
     const tabs = all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n)).map(textOf)
-    ok(JSON.stringify(tabs) === JSON.stringify(['Files', 'Timeline', 'Autodream', 'Auto-archive', 'Audit', 'Conflicts']),
-      `六页签全部是英文（实际：${tabs.join(' / ')}）`)
+    ok(JSON.stringify(tabs) === JSON.stringify(['Files', 'Timeline', 'Automation', 'Health']),
+      `四个页签全部是英文（实际：${tabs.join(' / ')}）`)
     const hasCjk = (s) => /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(s)
 
-    // 25a 自动做梦 → 运行段
-    click(btn(tree, 'Autodream')[0])
+    // 25a 自动整理 → 自动做梦 · 运行段
+    click(btn(tree, 'Automation')[0])
     tree = await rt.settle(C, {})
     let t1 = treeText(tree)
     ok(t1.indexOf('Autodream') >= 0 && t1.indexOf('Organize now') >= 0 && t1.indexOf('Trigger') >= 0,
@@ -3205,17 +3394,15 @@ async function main() {
       '记录段是英文（回滚点 / 整理记录 / 历史报告）')
     ok(t3.indexOf('回滚点') < 0 && t3.indexOf('整理记录') < 0 && t3.indexOf('历史报告') < 0, '记录段没有残留中文文案')
 
-    // 25d 自动归档页签
-    click(btn(tree, 'Auto-archive')[0])
-    tree = await rt.settle(C, {})
-    const t4 = treeText(tree)
+    // 25d 自动归档卡：2.5.0 起它与自动做梦同屏（同一页签），所以直接在这一张卡里验
+    const t4 = treeText(all(tree, byClass('smem-archive-settings'))[0])
     ok(t4.indexOf('What auto-archive does') >= 0 && t4.indexOf('Save archive conditions') >= 0,
-      '自动归档页是英文（标题 / 保存按钮）')
+      '自动归档卡是英文（标题 / 保存按钮）')
     ok(t4.indexOf('Project') >= 0 && t4.indexOf('Reference') >= 0 && t4.indexOf('User') >= 0,
       '三个阈值标题是英文（Project / Reference / User）')
     ok(t4.indexOf('自动归档做什么') < 0 && t4.indexOf('保存归档条件') < 0 && t4.indexOf('闲置多少天算可以归档') < 0,
-      '自动归档页没有残留中文文案')
-    ok(!hasCjk(t4), '自动归档页整页无中文')
+      '自动归档卡没有残留中文文案')
+    ok(!hasCjk(t4), '自动归档卡整张无中文')
   }
 
   console.log(`\n结果：${pass} passed, ${fail} failed`)

@@ -25,6 +25,10 @@
 			const sErr = react.useState(null); const err = sErr[0], setErr = sErr[1];
 			const sNotice = react.useState(""); const notice = sNotice[0], setNotice = sNotice[1];
 			const sBusy = react.useState(false); const busy = sBusy[0], setBusy = sBusy[1];
+			// 2.5.0（D39）：「关闭」这一档从三档里拿掉了，开关是唯一的关闭入口。
+			// 开关要能「关掉再打开回到原档位」，所以记住关之前是哪一档（不落配置，
+			// 配置里只有 autoArchive 一个真身；重开时先回 report 也是安全的默认）。
+			const sLast = react.useState("report"); const lastMode = sLast[0], setLastMode = sLast[1];
 
 			const TH_KEYS = ["archiveAfterDaysProject", "archiveAfterDaysReference", "archiveAfterDaysUser"];
 			// 2.1.0：标签与提示走字典（键在这里，文案在 55-i18n-memory.js）。
@@ -97,6 +101,7 @@
 			}
 
 			function saveMode(v) {
+				if (v !== "off") setLastMode(v);
 				save({ autoArchive: v }, t("archive.notice.modeSet", { mode: modeLabel(v) }), function (got) {
 					const g = got ? autoArchiveOf(got.autoArchive) : null;
 					return g === v ? null : t("archive.err.modeStill", { mode: g ? modeLabel(g) : t("archive.unknown") });
@@ -122,8 +127,26 @@
 				});
 			}
 
-			return h("div", { }, [
-				// ── ① 它做什么（这一屏存在的理由写在最前面）──
+			// 根节点带一个稳定的类名（2.5.0）：它现在与「自动做梦」同屏堆叠，
+			// 断言与样式都得能把这一张卡与旁边那张分开 —— 没有类名就只能按整棵树找文本。
+			return h("div", { className: "smem-archive-settings" }, [
+				// ── ① 模块卡头（2.5.0，D39）：开关 + 标题 + 状态 ──
+				// 开关的真身就是 `autoArchive === 'off'`，没有新增配置键。
+				h("div", { className: "smem-modcard-head", key: "head" }, [
+					h(Switch, {
+						key: "sw",
+						on: mode !== "off",
+						label: t("archive.modeTitle"),
+						title: mode !== "off" ? t("archive.switch.onTitle") : t("archive.switch.offTitle"),
+						disabled: busy || !cfg,
+						onClick: function () { saveMode(mode === "off" ? lastMode : "off"); },
+					}),
+					h("span", { className: "smem-modcard-title", key: "t" }, t("archive.modeTitle")),
+					h("span", { className: "smem-modcard-status", key: "s" },
+						busy ? t("archive.action.saving")
+							: (mode === "off" ? t("archive.status.off") : t("archive.status.on", { mode: modeLabel(mode) }))),
+				]),
+				// ── ② 它做什么（这一屏存在的理由写在最前面）──
 				h("div", { className: "smem-autodream-sec", key: "what" }, [
 					h("div", { className: "smem-autodream-row", key: "h" }, [
 						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, t("archive.title")),
@@ -132,14 +155,16 @@
 					h("div", { className: "smem-autodream-note", key: "p2" }, t("archive.intro2")),
 					h("div", { className: "smem-autodream-note", key: "p3" }, t("archive.intro3")),
 				]),
-				// ── ② 三档策略 ──
+				// ── ③ 两档策略（「关闭」已删，见 D39）──
 				h("div", { className: "smem-autodream-sec", key: "mode" }, [
+					mode === "off"
+						? h("div", { className: "smem-modcard-off", key: "offNote" }, t("archive.note.offStop"))
+						: null,
 					h("div", { className: "smem-autodream-row", key: "r" }, [
 						h("span", { className: "smem-autodream-key", key: "k" }, t("archive.modeTitle")),
 						h(Seg, {
-							key: "v", value: mode,
+							key: "v", value: mode === "off" ? lastMode : mode,
 							options: [
-								{ value: "off", label: modeLabel("off") },
 								{ value: "report", label: modeLabel("report") },
 								{ value: "auto", label: modeLabel("auto") },
 							],

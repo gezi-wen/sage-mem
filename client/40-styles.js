@@ -1,5 +1,9 @@
 		const CSS = [
 			".smem-root{display:flex;flex-direction:column;gap:12px;font-size:13px;line-height:1.55;color:var(--dsw-alias-label-primary);max-width:760px;}",
+			// 2.5.0：一屏两张卡（自动整理 = 做梦 + 归档；库健康 = 冲突 + 体检）。
+			// `.smem-root` 本身是 gap 12 的列，但这两张卡中间有标题层级差，间距给大一点。
+			".smem-stack{display:flex;flex-direction:column;gap:18px;}",
+			".smem-stack > .smem-stack-sep{height:1px;background:var(--dsw-alias-border-l2);}",
 			".smem-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}",
 			/**
 			 * 头部带里的「弹簧」：吃掉本行的剩余空间，把后面的主操作顶到右边。
@@ -57,7 +61,6 @@
 			".smem-ar-hint{font-size:11.5px;color:var(--dsw-alias-label-secondary);}",
 			".smem-ar-meta{font-size:11.5px;color:var(--dsw-alias-label-secondary);white-space:nowrap;}",
 			".smem-ar-reason{font-size:12px;color:var(--dsw-alias-label-secondary);border-left:2px solid var(--dsw-alias-border-l2);padding-left:8px;white-space:pre-wrap;overflow-wrap:anywhere;}",
-			".smem-ar-confirm{border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:8px 10px;background:var(--dsw-alias-bg-layer-2);display:flex;flex-direction:column;gap:6px;font-size:12px;line-height:1.55;}",
 			".smem-ar-banner{font-size:12px;color:var(--dsw-alias-label-secondary);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:6px 10px;}",
 			// ── 工具行 + 工具面板（体检 / 归档候选 / 保留名原样编辑）──
 			// 三个新入口收在一行**轻量**文字按钮里：不跟主工具栏抢重量级，也不各占一块版面。
@@ -129,7 +132,6 @@
 			".smem-cand-main{display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;}",
 			".smem-cand-reason{font-size:12px;color:var(--dsw-alias-label-secondary);border-left:2px solid var(--dsw-alias-border-l2);padding-left:8px;overflow-wrap:anywhere;}",
 			".smem-cand-act{display:flex;justify-content:flex-end;}",
-			".smem-cand-confirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;border-top:1px dashed var(--dsw-alias-border-l2);padding-top:6px;}",
 			".smem-raw-names{display:flex;gap:6px;flex-wrap:wrap;}",
 			// 自动做梦的二级分组：导航用**下划线**（跟筛选 chip、动作按钮区分开，三种层级三种形状）。
 			".smem-subtabs{display:flex;gap:16px;border-bottom:1px solid var(--dsw-alias-border-l2);margin:2px 0 8px;}",
@@ -142,8 +144,32 @@
 			".smem-ad-field{display:flex;align-items:center;gap:8px;min-width:0;}",
 			".smem-ad-field .smem-autodream-key{min-width:96px;}",
 			".smem-actions{display:flex;gap:6px;}",
-			".smem-form{border:1px solid var(--dsw-alias-border-l2);border-radius:10px;padding:12px;background:var(--dsw-alias-bg-layer-2);display:flex;flex-direction:column;gap:8px;}",
-			".smem-form-title{font-weight:600;font-size:13px;}",
+			// ── 模态确认框（2.5.0，D39）：替掉全部就地确认条 ──
+			// 遮罩压暗全屏并**吃掉**背景的点击；卡片居中，键盘焦点被 Tab 圈不住时
+			// 至少还有 Esc / 点遮罩 / 取消三条出口（Esc 由调用方的 effect 挂）。
+			".smem-modal-host{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;}",
+			".smem-modal-scrim{position:absolute;inset:0;background:rgba(0,0,0,.5);animation:smem-fade 220ms cubic-bezier(.2,0,0,1);}",
+			".smem-modal{position:relative;width:min(460px,92vw);max-height:calc(100vh - 48px);overflow:auto;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:12px;padding:16px;box-shadow:0 24px 60px rgba(0,0,0,.34);animation:smem-pop 220ms cubic-bezier(.2,0,0,1);}",
+			"@keyframes smem-pop{from{opacity:0;transform:translateY(6px) scale(.985);}to{opacity:1;transform:none;}}",
+			".smem-modal-title{font-weight:600;font-size:13.5px;margin-bottom:8px;}",
+			".smem-modal-body{font-size:12.5px;line-height:1.65;color:var(--dsw-alias-label-secondary);display:flex;flex-direction:column;gap:8px;}",
+			".smem-modal-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}",
+			"@media (prefers-reduced-motion:reduce){.smem-modal,.smem-modal-scrim{animation:none;}}",
+			// ── 编辑抽屉（2.5.0，D39）：替掉 1.0 起的页面内联表单 `.smem-form` ──
+			// 抽屉从右侧滑入，遮罩自带淡入。两处都用 `animation` 而不是 transition：mount 即播，
+			// 不依赖二次渲染（页面不可见时 rAF 不触发）。
+			".smem-drawer-host{position:fixed;inset:0;z-index:40;display:flex;justify-content:flex-end;}",
+			".smem-drawer-scrim{position:absolute;inset:0;background:rgba(0,0,0,.42);animation:smem-fade 220ms cubic-bezier(.2,0,0,1);}",
+			"@keyframes smem-fade{from{opacity:0;}to{opacity:1;}}",
+			"@keyframes smem-slide{from{transform:translateX(100%);}to{transform:none;}}",
+			".smem-drawer-panel{position:relative;display:flex;flex-direction:column;width:min(560px,94vw);height:100%;background:var(--dsw-alias-bg-layer-1);border-left:1px solid var(--dsw-alias-border-l2);box-shadow:-18px 0 42px rgba(0,0,0,.28);animation:smem-slide 220ms cubic-bezier(.2,0,0,1);}",
+			".smem-drawer-head{display:flex;align-items:flex-start;gap:10px;padding:14px 16px;border-bottom:1px solid var(--dsw-alias-border-l2);}",
+			".smem-drawer-title{font-weight:600;font-size:13.5px;}",
+			".smem-drawer-x{margin-left:auto;flex:none;width:26px;height:26px;border-radius:8px;border:1px solid var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);font-size:15px;line-height:1;font-family:inherit;cursor:pointer;}",
+			".smem-drawer-body{flex:1;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:8px;}",
+			".smem-drawer-foot{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--dsw-alias-border-l2);}",
+			".smem-drawer-ta{font-family:inherit;min-height:220px;resize:vertical;}",
+			"@media (prefers-reduced-motion:reduce){.smem-drawer-scrim,.smem-drawer-panel{animation:none;}}",
 			".smem-label{font-size:12px;color:var(--dsw-alias-label-secondary);}",
 			".smem-input,.smem-textarea{width:100%;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-base);color:inherit;padding:6px 10px;font-size:13px;outline:none;font-family:inherit;}",
 			".smem-input:focus,.smem-textarea:focus{border-color:var(--dsw-alias-brand-primary,#4d76e6);}",
@@ -153,6 +179,13 @@
 			".smem-chip:hover{border-color:var(--dsw-alias-border-l2);}",
 			'.smem-chip[data-on="1"]{border-color:var(--dsw-alias-brand-primary,#4d76e6);color:var(--dsw-alias-brand-primary,#4d76e6);}',
 			".smem-chips{display:flex;gap:6px;flex-wrap:wrap;}",
+			// ── 模块卡头（2.5.0，D39）────────────────────────────────────────────
+			// 开关本体的样式在下面 `.smem-switch`（2.0 起就有，这里只补语义与卡头排版）。
+			".smem-modcard-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}",
+			".smem-modcard-title{font-weight:600;font-size:13px;}",
+			".smem-modcard-head .smem-modcard-status{margin-left:auto;color:var(--dsw-alias-label-tertiary);font-size:12px;}",
+			// 关掉时的说明条：只解释「运行被停了」，不暗示设置被锁。
+			".smem-modcard-off{margin:6px 0 10px;padding:7px 10px;border-radius:8px;font-size:12px;line-height:1.6;color:var(--dsw-alias-state-warn-primary,#d97706);background:var(--dsw-alias-bg-layer-2);}",
 			".smem-err{border:1px solid var(--dsw-alias-state-error-primary,#ef4444);color:var(--dsw-alias-state-error-primary,#ef4444);border-radius:8px;padding:6px 10px;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;}",
 			".smem-ok{color:var(--dsw-alias-state-success-primary,#16a34a);font-size:12px;}",
 			".smem-empty{border:1px dashed var(--dsw-alias-border-l2);border-radius:10px;padding:22px 14px;text-align:center;color:var(--dsw-alias-label-secondary);font-size:12.5px;}",
@@ -195,7 +228,6 @@
 			".smem-ad-badge{display:inline-flex;align-items:center;font-size:11px;color:var(--dsw-alias-label-secondary);border:1px solid var(--dsw-alias-border-l1);border-radius:6px;padding:0 5px;white-space:nowrap;}",
 			".smem-ad-badge--warn{color:var(--dsw-alias-state-warn-primary,#d97706);border-color:var(--dsw-alias-state-warn-primary,#d97706);}",
 			".smem-ad-badge--legacy{opacity:.78;}",
-			".smem-ad-confirm{border:1px solid var(--dsw-alias-state-error-primary,#ef4444);border-radius:8px;padding:7px 9px;font-size:12px;line-height:1.55;display:flex;flex-direction:column;gap:6px;overflow-wrap:anywhere;}",
 			".smem-ad-rb{font-size:12px;line-height:1.5;overflow-wrap:anywhere;}",
 			".smem-ad-run{display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:6px 9px;background:transparent;color:inherit;text-align:left;font-family:inherit;font-size:12px;cursor:pointer;}",
 			".smem-ad-run:hover{border-color:var(--dsw-alias-border-l2);}",
@@ -222,6 +254,16 @@
 			".smem-skeleton-row{height:44px;border-radius:8px;background:var(--dsw-alias-bg-layer-2);opacity:.55;}",
 			".smem-empty{display:flex;flex-direction:column;align-items:flex-start;gap:8px;}",
 			".smem-tabs-sep{width:1px;align-self:stretch;margin:6px 2px;background:var(--dsw-alias-border-l2);}",
+			// ── 切页签的进场动画（2.5.0，D39）──────────────────────────────────────
+			// 只在**换页签**时播一次：`.smem-view` 带 key={tab}，换页签＝换 key＝换 DOM 节点，
+			// CSS 动画自然重播；同一页签内的任何 setState 都复用同一个节点，不会重播。
+			// 所以这里不需要「记住上一个 tab」的 JS 状态 —— 让 DOM 节点身份来回答这个问题。
+			// 首次打开也播一次：在用户看来那就是切了一页（D39）。
+			"@keyframes smem-enter{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}",
+			"@keyframes smem-under{from{transform:scaleX(.35);opacity:0;}to{transform:scaleX(1);opacity:1;}}",
+			".smem-view{animation:smem-enter 220ms cubic-bezier(.2,0,0,1);}",
+			".smem-tab--on:after{animation:smem-under 220ms cubic-bezier(.2,0,0,1);}",
+			"@media (prefers-reduced-motion:reduce){.smem-view{animation:none;}.smem-tab--on:after{animation:none;}}",
 			// 窄窗口（≤420px）：头部带与筛选条各让一行，卡片动作允许换行、分隔符隐藏。
 			"@media (max-width:420px){.smem-root{gap:10px;}.smem-head{gap:6px;}.smem-head-actions{flex-wrap:wrap;}.smem-card-title{min-width:0;word-break:break-word;}.smem-actions{flex-wrap:wrap;}.smem-actions-sep{display:none;}.smem-num{width:56px;}.smem-search{min-width:100px;}}",
 			// ── 1.8.0：侧栏入口（设置开关 + 中央主区整页）──
@@ -242,8 +284,17 @@
 			".smem-plugin-card-note{font-size:12px;line-height:1.55;color:var(--dsw-alias-label-secondary,#6b7280);}",
 			".smem-plugin-card-err{font-size:12px;line-height:1.5;color:var(--dsw-alias-state-error-primary,#ef4444);overflow-wrap:anywhere;}",
 			// ── 底部一行仓库链接（引流，不抢视线）──
-			".smem-star{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--dsw-alias-label-tertiary,#8b93a1);padding:2px 2px 0;}",
-			".smem-star-link{color:var(--dsw-alias-brand-primary,#4d76e6);text-decoration:underline;}",
+			// ── 求 Star 的角标（2.5.0，D39）：不占正文位置，hover 才展开半句话 ──
+			".smem-star-corner{position:fixed;right:16px;bottom:16px;z-index:20;display:flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--dsw-alias-border-l1);border-radius:999px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-tertiary,#8b93a1);font-size:12px;line-height:1.4;opacity:.62;transition:opacity 220ms cubic-bezier(.2,0,0,1),border-color 220ms cubic-bezier(.2,0,0,1);}",
+			".smem-star-corner:hover{opacity:1;border-color:var(--dsw-alias-border-l2);}",
+			".smem-star-glyph{font-size:11px;color:var(--dsw-alias-state-warn-primary,#d97706);}",
+			".smem-star-link{color:inherit;text-decoration:none;border-bottom:1px dashed transparent;}",
+			".smem-star-corner:hover .smem-star-link{border-bottom-color:currentColor;}",
+			".smem-star-more{max-width:0;overflow:hidden;white-space:nowrap;transition:max-width 220ms cubic-bezier(.2,0,0,1);}",
+			".smem-star-corner:hover .smem-star-more{max-width:180px;}",
+			".smem-star-x{border:0;background:transparent;color:inherit;cursor:pointer;font-size:11px;line-height:1;padding:0 1px;opacity:.7;font-family:inherit;}",
+			".smem-star-x:hover{opacity:1;}",
+			"@media (prefers-reduced-motion:reduce){.smem-star-corner,.smem-star-more{transition:none;}}",
 			// ── 冲突页签（2.0.0 矛盾检测）──
 			// 一屏里要同时看「两份正文对照 + 动作 + 后果」，所以独立成套类名，不复用文件卡片：
 			// 文件卡片的灰系 / 动作语义是「这条记忆怎么处置」，裁决是另一件事，混用会让
@@ -257,7 +308,6 @@
 			".smem-conf-file{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow-wrap:anywhere;white-space:normal;text-align:left;}",
 			".smem-conf-arrow{color:var(--dsw-alias-label-secondary);}",
 			".smem-conf-acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}",
-			".smem-conf-confirm{border:1px solid var(--dsw-alias-state-error-primary,#ef4444);border-radius:8px;padding:8px 10px;background:var(--dsw-alias-bg-layer-2);font-size:12px;line-height:1.55;display:flex;flex-direction:column;gap:6px;overflow-wrap:anywhere;}",
 			// 两份正文并排对照：窄窗口自动堆成一列（grid auto-fit，不用媒体查询）。
 			".smem-conf-bodies{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;}",
 			".smem-conf-body{border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:7px 9px;display:flex;flex-direction:column;gap:4px;min-width:0;}",

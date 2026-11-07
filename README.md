@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.4.3`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.5.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -165,7 +165,9 @@ The state directory (configuration, ledger, rollback points, conflict queue) def
 
 Every image below is **rendered from the UI code in this repository** (the same CSS, the same component tree; the data is demo data for illustration, not a real memory directory).
 
-Since 1.9.0 the memory-management surface follows the harness language (**Settings → General → Language**); memory content itself stays in whatever language it was written in, 2.1.0 extends it to the **Autodream** (run / settings / records) and **Auto-archive** screens; the timeline / star-map screen is the only panel still Chinese until the next i18n batch.
+Since 2.5.0 the panel has **four tabs: Files | Timeline | Automation | Health** — split by what you want to do, not by which data source feeds it: autodream and auto-archive are two cards on one "Automation" screen, conflicts and the audit are two cards on one "Health" screen. Editing opens a right-hand drawer, and every action that touches a file on disk asks in a modal dialog.
+
+Since 1.9.0 the memory-management surface follows the harness language (**Settings → General → Language**); memory content itself stays in whatever language it was written in, 2.1.0 extended that to the autodream (run / settings / records) and auto-archive cards; the timeline / star-map screen is the only panel still Chinese until the next i18n batch.
 
 ![File list: one Markdown file per memory, greyed rows are archived](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/files-list.png)
 
@@ -179,9 +181,9 @@ Since 1.9.0 the memory-management surface follows the harness language (**Settin
 
 *Lock — one click locks an important memory: **it no longer appears among the automatic archive candidates; the archive button in the UI is disabled, and even if you bypass the UI, the archive implementation refuses explicitly with `locked`**. The lock lives in the state directory and is not written into the memory's own frontmatter — that would be rewritten by automatic consolidation, and once the lock is lost it would be back among the candidates.*
 
-![Audit: a page of its own, hard problems reported in red sections by category](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/audit.png)
+![Health: conflicts that need your call on top, machine-scanned structural problems below](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/audit.png)
 
-*Audit — hard problems such as dangling index entries, missing index entries and broken links are reported in red by category; "points to an archived memory" is only a hint, does not count as a problem, and has no one-click fix (which one to change is your call).*
+*Health — one screen answers "is anything wrong with this library": the **conflict queue on top** (a finite list that needs your decision: which of two contradictory statements is void) and the **audit below** (dangling index entries, missing index entries, broken links and the rest, reported in red by category). "Points to an archived memory" is only a hint — it does not count as a problem, and there is no one-click fix: which one to change is your call. The audit only reports and never modifies.*
 
 ![Update notice: a single banner, only when there really is a new version](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/update-banner.png)
 
@@ -203,9 +205,9 @@ Since 1.9.0 the memory-management surface follows the harness language (**Settin
 
 *Autodream · settings — run / settings / history as secondary groups; the five injection parameters laid out in two columns, with both 「当前生效」(currently in effect) and 「重启后」(after restart) written out.*
 
-![Auto-archive: a page of its own, three strategies and three idle thresholds](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/archive-settings.png)
+![Auto-archive: the second card on the Automation screen — one switch, two modes, three idle thresholds](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/archive-settings.png)
 
-*Auto-archive — it is not the same thing as autodream: archiving is a **deterministic rule** (computed from idle days in the access ledger, no model call), which is why it gets a page of its own. Thresholds take effect on save, no restart needed.*
+*Auto-archive — it is not the same thing as autodream: archiving is a **deterministic rule** (computed from idle days in the access ledger, no model call), which is why it is its own card. Since 2.5.0 it has a **switch**, and that switch is the only way to turn it off (the old third mode 「关闭」 is gone); the mode is either 「只出报告」(report only) or 「满足条件自动跑」(run when the threshold is hit). Turning it off stops the running, not the settings — thresholds and history stay editable. Thresholds take effect on save, no restart needed.*
 
 ![Timeline · star-map view](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/starmap.png)
 
@@ -303,7 +305,7 @@ The guard has two paths, with **different** coverage, spelled out:
 
 - **Conflicts are not merged automatically**; which side to keep is your decision (the record is JSON, open it directly when you need to). Silent retry and silent abandonment both decide on your behalf.
 - **From 2.0.0 the injection side does read this queue**: only the **two sides of a `contradiction`** (status `open`) are suppressed; the three write-failure kinds (`stale_version` / `external_change` / `unresolved_merge`) are still injected — what is on disk there is the current content. The resolution entry and the suppression ship together, so there is no longer a state where "suppression is wired but there is no entry point".
-- **Resolution lives on the 「记忆管理 → 冲突」(Memory management → Conflicts) tab** (the sixth tab, with a permanent badge in the panel header): you look at both bodies one by one, and the actions are "mark this one invalid", "undo invalidation" and "delete record", with two-step confirmation for the dangerous ones. "Mark invalid" only adds one line `invalid_at` to the memory's frontmatter (optionally plus `superseded_by`) — **the file stays in place, the body does not change by a single byte, and `updated` is not touched**; the write is idempotent (clicking twice does not rewrite), it can be undone, and a failure returns an explicit error while the record stays pending.
+- **Resolution lives on the 「记忆管理 → 库健康」(Memory management → Health) tab** (the conflict queue sits at the top of that screen, with a permanent badge in the panel header): you look at both bodies one by one, and the actions are "mark this one invalid", "undo invalidation" and "delete record", with two-step confirmation for the dangerous ones. "Mark invalid" only adds one line `invalid_at` to the memory's frontmatter (optionally plus `superseded_by`) — **the file stays in place, the body does not change by a single byte, and `updated` is not touched**; the write is idempotent (clicking twice does not rewrite), it can be undone, and a failure returns an explicit error while the record stays pending.
 - **Conflict records only ever gain fields**: 2.0.0 appends `otherFile` / `decision` / `decidedAt` / `appliedVersion` / `invalidatedFile` at the tail, and the record version stays 1; 1.9.x readers ignore keys they do not know, so no migration is needed in either direction.
 - **Manual edits are outside the guard**: editing the file directly takes effect too (delete `invalid_at` and the memory is injected again); the plugin does not police hand edits — that is the tradeoff of file-based memory, see boundary C11.
 - **The same conflict is not duplicated**: if a failure matches an unresolved record field for field (same file, both bodies, both versions), no extra copy is appended.

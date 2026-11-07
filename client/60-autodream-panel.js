@@ -94,6 +94,24 @@
 			}, [c.provider, c.model]);
 
 			/**
+			 * 回滚确认框的 Esc（2.5.0，D39）。
+			 *
+			 * 确认框搬进模态之后，键盘出口由调用方挂：这里只认 Escape（不挂「点外部关闭」——
+			 * 遮罩自己就是 onCancel，再挂一个 document click 会在同一次点击里关两遍）。
+			 */
+			react.useEffect(function () {
+				if (confirmSnap === null) return undefined;
+				if (typeof document === "undefined" || !document.addEventListener) return undefined;
+				function onKey(e) {
+					if (!e || (e.key !== "Escape" && e.keyCode !== 27)) return;
+					if (rbBusy !== null) return; // 回滚进行中不给半路的出口，等它回话
+					setConfirmSnap(null);
+				}
+				document.addEventListener("keydown", onKey);
+				return function () { document.removeEventListener("keydown", onKey); };
+			}, [confirmSnap, rbBusy]);
+
+			/**
 			 * 所有 remote 调用的统一出口。
 			 *
 			 * 契约的硬约束是「每个调用都 try/catch，失败显示错误文案、不白屏」，而
@@ -352,11 +370,11 @@
 				segOf === "run" ? h("div", { key: "seg-run" }, [
 				h("div", { className: "smem-autodream-sec", key: "top" }, [
 					h("div", { className: "smem-autodream-row", key: "r" }, [
-						h("button", {
-							type: "button", key: "sw", className: "smem-switch",
-							"data-on": c.enabled ? "1" : "0",
+						h(Switch, {
+							key: "sw",
+							on: !!c.enabled,
+							label: t("ad.switch.aria"),
 							title: c.enabled ? t("ad.switch.onTitle") : t("ad.switch.offTitle"),
-							"aria-label": t("ad.switch.aria"),
 							onClick: function () { patch({ enabled: !c.enabled }); },
 						}),
 						h("span", { key: "t", style: { fontWeight: "600" } }, t("ad.title")),
@@ -445,10 +463,14 @@
 						: null,
 				]),
 				h("div", { className: "smem-autodream-sec", key: "run" }, [
+					// 2.5.0（D39）：开关是唯一的关闭入口，所以关掉时手动跑也一起置灰 ——
+					// 「关了还能点」等于开关只挡住了定时器，说的和做的不是一件事。
+					c.enabled ? null : h("div", { className: "smem-modcard-off", key: "off" }, t("ad.note.offStop")),
 					h("div", { className: "smem-autodream-row", key: "r" }, [
 						h("button", {
 							type: "button", className: "smem-btn smem-btn-primary", key: "go",
-							disabled: busy || running || !remote,
+							disabled: busy || running || !remote || !c.enabled,
+							title: c.enabled ? "" : t("ad.note.offStopTitle"),
 							onClick: run,
 						}, running ? t("ad.action.runningNow") : t("ad.action.runNow")),
 						h("span", { className: "smem-status", key: "s" },
@@ -638,20 +660,18 @@
 												}, t("ad.action.rollback")),
 									]),
 									confirmSnap === sp.name
-										? h("div", { className: "smem-ad-confirm", key: "cf" }, [
-												h("div", { key: "t", style: { fontWeight: "600" } }, t("ad.snap.confirmTitle", { at: String(sp.atHuman || "") })),
-												h("div", { key: "d" }, t("ad.snap.confirmScope", {
-													scope: rollbackScope === "all" ? t("ad.snap.scopeAll") : t("ad.snap.scopeFiles"),
-												}) + t("ad.snap.confirmSuffix")),
-												h("div", { className: "smem-autodream-row", key: "acts" }, [
-													h("button", {
-														type: "button", className: "smem-btn smem-btn-danger", key: "yes",
-														disabled: rbBusy === sp.name,
-														onClick: function () { doRollback(sp); },
-													}, rbBusy === sp.name ? t("ad.action.rollingBack") : t("ad.action.confirmRollback")),
-													h("button", { type: "button", className: "smem-btn", key: "no", onClick: function () { setConfirmSnap(null); } }, t("ad.action.cancel")),
-												]),
-											])
+										? h(Confirm, {
+												key: "cf",
+												title: t("ad.snap.confirmTitle", { at: String(sp.atHuman || "") }),
+												confirmLabel: t("ad.action.confirmRollback"),
+												busyLabel: t("ad.action.rollingBack"),
+												busy: rbBusy === sp.name,
+												danger: true,
+												onConfirm: function () { doRollback(sp); },
+												onCancel: function () { setConfirmSnap(null); },
+											}, h("div", { key: "d" }, t("ad.snap.confirmScope", {
+												scope: rollbackScope === "all" ? t("ad.snap.scopeAll") : t("ad.snap.scopeFiles"),
+											}) + t("ad.snap.confirmSuffix")))
 										: null,
 								]);
 							})),

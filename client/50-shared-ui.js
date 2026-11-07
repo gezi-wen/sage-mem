@@ -256,6 +256,28 @@
 		}
 
 		/**
+		 * 开关（2.5.0，D39）。两个自动模块的启停用它，**开关是唯一的关闭入口**。
+		 *
+		 * 为什么不是 `Seg` 的两颗按钮：`Seg` 表达「几个里选一个」，开关表达「开 / 关」。
+		 * 后者不用读两边的字就能看出现在的状态，也不会让人以为还有第三个选项。
+		 * 语义走 `role="switch"` + `aria-checked`（键盘与读屏都按开关处理），不是样式上的门面。
+		 */
+		function Switch(props) {
+			const on = props.on === true;
+			return h("button", {
+				type: "button",
+				className: "smem-switch",
+				"data-on": on ? "1" : "0",
+				role: "switch",
+				"aria-checked": on ? "true" : "false",
+				"aria-label": props.label || "",
+				title: props.title || "",
+				disabled: props.disabled === true,
+				onClick: props.onClick,
+			});
+		}
+
+		/**
 		 * 活动卡片「展开态」的合并（Q16，2.1.21）。
 		 *
 		 * 为什么是个纯函数：连续点两张卡（或同一帧里点两次）时，事件回调手里那个
@@ -293,9 +315,51 @@
 							title: isOpen ? t("card.collapse") : t("card.expand"),
 						}, String(item.description))
 					: null,
-				h("div", { className: "smem-card-foot", key: "foot" },
+				h("div", { className: "smem-card-foot", key: "foot" }, [
+					h("div", { className: "smem-actions", key: "acts" }, [
+						h("button", { type: "button", className: "smem-btn", key: "edit", onClick: function () { props.onEdit(item.file); } }, t("card.edit")),
+						// 语义分组：左边只放「编辑」（安全、可逆），右边放「锁定 / 归档 / 删除」（对这条记忆的退役/保护决定）。
+						h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
+						/**
+						 * 锁定排在「编辑」与「归档」之间（用户 2026-10-11 指定）：
+						 * 它是「别归档这条」的开关，紧挨着归档才说得通。
+						 *
+						 * 锁上的记忆**自动与手动都不许归档** —— 候选计算会跳过它，
+						 * 手动点归档会被宿主拒绝。图标用 🔒 / 🔓 之外还留着文字，
+						 * 因为「锁」在这里是**拒绝归档**，不是「只读」。
+						 */
+						h("button", {
+							type: "button",
+							className: "smem-btn" + (item.locked ? " smem-btn-locked" : ""),
+							key: "lock",
+							title: item.locked
+								? t("card.lockedTitle")
+								: t("card.unlockedTitle"),
+							disabled: props.busy,
+							onClick: function () { props.onToggleLock(item.file, !item.locked); },
+						}, item.locked ? t("card.locked") : t("card.lock")),
+						// 归档排在「锁定」和「删除」之间：比编辑轻、比删除温和，且随时可逆。
+						h("button", {
+							type: "button", className: "smem-btn", key: "arch",
+							title: item.locked
+								? t("card.archiveLockedTitle")
+								: t("card.archiveTitle"),
+							disabled: props.busy || item.locked === true,
+							onClick: function () { props.onAskArchive(item.file); },
+						}, t("card.archive")),
+						h("button", { type: "button", className: "smem-btn smem-btn-danger-ghost", key: "del", onClick: function () { props.onAskDelete(item.file); } }, t("card.delete")),
+					]),
+					// 两个确认框都是**模态**（2.5.0）：DOM 里留在卡片内只是为了「状态跟着这一行走」，
+					// 视觉上是全屏一层 —— 列表被滚出视野时，按下去那一刻看到的东西还在眼前。
 					props.archiving
-						? h("div", { className: "smem-ar-confirm", key: "ar" }, [
+						? h(Confirm, {
+								key: "ar",
+								title: t("card.archiveAsk", { file: item.file }),
+								confirmLabel: t("card.confirmArchive"),
+								busy: props.busy === true,
+								onConfirm: function () { props.onConfirmArchive(item.file); },
+								onCancel: props.onCancelArchive,
+							}, [
 								h("div", { key: "what" }, t("card.archiveWhat", { file: item.file })),
 								// 「可留空」必须跟输入框贴在一起、并且独立成行 —— 它是这一块最容易
 								// 被误读成「必须填才能按」的地方。
@@ -307,50 +371,20 @@
 									onChange: function (e) { props.onArchiveReason(e.target.value); },
 								}),
 								h("div", { className: "smem-ar-hint", key: "hint" }, t("card.archiveHint")),
-								h("div", { className: "smem-row", key: "btns" }, [
-									h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "ok", disabled: props.busy, onClick: function () { props.onConfirmArchive(item.file); } }, t("card.confirmArchive")),
-									h("button", { type: "button", className: "smem-btn", key: "no", disabled: props.busy, onClick: props.onCancelArchive }, t("card.cancel")),
-								]),
 							])
-						: h("div", { className: "smem-actions", key: "acts" },
-								props.deleting
-									? [
-											h("button", { type: "button", className: "smem-btn smem-btn-danger", key: "yes", onClick: function () { props.onConfirmDelete(item.file); } }, t("card.confirmDelete")),
-											h("button", { type: "button", className: "smem-btn", key: "no", onClick: function () { props.onCancelDelete(); } }, t("card.cancel")),
-										]
-									: [
-											h("button", { type: "button", className: "smem-btn", key: "edit", onClick: function () { props.onEdit(item.file); } }, t("card.edit")),
-											// 语义分组：左边只放「编辑」（安全、可逆），右边放「锁定 / 归档 / 删除」（对这条记忆的退役/保护决定）。
-											h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
-											/**
-											 * 锁定排在「编辑」与「归档」之间（用户 2026-10-11 指定）：
-											 * 它是「别归档这条」的开关，紧挨着归档才说得通。
-											 *
-											 * 锁上的记忆**自动与手动都不许归档** —— 候选计算会跳过它，
-											 * 手动点归档会被宿主拒绝。图标用 🔒 / 🔓 之外还留着文字，
-											 * 因为「锁」在这里是**拒绝归档**，不是「只读」。
-											 */
-											h("button", {
-												type: "button",
-												className: "smem-btn" + (item.locked ? " smem-btn-locked" : ""),
-												key: "lock",
-												title: item.locked
-													? t("card.lockedTitle")
-													: t("card.unlockedTitle"),
-												disabled: props.busy,
-												onClick: function () { props.onToggleLock(item.file, !item.locked); },
-											}, item.locked ? t("card.locked") : t("card.lock")),
-											// 归档排在「锁定」和「删除」之间：比编辑轻、比删除温和，且随时可逆。
-											h("button", {
-												type: "button", className: "smem-btn", key: "arch",
-												title: item.locked
-													? t("card.archiveLockedTitle")
-													: t("card.archiveTitle"),
-												disabled: props.busy || item.locked === true,
-												onClick: function () { props.onAskArchive(item.file); },
-											}, t("card.archive")),
-											h("button", { type: "button", className: "smem-btn smem-btn-danger-ghost", key: "del", onClick: function () { props.onAskDelete(item.file); } }, t("card.delete")),
-										])),
+						: null,
+					props.deleting
+						? h(Confirm, {
+								key: "del",
+								title: t("card.deleteAsk", { file: item.file }),
+								confirmLabel: t("card.confirmDelete"),
+								busy: props.busy === true,
+								danger: true,
+								onConfirm: function () { props.onConfirmDelete(item.file); },
+								onCancel: function () { props.onCancelDelete(); },
+							}, h("div", { key: "what" }, t("card.deleteHint")))
+						: null,
+				]),
 			]);
 		}
 
@@ -418,37 +452,43 @@
 								h("button", { type: "button", className: "smem-btn", key: "cancel", disabled: props.busy, onClick: props.onCancel }, t("card.cancel")),
 							]),
 						])
-					: props.deleting
-						? h("div", { className: "smem-ar-confirm", key: "del" }, [
-								h("div", { key: "what" }, t("card.purgeWhat", { file: item.file })),
-								h("div", { className: "smem-ar-hint", key: "hint" }, t("card.purgeHint")),
-								h("div", { className: "smem-row", key: "btns" }, [
-									h("button", { type: "button", className: "smem-btn smem-btn-danger", key: "yes", disabled: props.busy, onClick: function () { props.onConfirmDelete(item.file); } }, t("card.confirmPurge")),
-									h("button", { type: "button", className: "smem-btn", key: "no", disabled: props.busy, onClick: props.onCancelDelete }, t("card.cancel")),
-								]),
-							])
-						: h("div", { className: "smem-card-foot", key: "foot" },
-								h("div", { className: "smem-actions", key: "acts" }, [
-									h("button", {
-										type: "button", className: "smem-btn", key: "edit",
-										disabled: props.busy,
-										onClick: function () { props.onEdit(item.file); },
-									}, t("card.edit")),
+					: h("div", { className: "smem-card-foot", key: "foot" },
+							h("div", { className: "smem-actions", key: "acts" }, [
+								h("button", {
+									type: "button", className: "smem-btn", key: "edit",
+									disabled: props.busy,
+									onClick: function () { props.onEdit(item.file); },
+								}, t("card.edit")),
 h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
-																		h("button", {
-										type: "button", className: "smem-btn smem-btn-primary", key: "restore",
-										disabled: props.busy,
-										onClick: function () { props.onRestore(item.file); },
-									}, props.restoring ? t("card.restoring") : t("card.restore")),
-									// 放在最后、且用 danger-ghost：它是这张卡上唯一不可逆的动作，
-									// 不该跟「恢复」长得一样。
-									h("button", {
-										type: "button", className: "smem-btn smem-btn-danger-ghost", key: "purge",
-										disabled: props.busy,
-										title: t("card.purgeTitle"),
-										onClick: function () { props.onAskDelete(item.file); },
-									}, t("card.purge")),
-								])),
+																	h("button", {
+									type: "button", className: "smem-btn smem-btn-primary", key: "restore",
+									disabled: props.busy,
+									onClick: function () { props.onRestore(item.file); },
+								}, props.restoring ? t("card.restoring") : t("card.restore")),
+								// 放在最后、且用 danger-ghost：它是这张卡上唯一不可逆的动作，
+								// 不该跟「恢复」长得一样。
+								h("button", {
+									type: "button", className: "smem-btn smem-btn-danger-ghost", key: "purge",
+									disabled: props.busy,
+									title: t("card.purgeTitle"),
+									onClick: function () { props.onAskDelete(item.file); },
+								}, t("card.purge")),
+							])),
+				// 彻底删除的确认框：模态（2.5.0），文案一字未改，只是从行内条搬到全屏一层。
+				props.deleting
+					? h(Confirm, {
+							key: "del",
+							title: t("card.purgeAsk", { file: item.file }),
+							confirmLabel: t("card.confirmPurge"),
+							busy: props.busy === true,
+							danger: true,
+							onConfirm: function () { props.onConfirmDelete(item.file); },
+							onCancel: props.onCancelDelete,
+						}, [
+							h("div", { key: "what" }, t("card.purgeWhat", { file: item.file })),
+							h("div", { className: "smem-ar-hint", key: "hint" }, t("card.purgeHint")),
+						])
+					: null,
 			]);
 		}
 
@@ -628,22 +668,86 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 		 * 跟问题一样染红会让人去「修」一条本来正确的链接 —— 那正是审计里那条分界线。
 		 */
 		/**
-		 * 面板底部的一行仓库链接。
+		 * 右下角的「求 Star」角标（2.5.0，D39）。
 		 *
-		 * 参照手机访问插件那一行的做法：放在不抢视线的地方、语气轻、点开是新标签页。
-		 * 它**是引流不是功能** —— 所以不占一屏、不做成按钮、失败也没有任何副作用；
-		 * 四个 tab 下都在（谁也没必要为看它切页）。
+		 * 1.0~2.4 是一行居中的正文：`⭐ 顺手留颗 Star，作者能高兴一整天` + `行，给你一颗 Star`。
+		 * 那套说辞两个问题 —— ①它**占正文位置**，四个页签底部各一行，读起来像广告；
+		 * ②「作者能高兴一整天」是求人，把读者放到施舍的位置上。
+		 *
+		 * 改成一个角落里的小东西：恒显一个星号 + `Star`，hover 才展开半句话，可关。
+		 * 关闭状态**只存这个模块的变量**：不落 localStorage（面板端口每次启动都变，
+		 * 存了也读不回来 —— sage-reminder 踩过），也不落设置（不为一个装饰件改宿主半身）。
+		 * 于是它的语义正好是「本次启动不再打扰」，下次打开 DSH 再说一次。
 		 */
+		let starDismissed = false;
+
 		function StarLine() {
-			return h("div", { className: "smem-star" }, [
-				h("span", { key: "ask" }, t("star.ask")),
+			const s = react.useState(starDismissed);
+			const gone = s[0], setGone = s[1];
+			if (gone) return null;
+			return h("div", { className: "smem-star-corner", key: "star" }, [
+				h("span", { className: "smem-star-glyph", key: "g", "aria-hidden": "true" }, "★"),
 				h("a", {
 					key: "cta",
 					href: "https://github.com/gezi-wen/sage-mem",
 					target: "_blank",
 					rel: "noreferrer",
 					className: "smem-star-link",
+					title: t("star.aria"),
 				}, t("star.cta")),
+				h("span", { className: "smem-star-more", key: "more" }, t("star.hover")),
+				h("button", {
+					type: "button", key: "x", className: "smem-star-x",
+					title: t("star.dismiss"),
+					"aria-label": t("star.dismiss"),
+					onClick: function () { starDismissed = true; setGone(true); },
+				}, "×"),
+			]);
+		}
+
+		/**
+		 * 危险动作的模态确认框（2.5.0，D39）。
+		 *
+		 * 1.0~2.4 用的是「就地确认条」：在那一行下面展开一条，按钮和列表挤在一起。
+		 * 换成模态的两个理由，都是实测出来的：
+		 *  ① 就地条与「取消」在同一张列表里，误点路径太短；同一屏出现两条时
+		 *     也分不清正在确认哪一条（归档候选面板能同时展开两条）。
+		 *  ② 那些动作会改盘上文件，而条子可以被滚出视野 —— 按下去的那一刻
+		 *     用户看到的东西必须还在。
+		 *
+		 * 两条纪律：
+		 *  - **两段不能变一段**：模态是第二段，第一段是那颗按钮。永远不合并。
+		 *  - **文案来自调用方**：每个动作的后果不一样，这里只提供壳子（问句 + 危险按钮 + 取消）。
+		 *
+		 * `busy` 时按钮禁用、确认键换成进行中的字样：默认是本文件通用的「保存中…」，
+		 * 但调用方原来若有自己那一句（回滚是「回滚中…」、冲突裁决是「处理中…」），
+		 * 用 `busyLabel` 传进来 —— 换模态不该把每一处具体的进度措辞压成同一句。
+		 *
+		 * ⚠️ 它靠 `position:fixed` 铺满视口，所以祖先节点**不能有静态的 transform / filter**
+		 * （有的话 `fixed` 会改成相对那个祖先定位，模态就跑进列表里去了）。换页签那条
+		 * `smem-enter` 动画带 transform，但只活 220ms、不带 fill，播完就没了 —— 别把确认框
+		 * 塞进另一层还在跑动效的容器里就行。
+		 */
+		function Confirm(props) {
+			const busy = props.busy === true;
+			return h("div", { className: "smem-modal-host" }, [
+				h("div", { className: "smem-modal-scrim", key: "scrim", onClick: busy ? undefined : props.onCancel }),
+				h("div", {
+					className: "smem-modal", key: "m",
+					role: "dialog", "aria-modal": "true",
+					"aria-label": props.title || "",
+				}, [
+					h("div", { className: "smem-modal-title", key: "t" }, props.title),
+					h("div", { className: "smem-modal-body", key: "b" }, props.children),
+					h("div", { className: "smem-modal-foot", key: "f" }, [
+						h("button", { type: "button", className: "smem-btn", key: "c", disabled: busy, onClick: props.onCancel }, t("card.cancel")),
+						h("button", {
+							type: "button", key: "ok", disabled: busy,
+							className: "smem-btn " + (props.danger ? "smem-btn-danger" : "smem-btn-primary"),
+							onClick: props.onConfirm,
+						}, busy ? (props.busyLabel || t("card.saving")) : props.confirmLabel),
+					]),
+				]),
 			]);
 		}
 
@@ -844,14 +948,33 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 				return parts;
 			}
 
-			/** 危险动作的两段式确认条（照「彻底归档删除」先例：先问，再动手）。 */
+			/**
+			 * 危险动作的两段式确认（照「彻底归档删除」先例：先问，再动手）。
+			 *
+			 * 2.5.0 起是**模态**（D39）：同一屏能同时展开好几条记录，行内条会让人分不清
+			 * 正在确认哪一条；搬到全屏一层之后，「问的是哪条」写在标题上。
+			 * 三个动作的后果不同，所以确认键的措辞也各自保留（`busyLabel` 传原来那句
+			 * 「处理中…」）。
+			 */
 			function confirmBlock(item) {
 				if (!confirm || confirm.id !== item.id) return null;
 				const act = confirm.action;
 				const file = confirm.file || item.file;
+				const busy = busyId === item.id;
 				if (act === "invalidate") {
-					return h("div", { className: "smem-conf-confirm", key: "cf" }, [
-						h("div", { key: "what" }, t("conflict.confirmInvalidate", { file: file })),
+					return h(Confirm, {
+						key: "cf",
+						title: t("conflict.invalidateAsk", { file: file }),
+						confirmLabel: t("conflict.confirmYesInvalidate"),
+						busyLabel: t("conflict.busy"),
+						busy: busy,
+						danger: true,
+						onConfirm: props.onRun,
+						onCancel: props.onCancelConfirm,
+					}, [
+						h("div", { key: "what" }, t("conflict.confirmInvalidate")),
+						// 「两句互斥，选哪一边作废」的选择器必须留在确认框里：
+						// 它改的正是这一问的宾语，挪到框外就会出现「框里问 A、按钮标 B」。
 						item.otherFile
 							? h("div", { className: "smem-chips", key: "pick" }, [
 									h(Chip, {
@@ -865,49 +988,35 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 								])
 							: null,
 						h("div", { className: "smem-ar-hint", key: "hint" }, t("conflict.confirmInvalidateHint")),
-						h("div", { className: "smem-row", key: "btns" }, [
-							h("button", {
-								type: "button", className: "smem-btn smem-btn-danger", key: "yes",
-								disabled: busyId === item.id,
-								onClick: props.onRun,
-							}, busyId === item.id ? t("conflict.busy") : t("conflict.confirmYesInvalidate")),
-							h("button", {
-								type: "button", className: "smem-btn", key: "no",
-								disabled: busyId === item.id, onClick: props.onCancelConfirm,
-							}, t("conflict.cancel")),
-						]),
 					]);
 				}
 				if (act === "undo") {
-					return h("div", { className: "smem-conf-confirm", key: "cf" }, [
-						h("div", { key: "what" }, t("conflict.confirmUndo", { file: item.invalidatedFile || item.file })),
+					return h(Confirm, {
+						key: "cf",
+						title: t("conflict.undoAsk", { file: item.invalidatedFile || item.file }),
+						confirmLabel: t("conflict.confirmYesUndo"),
+						busyLabel: t("conflict.busy"),
+						busy: busy,
+						onConfirm: props.onRun,
+						onCancel: props.onCancelConfirm,
+					}, [
+						h("div", { key: "what" }, t("conflict.confirmUndo")),
 						h("div", { className: "smem-ar-hint", key: "hint" }, t("conflict.confirmUndoHint")),
-						h("div", { className: "smem-row", key: "btns" }, [
-							h("button", {
-								type: "button", className: "smem-btn smem-btn-primary", key: "yes",
-								disabled: busyId === item.id, onClick: props.onRun,
-							}, busyId === item.id ? t("conflict.busy") : t("conflict.confirmYesUndo")),
-							h("button", {
-								type: "button", className: "smem-btn", key: "no",
-								disabled: busyId === item.id, onClick: props.onCancelConfirm,
-							}, t("conflict.cancel")),
-						]),
 					]);
 				}
 				if (act === "removeRecord") {
-					return h("div", { className: "smem-conf-confirm", key: "cf" }, [
+					return h(Confirm, {
+						key: "cf",
+						title: t("conflict.removeAsk"),
+						confirmLabel: t("conflict.confirmYesRemove"),
+						busyLabel: t("conflict.busy"),
+						busy: busy,
+						danger: true,
+						onConfirm: props.onRun,
+						onCancel: props.onCancelConfirm,
+					}, [
 						h("div", { key: "what" }, t("conflict.confirmRemove")),
 						h("div", { className: "smem-ar-hint", key: "hint" }, t("conflict.confirmRemoveHint")),
-						h("div", { className: "smem-row", key: "btns" }, [
-							h("button", {
-								type: "button", className: "smem-btn smem-btn-danger", key: "yes",
-								disabled: busyId === item.id, onClick: props.onRun,
-							}, busyId === item.id ? t("conflict.busy") : t("conflict.confirmYesRemove")),
-							h("button", {
-								type: "button", className: "smem-btn", key: "no",
-								disabled: busyId === item.id, onClick: props.onCancelConfirm,
-							}, t("conflict.cancel")),
-						]),
 					]);
 				}
 				return null;
@@ -1030,6 +1139,11 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 			const pickedN = cands.filter((x) => props.picked[x.file]).length;
 			const mode = autoArchiveOf(c.autoArchive);
 			const allPicked = cands.length > 0 && pickedN === cands.length;
+			// 2.5.0（D39）：自动归档关掉时，手动「执行归档」一起置灰 —— 开关是唯一的关闭入口，
+			// 关掉还说「能手动跑」等于开关只挡住了自动那部分。清单照常可看（要看得先看得见。
+			// 想看会被收走哪些，正是决定要不要打开开关的依据）。
+			// ⚠️ 这是**界面决定**：宿主侧 `archiveCandidates` 不看 autoArchive，手动归档随时能跑。
+			const offNow = mode === "off";
 			return h("div", { className: "smem-tool-panel smem-tool-panel--cap", key: "cand" }, [
 				h("div", { className: "smem-tool-head", key: "head" }, [
 					h("span", { className: "smem-tool-title", key: "t" }, "归档候选"),
@@ -1047,6 +1161,9 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 					: h("div", { className: "smem-cand-list", key: "list" }, [
 							h("div", { className: "smem-cand-note", key: "note" },
 								"候选只按「多久没被注入过」算。归档 = 移进 archive/（不删），随时可以恢复。"),
+							offNow
+								? h("div", { className: "smem-modcard-off", key: "off" }, t("archive.note.offStop"))
+								: null,
 							cands.map((x) => h("div", { className: "smem-cand", key: x.file }, [
 								h("label", { className: "smem-cand-main", key: "m" }, [
 									h("input", { type: "checkbox", key: "cb", checked: !!props.picked[x.file], onChange: function () { props.onPick(x.file); } }),
@@ -1057,26 +1174,34 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 								h("div", { className: "smem-cand-reason", key: "why" },
 									"为什么建议归档：" + (x.reason || ("闲置 " + String(x.days) + " 天，超过该类型阈值 " + String(x.limit) + " 天"))),
 								props.confirm === x.file
-									? h("div", { className: "smem-cand-confirm", key: "cf" }, [
-											h("span", { key: "t" }, "确认把「" + x.file + "」移进档案馆？它不再参与检索与星图，随时可以恢复。"),
-											h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "yes", disabled: props.busy, onClick: function () { props.onArchiveOne(x); } }, "确认归档"),
-											h("button", { type: "button", className: "smem-btn", key: "no", disabled: props.busy, onClick: props.onCancelConfirm }, "取消"),
-										])
+									? h(Confirm, {
+											key: "cf",
+											title: t("card.candAsk", { file: x.file }),
+											confirmLabel: t("card.confirmArchive"),
+											busy: props.busy === true,
+											onConfirm: function () { props.onArchiveOne(x); },
+											onCancel: props.onCancelConfirm,
+										}, h("div", { key: "why" }, t("card.candAskHint")))
 									: h("div", { className: "smem-cand-act", key: "act" },
-											h("button", { type: "button", className: "smem-btn", key: "one", disabled: props.busy, onClick: function () { props.onAskOne(x.file); } }, "归档这一条")),
+											h("button", { type: "button", className: "smem-btn", key: "one", disabled: props.busy || offNow, title: offNow ? t("archive.note.offStop") : "", onClick: function () { props.onAskOne(x.file); } }, "归档这一条")),
 							])),
 						]),
 				cands.length
 					? h("div", { className: "smem-tool-foot", key: "foot" }, [
 							h("button", { type: "button", className: "smem-btn", key: "all", disabled: props.busy, onClick: props.onPickAll }, allPicked ? "全不选" : "全选"),
-							props.confirm === "__batch__"
-								? [
-										h("span", { className: "smem-ar-hint", key: "t" }, "确认把选中的 " + pickedN + " 条一起移进档案馆？"),
-										h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "yes", disabled: props.busy || !pickedN, onClick: props.onArchivePicked }, "确认归档"),
-										h("button", { type: "button", className: "smem-btn", key: "no", disabled: props.busy, onClick: props.onCancelConfirm }, "取消"),
-									]
-								: h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "go", disabled: props.busy || !pickedN, onClick: props.onAskPicked }, "执行归档（选中 " + pickedN + " 条）"),
+							h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "go", disabled: props.busy || !pickedN || offNow, title: offNow ? t("archive.note.offStop") : "", onClick: props.onAskPicked }, "执行归档（选中 " + pickedN + " 条）"),
 						])
+					: null,
+				// 批量确认：同一屏里逐条确认也走模态，两者不并存（confirm 一次只持有一个值）。
+				props.confirm === "__batch__"
+					? h(Confirm, {
+							key: "batch",
+							title: t("card.candBatchAsk", { count: pickedN }),
+							confirmLabel: t("card.confirmArchive"),
+							busy: props.busy === true,
+							onConfirm: props.onArchivePicked,
+							onCancel: props.onCancelConfirm,
+						}, h("div", { key: "why" }, t("card.candBatchHint")))
 					: null,
 			]);
 		}

@@ -75,7 +75,14 @@ ok(loaded && loaded.id === 'sage-mem', `模块 id 是 sage-mem（实际 ${loaded
 
 // ── 2. 跑 factory：假 react ──────────────────────────────────────────────────
 const fakeReact = {
-  createElement: (type, props, ...children) => ({ type, props, children }),
+  // 子节点同时进 `props.children`（React / 宿主 `h()` 的语义）：组件里只有这个入口能拿到
+  // 调用方塞的内容，只挂 `element.children` 会让 `props.children` 永远是 undefined。
+  createElement: (type, props, ...children) => {
+    const p = props || {}
+    if (children.length === 1) p.children = children[0]
+    else if (children.length > 1) p.children = children
+    return { type, props: p, children }
+  },
   useState: (init) => [typeof init === 'function' ? init() : init, () => {}],
   useEffect: () => {},
   useMemo: (fn) => fn(),

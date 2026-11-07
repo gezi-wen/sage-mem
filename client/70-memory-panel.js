@@ -271,6 +271,48 @@
 				setFormRevision(null);
 			}
 
+			/**
+			 * 抽屉的 Esc 关闭（2.5.0，D39）。
+			 *
+			 * 只挂 Escape，不挂「点外部关闭」：抽屉带遮罩，遮罩自己就是 onClick={closeForm}，
+			 * 再叠一个 document 级监听会在同一次点击里关两遍（tools 抽屉那次
+			 * 「弹层活 2 毫秒」的 bug 就是这么来的）。Esc 是这个交互唯一的键盘出口。
+			 */
+			react.useEffect(function () {
+				if (!formOpen) return undefined;
+				function onKey(e) { if (e && (e.key === "Escape" || e.keyCode === 27)) closeForm(); }
+				document.addEventListener("keydown", onKey);
+				return function () { document.removeEventListener("keydown", onKey); };
+			}, [formOpen]);
+
+			/**
+			 * 确认框的 Esc（2.5.0，D39）。
+			 *
+			 * `Confirm` 只提供壳子，键盘出口归调用方 —— 这里一处盖住本屏全部五个确认态：
+			 * 归档 / 删除 / 彻底删除 / 归档候选（逐条与批量）/ 冲突裁决。五个状态互斥
+			 * （同一时刻最多一个为真），所以一次 Escape 就是「全清」：清一个本来就没开的状态无害。
+			 *
+			 * ⚠️ 只挂 Escape，**不挂「点外部关闭」**：遮罩自己就是 `onClick={onCancel}`，
+			 * 再叠一个 document 级 click 监听会在同一次点击里关两遍 —— tools 抽屉那个
+			 * 「弹层活 2 毫秒」的 bug 就是这么来的。
+			 */
+			const confirmOpen = archiving !== null || deleting !== null || archDelete !== null ||
+				candConfirm !== null || confConfirm !== null;
+			react.useEffect(function () {
+				if (!confirmOpen) return undefined;
+				if (typeof document === "undefined" || !document.addEventListener) return undefined;
+				function onKey(e) {
+					if (!e || (e.key !== "Escape" && e.keyCode !== 27)) return;
+					setArchiving(null); setArchiveReason("");
+					setDeleting(null);
+					setArchDelete(null);
+					setCandConfirm(null);
+					setConfConfirm(null);
+				}
+				document.addEventListener("keydown", onKey);
+				return function () { document.removeEventListener("keydown", onKey); };
+			}, [confirmOpen]);
+
 			// 空记忆库时「建立索引骨架」写进去的引导文件。它只是给人看的起点：
 			// 索引本来就是手写维护的，这里不猜用户有什么记忆、也不生成假条目。
 			const INDEX_SKELETON = [
@@ -703,10 +745,23 @@
 			}
 
 			/** 打开「冲突」这一屏。数据没取过才取（挂载时已经取过一次，通常直接有内容）。 */
-			function openConflictTab() {
-				setTab("conflict");
+			/**
+			 * 2.5.0：体检与冲突并进「库健康」一屏（D39）。
+			 *
+			 * 两样都是「按需取」的，所以进这一屏时把没取过的都取上 —— 用户点「库健康」
+			 * 想看的就是这一屏的整体状态，不该还得再点一次才发现另一半是空的。
+			 * 体检是只读扫描（不改盘），冲突列表是一次状态目录读，都不贵。
+			 */
+			function openHealthTab() {
+				setTab("health");
 				setError(null); setNotice("");
-				if (!conf || confErr) loadConflicts();
+				if (!audit) runAudit();
+				if (conflictOk && (!conf || confErr)) loadConflicts();
+			}
+
+			/** 体检徽标 / 冲突徽标都落到同一屏，只是落点不同（滚动交给浏览器）。 */
+			function openConflictTab() {
+				openHealthTab();
 			}
 
 			/**
@@ -861,9 +916,13 @@
 			 * 切过来通常直接就看得见内容。
 			 */
 			function openAuditTab() {
-				setTab("audit");
-				setError(null);
-				if (!audit) runAudit();
+				openHealthTab();
+			}
+
+			/** 「自动整理」一屏 = 自动做梦 + 自动归档两张卡（D39）。 */
+			function openAutoTab() {
+				setTab("auto");
+				setError(null); setNotice("");
 			}
 
 			/** 打开某个工具（抽屉里点进来时用）。 */
@@ -1070,25 +1129,18 @@
 
 
 			return h("div", { className: "smem-root" }, [
+				// 2.5.0：六个页签收成四个，**按动作而不是按数据源分**（D39）。
+				// 自动做梦 / 自动归档原本各占一屏、体检 / 冲突也各占一屏 —— 它们回答的是
+				// 同一句话（「自动化现在什么状态」「我的库有没有事」），拆开就逼用户来回切。
 				h("div", { className: "smem-tabs", key: "tabs", role: "tablist" }, [
 					h("button", { type: "button", className: "smem-tab" + (tab === "files" ? " smem-tab--on" : ""), key: "f", role: "tab", "aria-selected": tab === "files" ? "true" : "false", onClick: function () { setTab("files"); } }, t("tab.files")),
 					h("button", { type: "button", className: "smem-tab" + (tab === "star" ? " smem-tab--on" : ""), key: "s", role: "tab", "aria-selected": tab === "star" ? "true" : "false", onClick: function () { setTab("star"); } }, t("tab.star")),
-					h("button", { type: "button", className: "smem-tab" + (tab === "autodream" ? " smem-tab--on" : ""), key: "d", role: "tab", "aria-selected": tab === "autodream" ? "true" : "false", onClick: function () { setTab("autodream"); } }, t("tab.autodream")),
-					// 视觉分组：左边「看」（文件列表 / 星图），右边「设置 · 自动化」。
+					// 视觉分组：左边「看」（文件列表 / 时间线），右边「管」（自动整理 / 库健康）。
 					h("span", { className: "smem-tabs-sep", key: "sep", "aria-hidden": "true" }),
-					// 「自动归档」排在自动做梦之后：归档是**确定性规则**（按闲置天数算，不调模型），
-					// 和「让模型整理记忆」是两件事。塞在自动做梦的设置里用户找不到
-					// （2026-10-11 用户原话：「扔这里连我都找不到」）。
-					h("button", { type: "button", className: "smem-tab" + (tab === "archive" ? " smem-tab--on" : ""), key: "ar", role: "tab", "aria-selected": tab === "archive" ? "true" : "false", onClick: function () { setTab("archive"); } }, t("tab.archive")),
-					// 体检再排在「自动归档」之后、独立成一屏：它只报告不修改，和「文件列表」里的
-					// 增删改是两件事，塞在工具抽屉里会让人以为它是个动作按钮。
-					h("button", { type: "button", className: "smem-tab" + (tab === "audit" ? " smem-tab--on" : ""), key: "a", role: "tab", "aria-selected": tab === "audit" ? "true" : "false", onClick: openAuditTab }, t("tab.audit")),
-					// 2.0.0「冲突」：裁决是**多动作、要逐条看两份正文**的流程，所以独立成第 6 个
-					// 页签，而不是塞进工具抽屉（抽屉方案的前提是「一年用不了几次」）。
-					// 没有 conflict 面的旧宿主：整颗不出现（能力检测，不是渲染错误）。
-					conflictOk
-						? h("button", { type: "button", className: "smem-tab" + (tab === "conflict" ? " smem-tab--on" : ""), key: "c", role: "tab", "aria-selected": tab === "conflict" ? "true" : "false", onClick: openConflictTab }, t("tab.conflict"))
-						: null,
+					h("button", { type: "button", className: "smem-tab" + (tab === "auto" ? " smem-tab--on" : ""), key: "d", role: "tab", "aria-selected": tab === "auto" ? "true" : "false", onClick: openAutoTab }, t("tab.auto")),
+					// 库健康 = 体检（机器扫）＋ 冲突（要人裁决）。两者回答的是同一句话，
+					// 所以并成一屏；没有 conflict 面的旧宿主只少一张卡，页签照常在。
+					h("button", { type: "button", className: "smem-tab" + (tab === "health" ? " smem-tab--on" : ""), key: "a", role: "tab", "aria-selected": tab === "health" ? "true" : "false", onClick: openHealthTab }, t("tab.health")),
 				]),
 				// 四个 tab 共用的一条头部带：我在哪 · 目录状态 · 活动/归档计数 · 体检徽标 · 待重启徽标 · 主操作。
 				// 层级形状固定：导航＝下划线（.smem-tabs）、筛选＝chip、动作＝按钮，三种不混用。
@@ -1122,7 +1174,7 @@
 						? h("button", {
 								type: "button", key: "rs", className: "smem-tool-badge smem-ad-badge--warn",
 								title: t("header.restartTitle"),
-								onClick: function () { setTab("autodream"); setAdSeg("settings"); },
+								onClick: function () { setTab("auto"); setAdSeg("settings"); },
 							}, t(pendingDiff ? "header.restartPendingCount" : "header.restartPending", { count: pendingDiff }))
 						: null,
 					// 主操作：只放当前 tab 的那一个（星图/自动做梦的主操作在各自面板里，不重复摆一份）。
@@ -1188,9 +1240,8 @@
 						]) : null,
 					]),
 				]) : null,
-				tab === "audit"
-					? h(AuditPanel, { report: audit, busy: auditBusy, onRun: runAudit, standalone: true })
-					: null,
+				// 2.5.0：体检不再单独一屏 —— 它和冲突并进「库健康」，见下面的 tab === "health"。
+				// 这里保留 null 会落进 filesView 兜底（历史上踩过），所以整块删掉。
 				tab === "files" && tool === "candidates"
 					? h(CandidatePanel, {
 							data: cand,
@@ -1261,69 +1312,97 @@
 				error ? h("div", { className: "smem-err", key: "err", role: "alert" }, "⚠ " + error) : null,
 				notice && !error ? h("div", { className: "smem-ok", key: "ok", role: "status" }, "✓ " + notice) : null,
 				formOpen
-					? h("div", { className: "smem-form", key: "form" }, [
-							h("div", { className: "smem-form-title", key: "ft" }, editingFile ? t("form.editTitle", { file: editingFile }) : t("form.addTitle")),
-							h("div", { className: "smem-row", key: "cat" }, [
-								h("span", { className: "smem-label", key: "l" }, t("form.type")),
-								h("div", { className: "smem-chips", key: "chips" }, TYPE_ORDER.map(function (id) {
-									const meta = TYPE_META[id];
-									return h(Chip, { key: id, label: meta[0] + " " + typeLabel(id), on: formType === id, onClick: function () { setFormType(id); } });
-								})),
-							]),
-							h("label", { className: "smem-label", key: "ln" }, t("form.fileName", { type: formType })),
-							h("input", { className: "smem-input", key: "tn", value: formName, onChange: function (e) { setFormName(e.target.value); }, placeholder: t("form.fileNamePlaceholder") }),
-							h("label", { className: "smem-label", key: "ld" }, t("form.desc")),
-							h("input", { className: "smem-input", key: "td", value: formDesc, onChange: function (e) { setFormDesc(e.target.value); }, placeholder: t("form.descPlaceholder") }),
-							h("label", { className: "smem-label", key: "lt" }, t("form.tags")),
-							h("input", { className: "smem-input", key: "tt", value: formTags, onChange: function (e) { setFormTags(e.target.value); }, placeholder: t("form.tagsPlaceholder") }),
-							h("label", { className: "smem-label", key: "lb" }, t("form.body")),
-							h("textarea", { className: "smem-textarea", key: "tb", rows: 6, value: formBody, onChange: function (e) { setFormBody(e.target.value); }, placeholder: t("form.bodyPlaceholder") }),
-							h("div", { className: "smem-row", key: "btns" }, [
-								h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "save", disabled: busy, onClick: submit }, busy ? t("card.saving") : t("card.save")),
-								h("button", { type: "button", className: "smem-btn", key: "cancel", disabled: busy, onClick: closeForm }, t("card.cancel")),
+					// 2.5.0（D39）：编辑从「页面内联表单」搬进右侧抽屉。
+					// 字段、校验、保存路径一个字没动 —— 换的只是它挂在哪。
+					// 为什么要搬：内联表单会把列表顶下去，长正文时整页跟着滚，
+					// 「改一条记忆」这件事在视觉上霸占了整屏。
+					// 动画用 CSS `animation` 而不是 transition + 二次渲染：mount 即播，
+					// 不依赖 requestAnimationFrame（页面不可见时 rAF 不触发，会把抽屉卡在屏幕外）。
+					? h("div", { className: "smem-drawer-host", key: "form" }, [
+							// 遮罩点一下就关：与「取消」同义，且它挡着列表，不给第二种解释。
+							h("div", { className: "smem-drawer-scrim", key: "scrim", onClick: closeForm }),
+							h("aside", {
+								className: "smem-drawer-panel", key: "panel",
+								role: "dialog", "aria-modal": "true",
+								"aria-label": editingFile ? t("form.editTitle", { file: editingFile }) : t("form.addTitle"),
+							}, [
+								h("div", { className: "smem-drawer-head", key: "h" }, [
+									h("div", { className: "smem-drawer-title", key: "t" }, editingFile ? t("form.editTitle", { file: editingFile }) : t("form.addTitle")),
+									h("button", {
+										type: "button", className: "smem-drawer-x", key: "x",
+										title: t("card.cancel"), "aria-label": t("card.cancel"),
+										onClick: closeForm,
+									}, "×"),
+								]),
+								h("div", { className: "smem-drawer-body", key: "b" }, [
+									h("div", { className: "smem-row", key: "cat" }, [
+										h("span", { className: "smem-label", key: "l" }, t("form.type")),
+										h("div", { className: "smem-chips", key: "chips" }, TYPE_ORDER.map(function (id) {
+											const meta = TYPE_META[id];
+											return h(Chip, { key: id, label: meta[0] + " " + typeLabel(id), on: formType === id, onClick: function () { setFormType(id); } });
+										})),
+									]),
+									h("label", { className: "smem-label", key: "ln" }, t("form.fileName", { type: formType })),
+									h("input", { className: "smem-input", key: "tn", value: formName, onChange: function (e) { setFormName(e.target.value); }, placeholder: t("form.fileNamePlaceholder") }),
+									h("label", { className: "smem-label", key: "ld" }, t("form.desc")),
+									h("input", { className: "smem-input", key: "td", value: formDesc, onChange: function (e) { setFormDesc(e.target.value); }, placeholder: t("form.descPlaceholder") }),
+									h("label", { className: "smem-label", key: "lt" }, t("form.tags")),
+									h("input", { className: "smem-input", key: "tt", value: formTags, onChange: function (e) { setFormTags(e.target.value); }, placeholder: t("form.tagsPlaceholder") }),
+									h("label", { className: "smem-label", key: "lb" }, t("form.body")),
+									h("textarea", { className: "smem-textarea smem-drawer-ta", key: "tb", rows: 12, value: formBody, onChange: function (e) { setFormBody(e.target.value); }, placeholder: t("form.bodyPlaceholder") }),
+								]),
+								h("div", { className: "smem-drawer-foot", key: "f" }, [
+									h("button", { type: "button", className: "smem-btn", key: "cancel", disabled: busy, onClick: closeForm }, t("card.cancel")),
+									h("button", { type: "button", className: "smem-btn smem-btn-primary", key: "save", disabled: busy, onClick: submit }, busy ? t("card.saving") : t("card.save")),
+								]),
 							]),
 						])
 					: null,
-				tab === "autodream"
-					? h(AutodreamPanel, { key: "autodream", ctx: props.ctx, seg: adSeg, onSeg: setAdSeg })
+				tab === "auto"
+					// 两张模块卡同屏（D39）：各自保留运行 / 设置 / 记录三段，只是不再各占一屏。
+					// 顺序固定「自动做梦 → 自动归档」：前者要调模型、有 token 成本，先看见它。
+					? h("div", { className: "smem-stack smem-view", key: "auto" }, [
+							h(AutodreamPanel, { key: "ad", ctx: props.ctx, seg: adSeg, onSeg: setAdSeg }),
+							h(ArchiveSettingsPanel, { key: "ar", ctx: props.ctx }),
+						])
 					: tab === "star"
-					? h("div", { className: "smem-starmap", key: "starmap" },
+					? h("div", { className: "smem-starmap smem-view", key: "starmap" },
 							h(StarmapRuntime.StarMap, { ctx: props.ctx }))
-					: tab === "archive"
-					? h(ArchiveSettingsPanel, { key: "archive", ctx: props.ctx })
-					: tab === "audit"
-					// 体检面板在上面已经渲染过了 —— 这里必须显式给 null，
-					// 否则会落进下面那个 `filesView` 兜底分支，变成「体检 + 一整套文件列表」同屏。
-					? null
-					: tab === "conflict"
-					? h(ConflictPanel, {
-							key: "conflict",
-							data: conf,
-							loading: confLoad,
-							error: confErr,
-							bodies: confBodies,
-							expanded: confExpanded,
-							confirm: confConfirm,
-							busyId: confBusy,
-							// 逐动作的能力检测：宿主有 list 没 invalidate（版本错配）时按钮要禁用，
-							// 不是点了之后才报错。
-							tools: {
-								list: conflictOk,
-								read: !!(conflictOk && typeof conflictRemote.read === "function"),
-								invalidate: !!(conflictOk && typeof conflictRemote.invalidate === "function"),
-								dismiss: !!(conflictOk && typeof conflictRemote.dismiss === "function"),
-								undo: !!(conflictOk && typeof conflictRemote.undo === "function"),
-								removeRecord: !!(conflictOk && typeof conflictRemote.removeRecord === "function"),
-							},
-							onReload: loadConflicts,
-							onToggleBodies: toggleConflictBodies,
-							onAsk: askConflict,
-							onPickFile: pickConflictFile,
-							onCancelConfirm: cancelConflictConfirm,
-							onRun: runConflictAction,
-							onOpenFile: openConflictFile,
-						})
-					: filesView,
+					: tab === "health"
+					// 冲突在前、体检在后：前者是**要你裁决的有限队列**，后者是一份长清单。
+					? h("div", { className: "smem-stack smem-view", key: "health" }, [
+							conflictOk
+								? h(ConflictPanel, {
+										key: "conflict",
+										data: conf,
+										loading: confLoad,
+										error: confErr,
+										bodies: confBodies,
+										expanded: confExpanded,
+										confirm: confConfirm,
+										busyId: confBusy,
+										// 逐动作的能力检测：宿主有 list 没 invalidate（版本错配）时按钮要禁用，
+										// 不是点了之后才报错。
+										tools: {
+											list: conflictOk,
+											read: !!(conflictOk && typeof conflictRemote.read === "function"),
+											invalidate: !!(conflictOk && typeof conflictRemote.invalidate === "function"),
+											dismiss: !!(conflictOk && typeof conflictRemote.dismiss === "function"),
+											undo: !!(conflictOk && typeof conflictRemote.undo === "function"),
+											removeRecord: !!(conflictOk && typeof conflictRemote.removeRecord === "function"),
+										},
+										onReload: loadConflicts,
+										onToggleBodies: toggleConflictBodies,
+										onAsk: askConflict,
+										onPickFile: pickConflictFile,
+										onCancelConfirm: cancelConflictConfirm,
+										onRun: runConflictAction,
+										onOpenFile: openConflictFile,
+									})
+								: null,
+							h(AuditPanel, { key: "audit", report: audit, busy: auditBusy, onRun: runAudit, standalone: true }),
+						])
+					: h("div", { className: "smem-view", key: "files" }, filesView),
 				// 底部一行仓库链接（四个 tab 都在，不抢视线）
 				h(StarLine, { key: "star-line" }),
 			]);

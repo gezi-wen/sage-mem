@@ -31,7 +31,14 @@ export function makeMiniReact(nodeFactory = makePlainNode) {
   let pending = []
 
   const api = {
-    createElement: (type, props, ...children) => ({ type, props: props || {}, children }),
+    // 与 React / 宿主的 `h()` 一致：子节点同时进 `props.children`（组件里只有这个入口能拿到
+    // 调用方塞的内容）。只挂在 `element.children` 上会让用 `props.children` 的组件渲染成空。
+    createElement: (type, props, ...children) => {
+      const p = props || {}
+      if (children.length === 1) p.children = children[0]
+      else if (children.length > 1) p.children = children
+      return { type, props: p, children }
+    },
     useState(init) {
       const i = n++
       if (!stateStore.has(i)) stateStore.set(i, typeof init === 'function' ? init() : init)
