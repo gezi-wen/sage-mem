@@ -84,6 +84,10 @@ const SUITES = [
   // 1.2.0：注入链从组合根搬出前先建的 golden —— 11 个场景逐字节比对，
   // 证明「纯搬移」不是一句自述（fixtures 由 scripts/gen-recall-golden.mjs 生成）。
   'recall-golden-test.mjs',
+  // 2026-11-07：注入段必须声明 `interpolate: false`。记忆正文里出现过一双大括号
+  // （`{{ }}` 这种写法）时，宿主会把注入段当提示词模板解析，**模型还没开跑**就抛
+  // `malformed prompt variable reference`，整轮对话失败。
+  'recall-context-literal-test.mjs',
   'host-facts-test.mjs',
   'archive-test.mjs',
   // 2.1.5（外部审查 Q06）：恢复归档改成「接管源 → 核对 → 排他落位 → 退役私有副本」的事务移动，
