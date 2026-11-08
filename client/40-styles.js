@@ -291,9 +291,14 @@
 			".smem-plugin-card-err{font-size:12px;line-height:1.5;color:var(--dsw-alias-state-error-primary,#ef4444);overflow-wrap:anywhere;}",
 			// ── 底部一行仓库链接（引流，不抢视线）──
 			// ── 求 Star 的角标（2.5.0，D39）：不占正文位置，hover 才展开半句话 ──
-			".smem-star-corner{position:fixed;right:16px;bottom:16px;z-index:20;display:flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--dsw-alias-border-l1);border-radius:999px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-tertiary,#8b93a1);font-size:12px;line-height:1.4;opacity:.62;transition:opacity 220ms cubic-bezier(.2,0,0,1),border-color 220ms cubic-bezier(.2,0,0,1);}",
-			".smem-star-corner:hover{opacity:1;border-color:var(--dsw-alias-border-l2);}",
-			".smem-star-glyph{font-size:11px;color:var(--dsw-alias-state-warn-primary,#d97706);}",
+			// 2026-11-09 调（文歌子：原来「太不显眼了」）：既然它固定在右下角、不压任何内容，
+			// 就没必要靠 0.62 的透明度自我隐形 —— 那是给「怕打扰阅读」的按下去的做法，
+			// 而这一颗星本来就该被看见。现在：不透明、底色抬到 layer-2、字色从 tertiary 抬到 secondary、
+			// 加一层轻阴影让它离底；hover 才把「喜欢这个插件的话」展开（不常显，仍不占阅读视线）。
+			".smem-star-corner{position:fixed;right:16px;bottom:16px;z-index:20;display:flex;align-items:center;gap:6px;padding:6px 11px;border:1px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary,#6b7482);font-size:12.5px;font-weight:500;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.16);transition:border-color 220ms cubic-bezier(.2,0,0,1),background 220ms cubic-bezier(.2,0,0,1),box-shadow 220ms cubic-bezier(.2,0,0,1);}",
+			".smem-star-corner:hover{border-color:var(--dsw-alias-brand-primary,#4d76e6);color:var(--dsw-alias-label-primary);box-shadow:0 6px 18px rgba(0,0,0,.22);}",
+			".smem-star-glyph{font-size:13px;color:var(--dsw-alias-state-warn-primary,#d97706);transition:transform 220ms cubic-bezier(.2,0,0,1);}",
+			".smem-star-corner:hover .smem-star-glyph{transform:scale(1.12);}",
 			".smem-star-link{color:inherit;text-decoration:none;border-bottom:1px dashed transparent;}",
 			".smem-star-corner:hover .smem-star-link{border-bottom-color:currentColor;}",
 			".smem-star-more{max-width:0;overflow:hidden;white-space:nowrap;transition:max-width 220ms cubic-bezier(.2,0,0,1);}",
