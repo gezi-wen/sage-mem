@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.5.1`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.6.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -191,7 +191,7 @@ Since 1.9.0 the memory-management surface follows the harness language (**Settin
 
 ![Health: conflicts that need your call on top, machine-scanned structural problems below](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/audit.png)
 
-*Health — one screen answers "is anything wrong with this library": the **conflict queue on top** (a finite list that needs your decision: which of two contradictory statements is void) and the **audit below** (dangling index entries, missing index entries, broken links and the rest, reported in red by category). "Points to an archived memory" is only a hint — it does not count as a problem, and there is no one-click fix: which one to change is your call. The audit only reports and never modifies.*
+*Health — one screen answers "is anything wrong with this library": the **conflict queue on top** (a finite list that needs your decision: which of two contradictory statements is void) and the **audit below** (dangling index entries, missing index entries, broken links and the rest, reported in red by category). "Points to an archived memory" is only a hint — it does not count as a problem, and there is **no one-click fix**: which one to change is your call. The audit only reports and never modifies. When there is really something to deal with, the badge gets a **「复制修复提示词」(copy fix prompt)** button next to it (2.6.0): it turns what this screen needs into one prompt in your clipboard — **the audit problems and the pending conflicts are written as two separate sections** (fix these / only advise on those), so you can paste it to the agent and let it work. A receipt appears at the bottom afterwards — it closes itself in 10 seconds, closes as soon as you switch tabs, and you can dismiss it by hand.*
 
 ![Update notice: a single banner, only when there really is a new version](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/update-banner.png)
 

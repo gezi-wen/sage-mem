@@ -143,7 +143,7 @@ group('4. entryFacts：归档把整条记忆承载的事实列出来')
     '# 旧项目',
     '',
     '- 接口在 2026-09-01 下线',
-    '- 备份留在灰云的 backup 目录',
+    '- 备份留在内网的 backup 目录',
     '- 联系人已经换过一次',
     '',
   ].join('\n')
@@ -419,7 +419,7 @@ group('7. 真实链路：write_memory / archive_memory 把事实塞进 change')
     '【事故】那条仍然生效的账进了机读记录',
   )
 
-  await writeFile(join(mem, 'retire.md'), `${FM}\n# 待退役\n\n- 接口在 2026-09-01 下线\n- 备份在灰云\n`, 'utf8')
+  await writeFile(join(mem, 'retire.md'), `${FM}\n# 待退役\n\n- 接口在 2026-09-01 下线\n- 备份在内网\n`, 'utf8')
   const a = await runner.run('archive_memory', { file: 'retire.md', reason: '已被取代' })
   ok(a.startsWith('已归档'), `归档成功（${a}）`)
   const c2 = runner.changes()[1]

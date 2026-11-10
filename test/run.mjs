@@ -115,6 +115,9 @@ const SUITES = [
   // 1.4.0：客户端共享基元的「只许一处」与拼接顺序守卫。
   'client-scope-test.mjs',
   'client-render-test.mjs',
+  // 2.6.0：库健康「复制修复提示词」—— 提示词是拿去指挥智能体的，坏法不是崩溃而是
+  // 「少一类 / 悄悄截断 / 把提示写成硬问题」，所以每条判据都盯具体文本。
+  'health-prompt-test.mjs',
   // 2.1.20：外部审查 Q15 —— 星图按需绘制的入场 / 回放 / 页面隐藏调度
   // （伪时钟 + 假 WebGL 直接读 render 写进去的 uTime / uRevealT）。
   'review-211-q15-test.mjs',

@@ -503,6 +503,16 @@
 			"archive.err.thresholdBad": "{label}的阈值要是 1~3650 之间的天数（现在是「{value}」）",
 			"archive.notice.thresholdsSaved": "归档条件已保存",
 			"archive.err.thresholdStill": "{label} 仍是 {value}",
+
+			// ── 库健康 · 复制修复提示词（2.6.0）──
+			// 只有按钮 / title / 提示条 / 兜底模态走 i18n；提示词**正文**仍是中文
+			// （体检卡与冲突卡本身还没 i18n，见 D31 / D40）。
+			"header.copyFixPrompt": "复制修复提示词",
+			"header.copyHealthTitle": "把这 {count} 件事整理成提示词 —— 粘给智能体（体检问题照修，冲突只给建议）",
+			"toast.copied": "复制修复任务成功，请在会话中发送给智能体",
+			"prompt.copyFailedTitle": "复制没成功 —— 手动复制这段提示词",
+			"prompt.copyFailedHint": "点一下文本框全选，再按 Ctrl+C 复制",
+			"prompt.close": "关闭",
 		};
 
 		const EN = {
@@ -1000,6 +1010,14 @@
 			"archive.err.thresholdBad": "{label} threshold must be between 1 and 3650 days (currently “{value}”)",
 			"archive.notice.thresholdsSaved": "Archive conditions saved",
 			"archive.err.thresholdStill": "{label} is still {value}",
+
+			// ── Health · copy the fix prompt (2.6.0) ──
+			"header.copyFixPrompt": "Copy fix prompt",
+			"header.copyHealthTitle": "Turn these {count} items into a prompt you can paste to the agent (it fixes the audit problems and only advises on conflicts)",
+			"toast.copied": "Fix task copied — paste it to the agent in the conversation",
+			"prompt.copyFailedTitle": "Copy failed — copy this prompt by hand",
+			"prompt.copyFailedHint": "Click the box to select it all, then press Ctrl+C",
+			"prompt.close": "Close",
 		};
 
 		/**

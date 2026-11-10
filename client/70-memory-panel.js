@@ -112,6 +112,11 @@
 			const audit = sAudit[0], setAudit = sAudit[1];
 			const sAuditBusy = react.useState(false);
 			const auditBusy = sAuditBusy[0], setAuditBusy = sAuditBusy[1];
+			// 2.6.0：复制修复提示词的回执（null = 不显示）与复制失败时的兜底模态。
+			const sToast = react.useState(null);
+			const toast = sToast[0], setToast = sToast[1];
+			const sPromptFallback = react.useState(null);
+			const promptFallback = sPromptFallback[0], setPromptFallback = sPromptFallback[1];
 			// 更新提示：只在**确实有新版本**时才被赋值（查不到/限流/网络错都不赋值）
 			const sUpdate = react.useState(null);
 			const updateInfo = sUpdate[0], setUpdateInfo = sUpdate[1];
@@ -224,6 +229,24 @@
 						.catch(function () { /* 查版本失败不是用户的事 */ });
 				}
 			}, []);
+
+			/**
+			 * 复制提示词的回执（2.6.0）：10 秒后自动收掉。
+			 *
+			 * 计时器挂在 `toast` 上：再复制一次只是换文本 → 依赖变 → 旧计时器清掉、重新计时。
+			 * 卸载时 cleanup 清掉，不留悬挂定时器（面板关掉之后再去 setState 是纯净的噪音）。
+			 */
+			react.useEffect(function () {
+				if (!toast) return undefined;
+				const id = setTimeout(function () { setToast(null); }, 10000);
+				return function () { clearTimeout(id); };
+			}, [toast]);
+
+			/**
+			 * 换页签立刻收掉回执 —— 用 effect 盯 `tab`，而不是在每个 setTab 的调用点里塞
+			 * `setToast(null)`：入口只会越来越多（徽标、抽屉、侧栏），漏一个就是「切了还在」。
+			 */
+			react.useEffect(function () { setToast(null); }, [tab]);
 
 			/**
 			 * 抽屉「点外部 / Esc 关闭」。
@@ -653,6 +676,25 @@
 					.then(function (r) { setAudit(unwrap(r) || null); })
 					.catch(function (e) { setError(String((e && e.message) || e)); })
 					.then(function () { setAuditBusy(false); });
+			}
+
+			/**
+			 * 把「库健康这一屏要处理的事」复制成一段提示词（2.6.0）。
+			 *
+			 * 界面上只有**一颗**按钮，提示词里却是**两段**（A 体检问题要修 / B 待裁决只判断）——
+			 * 分不分得清由 `buildHealthFixPrompt` 负责，这里只管复制与失败兜底。
+			 *
+			 * `built` 在两边都没事时是 null；按钮本就不会渲染，这里再挡一次，防将来有别的入口。
+			 * 复制失败**不静默**：把提示词摊进模态框让人手抄（局域网 http 不是安全上下文，
+			 * Clipboard API 与 execCommand 都可能被拒 —— 「点了没反应」是最坏的形态）。
+			 */
+			function copyHealthPrompt() {
+				const built = buildHealthFixPrompt({ report: audit, conflicts: conf });
+				if (!built) return;
+				copyPromptText(built.text).then(function (ok) {
+					if (ok) { setToast(t("toast.copied")); return; }
+					setPromptFallback(built.text);
+				});
 			}
 
 			function loadCandidates() {
@@ -1107,6 +1149,10 @@
 			// 冲突徽标数的是**待裁决**（open）条数 —— 与冲突页签里的「N 条待裁决」同源。
 			// -1 = 还没取到队列（显示「未载」，不假装 0 条）。
 			const conflictOpen = conf && conf.counts && typeof conf.counts.open === "number" ? conf.counts.open : -1;
+			// 「复制修复提示词」那颗按钮的分母：体检问题 + 待裁决冲突。两边都没有（=0）时按钮不渲染；
+			// 冲突队列还没载入（-1）不算进分母 —— 免得按钮先冒出来又消失。
+			const healthWork = (audit && typeof audit.problems === "number" && audit.problems > 0 ? audit.problems : 0)
+				+ (conflictOpen > 0 ? conflictOpen : 0);
 
 			// 「文件列表」这一屏：状态筛选决定看哪一批，灰色卡片与留痕块自带「退役」语义。
 			// banner 只在**专门看归档**时出现，切到全部时不重复说一遍。
@@ -1169,6 +1215,17 @@
 							}, !conf ? t("header.conflictNotRun")
 								: conflictOpen > 0 ? t("header.conflictOpen", { count: conflictOpen })
 								: t("header.conflictEmpty"))
+						: null,
+					// 2.6.0：**一颗**按钮收在两组徽标之后（2026-11-10 定：保持界面简洁）。
+					// 只在真有内容时出现（体检有问题 或 冲突待裁决）；提示词里 A / B 两段分开写，
+					// 所以一颗按钮不会把「要修」与「只判断」混成一件事。
+					(healthWork > 0)
+						? h("button", {
+								type: "button", className: "smem-btn", key: "cp",
+								title: t("header.copyHealthTitle", { count: healthWork }),
+								"aria-label": t("header.copyHealthTitle", { count: healthWork }),
+								onClick: copyHealthPrompt,
+							}, t("header.copyFixPrompt"))
 						: null,
 					restartPending
 						? h("button", {
@@ -1403,6 +1460,12 @@
 							h(AuditPanel, { key: "audit", report: audit, busy: auditBusy, onRun: runAudit, standalone: true }),
 						])
 					: h("div", { className: "smem-view", key: "files" }, filesView),
+				// 2.6.0：复制成功的回执铺在视口下方中央（`position:fixed`，不吃点击，10s 自收，
+				// 也能自己点 × 关）。渲染在 `.smem-root` 直属层 —— 别塞进带进场动画的
+				// `.smem-view`（那个祖先有 transform，`fixed` 会被改写定位）。
+				toast ? h(Toast, { key: "toast", text: toast, closeTitle: t("prompt.close"), onClose: function () { setToast(null); } }) : null,
+				// 复制失败时把提示词摊出来手抄；用户手动关（× / 关闭 / 点遮罩）。
+				promptFallback ? h(PromptFallbackModal, { key: "prompt-fallback", text: promptFallback, onClose: function () { setPromptFallback(null); } }) : null,
 				// 底部一行仓库链接（四个 tab 都在，不抢视线）
 				h(StarLine, { key: "star-line" }),
 			]);

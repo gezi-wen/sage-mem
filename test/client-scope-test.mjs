@@ -128,5 +128,24 @@ group('5. 每个作用域内的顶层声明不许重名（2026-11-03：原 14 �
   ok(crossHits.length === 0, '【反向对照】跨作用域同名（CSS）不报')
 }
 
+group('6. 体检分类表只许一处（2.6.0：面板分节与「复制修复提示词」共用）')
+{
+  // 这张表描述的是「体检有哪些类、每类怎么渲染一行」。面板（50）与提示词（56）各抄一份，
+  // 就会变成「面板上显示 8 条、复制出去的只有 6 条」这种只有用户才发现的错。
+  const where = declaredIn('AUDIT_SECTIONS')
+  ok(where.length === 1 && where[0] === '56-health-prompt.js',
+    'AUDIT_SECTIONS 只在 56-health-prompt.js 声明一次', where.join(','))
+  ok((SOURCES.get('50-shared-ui.js') || '').includes('AUDIT_SECTIONS'),
+    '面板（50-shared-ui.js）确实复用了这张表，而不是自己再写一份')
+  ok((SOURCES.get('50-shared-ui.js') || '').includes('AUDIT_ARCHIVED_LINKS'),
+    '「指向已归档」的条目格式也共用（两处只各写自己的标题）')
+  // 判据本身要有反证：把同一张表的两份声明塞进去，必须报出来
+  const fake = declaredIn('AUDIT_SECTIONS', new Map([
+    ['56-health-prompt.js', '\t\tconst AUDIT_SECTIONS = []'],
+    ['50-shared-ui.js', '\t\tconst AUDIT_SECTIONS = []'],
+  ]))
+  ok(fake.length === 2, '【反向对照】两处各自声明一份 → 判据报 2 处', fake.join(','))
+}
+
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

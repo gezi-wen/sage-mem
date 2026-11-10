@@ -751,6 +751,27 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 			]);
 		}
 
+		/**
+		 * 一条**不挡操作**的提示条（2.6.0）。
+		 *
+		 * 为什么不用模态：复制成功是一次「做完了」的回执，不该拦着人继续点 ——
+		 * 所以它铺在视口下方中央、容器 `pointer-events:none`（点得穿），只有右上那颗
+		 * × 收 `pointer-events:auto`，让用户能手动关掉（`onClose`）。
+		 *
+		 * 自动消失的计时器由调用方（Section）持有：它才知道「换页签就该收」。
+		 */
+		function Toast(props) {
+			return h("div", { className: "smem-toast", role: "status", "aria-live": "polite" }, [
+				h("span", { className: "smem-toast-check", key: "c", "aria-hidden": "true" }, "✓"),
+				h("span", { className: "smem-toast-text", key: "t" }, String(props.text == null ? "" : props.text)),
+				h("button", {
+					type: "button", key: "x", className: "smem-toast-x",
+					title: props.closeTitle || "", "aria-label": props.closeTitle || "",
+					onClick: props.onClose,
+				}, "×"),
+			]);
+		}
+
 		function AuditPanel(props) {
 			const r = props.report || {};
 			/**
@@ -768,6 +789,10 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 					])
 				: null);
 			const hints = r.archivedLinks || [];
+			// 分节表（字段 / 标题 / 条目格式）与「复制修复提示词」共用同一份，定义在
+			// `client/56-health-prompt.js` 的 `AUDIT_SECTIONS` —— 面板上看到的每一行，
+			// 就是提示词里读到的那一行。这里只负责把它渲染成「标题（说明）」。
+			const sectionTitle = (s) => (s.sub ? s.title + "（" + s.sub + "）" : s.title);
 			return h("div", { className: "smem-tool-panel" + (standalone ? " smem-tool-panel--full" : " smem-tool-panel--cap"), key: "audit" }, [
 				h("div", { className: "smem-tool-head", key: "head" }, [
 					h("span", { className: "smem-tool-title", key: "t" }, "体检"),
@@ -781,19 +806,9 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 					standalone ? null : toolClose(props),
 				]),
 				r.problems
-					? h("div", { key: "secs" }, [
-							section("索引悬空（索引里有、文件没了）", r.dangling, (x) => x.file),
-							section("漏索引（文件在、索引里没有）", r.unlisted, (x) => x.file),
-							section("type 与前缀对不上", r.typeMismatch, (x) => x.file + " · type=" + x.type + "，文件名前缀=" + x.prefix),
-							section("行尾是 CRLF", r.crlf, (x) => x.file),
-							section("双链断链", r.brokenLinks, (x) => x.file + " → [[" + x.target + "]]"),
-							section("未加引号的「空格+#」", r.hashHazards, (x) => x.file + " · " + x.line),
-							section("没有 frontmatter", r.noFrontmatter, (x) => x.file),
-							section("读不出来", r.unreadable, (x) => x.file),
-							// 归档中途崩溃留下的私有名残留：它不是一条记忆（扫描/注入都不认），
-							// 但里面可能是用户唯一一份内容 —— 所以要在体检里露头，而不是隐形。
-							section("归档残留（内容可能还在，请确认后改回 .md 或删除）", r.strays, (x) => x.file),
-						])
+					? h("div", { key: "secs" }, AUDIT_SECTIONS.map(function (s) {
+							return section(sectionTitle(s), r[s.field], s.item);
+						}))
 					: h("div", { className: "smem-empty smem-empty--ok", key: "ok" },
 							"没有发现问题 —— 索引、双链、frontmatter 与行尾都对得上。"),
 				hints.length
@@ -801,7 +816,7 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 							h("div", { className: "smem-audit-h", key: "h" }, "指向已归档（提示，不计入问题）"),
 							h("div", { className: "smem-ar-hint", key: "n" },
 								"归档不是删除：这些链接的目标还在档案馆里躺着，恢复它链接就活了 —— 不用改。"),
-							rows(hints, (x) => x.file + " → [[" + x.target + "]]"),
+							rows(hints, AUDIT_ARCHIVED_LINKS.item),
 						])
 					: null,
 				h("div", { className: "smem-ar-hint", key: "ro" }, "这里只报告、不修改 —— 要改哪条，用那条记忆自己的编辑入口。"),

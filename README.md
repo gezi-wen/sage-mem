@@ -14,7 +14,7 @@
 
 > File-based cross-session memory for DeepSeek Harness — every memory is a plain markdown file you can open, edit and delete. No database, no worker, no port.
 
-**当前发布版本：`2.5.1`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
+**当前发布版本：`2.6.0`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
 [契约冻结](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)。
 
 如果它对你有用，给个 Star 是最直接的反馈。
@@ -191,7 +191,7 @@ SAGE_MEM_DIR=/path/to/your/memory
 
 ![体检：独立一页，硬问题按类报红分节](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/audit.png)
 
-*库健康 —— 一屏回答「这个库有没有事」：**冲突队列在上**（要你裁决的有限队列：两条说法互斥，选哪一方作废），**体检在下**（索引悬空、漏索引、双链断链等结构问题按类报红）。「指向已归档」只作提示、不计入问题；也不提供一键修补 —— 改哪条由你决定。体检只报告、不修改。*
+*库健康 —— 一屏回答「这个库有没有事」：**冲突队列在上**（要你裁决的有限队列：两条说法互斥，选哪一方作废），**体检在下**（索引悬空、漏索引、双链断链等结构问题按类报红）。「指向已归档」只作提示、不计入问题；也**不提供一键修补** —— 改哪条由你决定。体检只报告、不修改。真有事要处理时，徽标后面会多一颗**「复制修复提示词」**（2.6.0）：把这一屏要处理的事整理成一段提示词放进剪贴板 —— **体检问题与待裁决冲突分两段写**（前者照清单修、后者只给建议），粘给智能体就能照着办；复制成功后下方弹一条提示，10 秒自收、换页签即收、也能自己关掉。*
 
 ![更新提示：只在真有新版本时出现一条横幅](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/update-banner.png)
 

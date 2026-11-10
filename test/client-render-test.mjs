@@ -594,10 +594,31 @@ function makeConflictRemote(cfg) {
   }
 }
 
+/**
+ * 2.6.0：复制提示词的两件量具。
+ *
+ * - `fakeClip.calls` 记下 `navigator.clipboard.writeText` 真收到了什么（断言的是**内容**，
+ *   不是「调用过」）；`mode='reject'` 模拟浏览器不给写，用来验兜底模态。
+ * - `fakeTimers` 收下 10 秒自动收条的计时器：测试自己触发，不让进程多活 10 秒。
+ */
+const FAKE_TOAST_TIMER_ID = 90001
+const fakeTimers = []
+const fakeClip = {
+  calls: [],
+  mode: 'ok',
+  navigator: {
+    clipboard: {
+      writeText(v) {
+        fakeClip.calls.push(v)
+        return fakeClip.mode === 'ok' ? Promise.resolve() : Promise.reject(new Error('clipboard denied'))
+      },
+    },
+  },
+}
+
 const fakeDoc = {
   hidden: false,
-  _created: [],
-  // 星图按 body 上的 data-ds-dark-theme 判主题（与宿主的挂钩一致），所以假 document
+  _created: [],  // 星图按 body 上的 data-ds-dark-theme 判主题（与宿主的挂钩一致），所以假 document
   // 也得有 body —— 否则主题 effect 会第一句就短路，两档色板永远测不到。
   // 默认不挂属性 = 浅色档；用例里手动 setAttribute 模拟宿主切主题。
   body: {
@@ -663,6 +684,11 @@ function makeEnLocale() {
 async function loadClient(rt, remotes) {
   const code = readFileSync(CLIENT, 'utf8')
   let loaded = null
+  // 2.6.0：复制提示词的两件量具 —— 剪贴板调用记录（真收到什么）与被拦下的 10s 计时器。
+  // 10s 的自动收条不在测试里真等：拦下来自己触发，既证明「排了 10 秒」也不让进程多活 10 秒。
+  fakeClip.calls.length = 0
+  fakeClip.mode = 'ok'
+  fakeTimers.length = 0
   // 每个运行时都从一份干净的 document 记录开始：监听表与注入记录不许跨运行时串。
   // （--preview 会先跑好几遍渲染，若不清，section 14 那句「关着时不挂监听」就会拿到
   //   上一轮残留的监听 —— 那是量具的脏，不是产品的错。）
@@ -675,9 +701,15 @@ async function loadClient(rt, remotes) {
       cancelAnimationFrame: rt.cancelAnimationFrame,
     },
     document: fakeDoc,
+    navigator: fakeClip.navigator,
     MutationObserver: FakeMutationObserver,
     console: { log() {}, warn() {}, error() {} },
-    setTimeout, clearTimeout, setInterval, clearInterval,
+    setTimeout: (fn, ms) => {
+      if (ms === 10000) { fakeTimers.push(fn); return FAKE_TOAST_TIMER_ID }
+      return setTimeout(fn, ms)
+    },
+    clearTimeout: (id) => { if (id === FAKE_TOAST_TIMER_ID) return; clearTimeout(id) },
+    setInterval, clearInterval,
     Symbol, Object, Array, JSON, Math, Date: FrozenDate, Map, Set, Promise, Error,
     String, Number, Boolean, RegExp, isNaN, parseInt, parseFloat,
   }
@@ -728,7 +760,7 @@ async function loadClient(rt, remotes) {
     if (el.textContent && capturedCss.indexOf(el.textContent) < 0) capturedCss.push(el.textContent)
   }
   const comp = regs.find((r) => r.spec && r.spec.name === 'settings.section' && r.spec.id === 'sage-mem').comp
-  return { comp, mounts, regs, ctx }
+  return { comp, mounts, regs, ctx, clip: fakeClip, timers: fakeTimers }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1027,7 +1059,7 @@ async function emitPreview() {
     let tree = await rt.settle(C, {})
     click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '库健康')[0])
     tree = await rt.settle(C, {})
-    S('audit', 'docs/images/audit.png', '库健康 —— 要你裁决的冲突在上，机器扫出的结构问题在下；「指向已归档」只作提示、不计入问题，也不提供一键修补按钮（改哪条由你决定）。', '③ 库健康（冲突 + 体检同屏；冲突在上、体检在下）', serHtml(tree))
+    S('audit', 'docs/images/audit.png', '库健康 —— 要你裁决的冲突在上，机器扫出的结构问题在下；「指向已归档」只作提示、不计入问题。头部徽标后会多一颗「复制修复提示词」（2.6.0）：把这一屏要处理的事整理成提示词交给智能体，**仍然没有一键修补** —— 改哪条由你决定。', '③ 库健康（冲突 + 体检同屏；冲突在上、体检在下）', serHtml(tree))
   }
   // ③f 「冲突」卡（2.0.0 矛盾检测）：待裁决列表 + 两份正文对照 + 只标不删的裁决动作
   {
@@ -1942,6 +1974,159 @@ async function main() {
       '新标签页打开、带 noreferrer')
   }
 
+  // ── 8c. 库健康「复制修复提示词」（2.6.0）──────────────────────────────────
+  // 三条是需求原话：按钮收在两组徽标之后（**只有一颗**）、**只在有问题时出现**、
+  // 复制成功弹一条不挡操作的提示条（10 秒自收 / 换页签即收 / 能手动关）。
+  // 提示词内部必须 A（体检要修）/ B（冲突只判断）两段分开 —— 一颗按钮不等于一段话。
+  group('8c. 复制修复提示词：一颗按钮、只在有事时出现；回执 10s 自收 / 换页签即收 / 能手动关')
+  {
+    const copyBtns = (t) => all(t, (n) => n.type === 'button' && textOf(n) === '复制修复提示词')
+    const toastOf = (t) => all(t, byClass('smem-toast'))[0]
+    const toastText = '复制修复任务成功，请在会话中发送给智能体'
+
+    // ① 只有体检有问题：头部一颗按钮，剪贴板里只有 A 段
+    {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      mem.st.audit = AUDIT_WITH_PROBLEMS
+      const { comp: C, clip, timers } = await loadClient(rt, { memory: mem })
+      let tree = await rt.settle(C, {})
+
+      const btns = copyBtns(tree)
+      ok(btns.length === 1, `头部只有一颗「复制修复提示词」（实际 ${btns.length} 颗）`)
+      ok(!!btns[0] && String(btns[0].props.title).indexOf('4 件事') >= 0,
+        `title 说清这一颗管几件事（实际 ${btns[0] ? btns[0].props.title : '没有按钮'}）`)
+      // 按钮在头部带、不在体检卡里 —— 卡里那句「只读」的断言（第 8 组）继续成立
+      click(all(tree, (n) => n.type === 'button' && byClass('smem-tool-badge')(n) &&
+        textOf(n).indexOf('体检') === 0)[0])
+      tree = await rt.settle(C, {})
+      const panel = all(tree, byClass('smem-tool-panel'))[0]
+      ok(!!panel && all(panel, (n) => n.type === 'button').map(textOf).join('|') === '重新体检',
+        `体检卡内部仍然只有「重新体检」一颗按钮（实际 ${panel ? all(panel, (n) => n.type === 'button').map(textOf).join('|') : '没有卡'}）`)
+
+      click(copyBtns(tree)[0])
+      tree = await rt.settle(C, {})
+      const copied = clip.calls[0] || ''
+      ok(clip.calls.length === 1, `剪贴板被写了一次（实际 ${clip.calls.length} 次）`)
+      ok(copied.indexOf('这次只有 A') >= 0 && copied.indexOf('A · 体检问题') >= 0,
+        '只有体检时：开场白说「只有 A」，且 A 段在')
+      ok(copied.indexOf('B · 待裁决的矛盾') < 0, '没有冲突时不摆一段空的 B')
+      ok(copied.indexOf('记忆目录：/tmp/memory') >= 0 && copied.indexOf('- dangling_one.md') >= 0,
+        'A 段带着目录与逐条文件名')
+
+      // 回执：下方一条、文案是约定的那句、带一颗 ×
+      const toast = toastOf(tree)
+      ok(!!toast, '复制成功后出现回执提示条')
+      ok(!!toast && textOf(toast).indexOf(toastText) >= 0, `回执文案对得上（实际 ${toast ? textOf(toast) : '没有'}）`)
+      ok(!!toast && all(toast, byClass('smem-toast-x')).length === 1, '回执上有「×」可以手动关')
+      ok(!!toast && toast.props.role === 'status' && toast.props['aria-live'] === 'polite',
+        '回执是 role=status / aria-live=polite（读屏能听到，不抢焦点）')
+
+      // 10 秒自动收：计时器被拦下来了（证明「排的是 10 秒」），自己触发它
+      ok(timers.length === 1, `复制后排了一个自动收条计时器（实际 ${timers.length} 个）`)
+      if (timers.length) timers.shift()()
+      tree = await rt.settle(C, {})
+      ok(!toastOf(tree), '计时器触发后回执自己消失')
+
+      // 换页签立刻收（必须切到**另一屏**：点当前页签不算切换，本来就不该清）
+      click(copyBtns(tree)[0])
+      tree = await rt.settle(C, {})
+      ok(!!toastOf(tree), '再复制一次回执又出现')
+      click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '时间线')[0])
+      tree = await rt.settle(C, {})
+      ok(!toastOf(tree), '换页签后回执立刻消失（不用等 10 秒）')
+
+      // 手动关：点 ×
+      click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '库健康')[0])
+      tree = await rt.settle(C, {})
+      click(copyBtns(tree)[0])
+      tree = await rt.settle(C, {})
+      const t2 = toastOf(tree)
+      ok(!!t2, '回到库健康再复制，回执再次出现')
+      click(all(t2, byClass('smem-toast-x'))[0])
+      tree = await rt.settle(C, {})
+      ok(!toastOf(tree), '点「×」可以手动关掉回执')
+    }
+
+    // ② 体检干净、也没有冲突 → 一颗都不出现
+    {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      mem.st.audit = AUDIT_CLEAN
+      const { comp: C } = await loadClient(rt, { memory: mem })
+      const tree = await rt.settle(C, {})
+      ok(copyBtns(tree).length === 0, '体检干净（只有归档链接提示）时头部没有复制按钮')
+      ok(!!all(tree, (n) => n.type === 'button' && byClass('smem-tool-badge')(n) &&
+        textOf(n).indexOf('体检') === 0)[0], '但体检徽标本身照旧在')
+    }
+
+    // ③ 体检干净、只有冲突待裁决：按钮同样出现，剪贴板里只有 B 段
+    {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      mem.st.audit = AUDIT_CLEAN
+      const cf = makeConflictRemote({ items: CONFLICT_ITEMS })
+      const { comp: C, clip } = await loadClient(rt, { memory: mem, conflict: cf })
+      let tree = await rt.settle(C, {})
+      const btns = copyBtns(tree)
+      ok(btns.length === 1, `只有冲突时也是一颗（实际 ${btns.length} 颗）`)
+      ok(!!btns[0] && String(btns[0].props.title).indexOf('2 件事') >= 0,
+        `title 数的是冲突条数（实际 ${btns[0] ? btns[0].props.title : '没有按钮'}）`)
+      click(btns[0])
+      tree = await rt.settle(C, {})
+      const copied = clip.calls[0] || ''
+      ok(copied.indexOf('这次只有 B') >= 0 && copied.indexOf('B · 待裁决的矛盾') >= 0,
+        '只有冲突时：开场白说「只有 B」，且 B 段在')
+      ok(copied.indexOf('A · 体检问题') < 0 && copied.indexOf('修复口径') < 0, '体检干净时不摆 A 段')
+      ok(copied.indexOf('user_alpha.md') >= 0 && copied.indexOf('只做判断，不要改盘上的文件') >= 0,
+        'B 段有记录、也写清了只判断不改盘')
+      ok(copied.indexOf('已裁决') < 0, '已裁决的记录不进提示词')
+    }
+
+    // ④ 两边都有：一颗按钮、两段分开
+    {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      mem.st.audit = AUDIT_WITH_PROBLEMS
+      const cf = makeConflictRemote({ items: CONFLICT_ITEMS })
+      const { comp: C, clip } = await loadClient(rt, { memory: mem, conflict: cf })
+      let tree = await rt.settle(C, {})
+      ok(copyBtns(tree).length === 1, '两边都有时仍然只有一颗（不是两颗）')
+      click(copyBtns(tree)[0])
+      tree = await rt.settle(C, {})
+      const copied = clip.calls[0] || ''
+      ok(copied.indexOf('这次两部分都有') >= 0, '开场白说清两部分都有')
+      ok(copied.indexOf('A · 体检问题') >= 0 && copied.indexOf('B · 待裁决的矛盾') >= 0, 'A / B 两段都在')
+      ok(copied.indexOf('A · 体检问题') < copied.indexOf('B · 待裁决的矛盾'), 'A 在前、B 在后')
+      ok(copied.indexOf('【索引悬空】') > copied.indexOf('A · 体检问题') &&
+        copied.indexOf('【索引悬空】') < copied.indexOf('B · 待裁决的矛盾'), '体检清单落在 A 段之内')
+      ok(copied.indexOf('user_alpha.md') > copied.indexOf('B · 待裁决的矛盾'), '冲突条目落在 B 段之内')
+    }
+
+    // ⑤ 复制被拒 → 兜底模态把提示词摊出来（手动关）
+    {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      mem.st.audit = AUDIT_WITH_PROBLEMS
+      const { comp: C, clip } = await loadClient(rt, { memory: mem })
+      clip.mode = 'reject'
+      let tree = await rt.settle(C, {})
+      click(copyBtns(tree)[0])
+      tree = await rt.settle(C, {})
+      ok(!toastOf(tree), '复制失败时不假装成功（没有回执条）')
+      const modal = modalOf(tree)
+      ok(!!modal, '复制失败时弹兜底模态')
+      const ta = all(modal || {}, (n) => n.type === 'textarea')[0]
+      ok(!!ta && String(ta.props.value).indexOf('【索引悬空】') >= 0, '模态里摊的是完整提示词')
+      ok(!!ta && ta.props.readOnly === true, 'textarea 只读')
+      const closeBtn = all(modal || {}, (n) => n.type === 'button' && textOf(n) === '关闭')[0]
+      ok(!!closeBtn, '兜底模态有关闭按钮')
+      click(closeBtn)
+      tree = await rt.settle(C, {})
+      ok(!modalOf(tree), '点关闭后模态消失')
+    }
+  }
+
   // ── 8b. 更新提示：只有真有新版才出现一条横幅 ─────────────────────────────
   group('8b. 更新提示：有新版本才出现，且「×」只关这一次')
   {
@@ -2052,7 +2237,7 @@ async function main() {
     ok(treeText(tree).indexOf('自动归档已设为「满足条件自动跑」') >= 0, '保存成功有明确反馈')
 
     // ③ 三个阈值在「设置」段（2.5.0 补：归档卡也有自己的运行 / 设置两段，
-    //    照文歌子 2026-11-08 的要求 —— 设置页只留阈值那一块，其余归运行页）。
+    //    照 2026-11-08 的要求 —— 设置页只留阈值那一块，其余归运行页）。
     click(all(archivePane(tree), (n) => n.type === 'button' && textOf(n) === '设置')[0])
     tree = await rt.settle(C, {})
     ok(all(archivePane(tree), (n) => n.type === 'button' && textOf(n) === '保存归档条件')[0],

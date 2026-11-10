@@ -155,6 +155,17 @@
 			".smem-modal-body{font-size:12.5px;line-height:1.65;color:var(--dsw-alias-label-secondary);display:flex;flex-direction:column;gap:8px;}",
 			".smem-modal-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}",
 			"@media (prefers-reduced-motion:reduce){.smem-modal,.smem-modal-scrim{animation:none;}}",
+			// ── 提示条（2.6.0）：复制成功的回执，铺在视口下方中央 ──
+			// **容器不吃点击**（pointer-events:none）：回执不该拦住下一次操作；只有 × 收回
+			// 点击，让用户能手动关掉。z-index 压在模态（50）之下、抽屉（40）同层之上。
+			".smem-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:41;pointer-events:none;display:flex;align-items:center;gap:10px;max-width:min(560px,92vw);padding:10px 10px 10px 16px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-2);box-shadow:0 12px 32px rgba(0,0,0,.38);font-size:13px;line-height:1.5;color:var(--dsw-alias-label-primary);animation:smem-pop 200ms cubic-bezier(.2,0,0,1);}",
+			".smem-toast-check{flex:none;color:var(--dsw-alias-state-success-primary,#16a34a);font-weight:700;}",
+			".smem-toast-text{min-width:0;overflow-wrap:anywhere;}",
+			".smem-toast-x{pointer-events:auto;flex:none;width:22px;height:22px;padding:0;border-radius:6px;border:1px solid var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1;font-family:inherit;cursor:pointer;}",
+			".smem-toast-x:hover{color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-border-l2);}",
+			"@media (prefers-reduced-motion:reduce){.smem-toast{animation:none;}}",
+			// 兜底模态里的提示词：等宽、尽量多显示几行。
+			".smem-prompt-ta{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11.5px;line-height:1.5;height:38vh;min-height:160px;white-space:pre;resize:vertical;}",
 			// ── 编辑抽屉（2.5.0，D39）：替掉 1.0 起的页面内联表单 `.smem-form` ──
 			// 抽屉从右侧滑入，遮罩自带淡入。两处都用 `animation` 而不是 transition：mount 即播，
 			// 不依赖二次渲染（页面不可见时 rAF 不触发）。
@@ -181,7 +192,7 @@
 			".smem-chips{display:flex;gap:6px;flex-wrap:wrap;}",
 			// ── 模块卡头（2.5.0，D39）────────────────────────────────────────────
 			// 一屏两张模块卡，就必须看得出「这张卡到哪儿为止」——
-			// 否则下面那张会被读成「当前这一段的内容」（2026-11-08 文歌子一眼看到的正是这个）。
+			// 否则下面那张会被读成「当前这一段的内容」（2026-11-08 维护时一眼看到的正是这个）。
 			// 所以每张卡自己带边框；卡头（开关 + 标题 + 状态）在分段之外，底下一条线把它和内容分开。
 			".smem-module-card{border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1);padding:14px 16px;}",
 			".smem-module-head{padding-bottom:10px;border-bottom:1px solid var(--dsw-alias-border-l1);margin-bottom:12px;}",
@@ -291,7 +302,7 @@
 			".smem-plugin-card-err{font-size:12px;line-height:1.5;color:var(--dsw-alias-state-error-primary,#ef4444);overflow-wrap:anywhere;}",
 			// ── 底部一行仓库链接（引流，不抢视线）──
 			// ── 求 Star 的角标（2.5.0，D39）：不占正文位置，hover 才展开半句话 ──
-			// 2026-11-09 调（文歌子：原来「太不显眼了」）：既然它固定在右下角、不压任何内容，
+			// 2026-11-09 调（原话：「太不显眼了」）：既然它固定在右下角、不压任何内容，
 			// 就没必要靠 0.62 的透明度自我隐形 —— 那是给「怕打扰阅读」的按下去的做法，
 			// 而这一颗星本来就该被看见。现在：不透明、底色抬到 layer-2、字色从 tertiary 抬到 secondary、
 			// 加一层轻阴影让它离底；hover 才把「喜欢这个插件的话」展开（不常显，仍不占阅读视线）。
