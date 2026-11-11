@@ -290,14 +290,20 @@
 			".smem-page-top{display:flex;align-items:center;}",
 			".smem-page-back{display:inline-flex;align-items:center;gap:5px;border:0;background:transparent;color:var(--dsw-alias-label-secondary);font-family:inherit;font-size:12.5px;line-height:1.4;padding:3px 6px 3px 2px;border-radius:6px;cursor:pointer;}",
 			".smem-page-back:hover{color:var(--dsw-alias-label-primary,#1f2329);background:var(--dsw-alias-bg-layer-2);}",
-			// ── 1.8.2：插件详情页的「侧栏入口」卡片 ──
+			// ── 1.8.2 / 2.7.0：插件详情页的「界面入口」折叠行 ──
 			// 融入宿主插件页：标题 13px/600、说明 12px 次要色，圆角与分隔线只用宿主 token。
-			// 不抄设置页的大标题 —— 这一块是插件页里的一张紧凑卡片，不是另一个 settings section。
+			// 2.7.0 起默认收起：收起时只露标题 + 当前状态，展开才是三选一。
 			".smem-plugin-card{display:flex;flex-direction:column;gap:8px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;padding:12px 14px;background:var(--dsw-alias-bg-layer-1,#fafbfc);box-sizing:border-box;}",
-			".smem-plugin-card-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}",
+			".smem-entry-summary{display:flex;align-items:center;gap:8px;width:100%;border:0;background:transparent;padding:0;margin:0;font-family:inherit;text-align:left;cursor:pointer;color:inherit;}",
+			".smem-entry-summary:hover .smem-plugin-card-title{color:var(--dsw-alias-brand-primary,#4d76e6);}",
+			".smem-entry-summary:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#4d76e6);outline-offset:3px;border-radius:6px;}",
+			".smem-entry-chevron{flex:none;margin-left:auto;color:var(--dsw-alias-label-tertiary,#8b93a1);transition:transform 180ms cubic-bezier(.2,0,0,1);}",
+			".smem-entry-body{display:flex;flex-direction:column;gap:8px;padding-top:2px;}",
+			".smem-entry-opts{display:flex;flex-direction:column;gap:6px;}",
+			".smem-entry-opt{font-size:12.5px;line-height:1.5;padding:1px 0;}",
+			".smem-entry-opt input:disabled{cursor:not-allowed;opacity:.55;}",
 			".smem-plugin-card-title{font-size:13px;font-weight:600;color:var(--dsw-alias-label-primary,#1f2430);line-height:1.4;}",
 			".smem-plugin-card-status{font-size:12px;color:var(--dsw-alias-label-secondary,#6b7280);line-height:1.4;}",
-			".smem-plugin-card-check{font-size:12.5px;}",
 			".smem-plugin-card-note{font-size:12px;line-height:1.55;color:var(--dsw-alias-label-secondary,#6b7280);}",
 			".smem-plugin-card-err{font-size:12px;line-height:1.5;color:var(--dsw-alias-state-error-primary,#ef4444);overflow-wrap:anywhere;}",
 			// ── 底部一行仓库链接（引流，不抢视线）──

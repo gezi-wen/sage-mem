@@ -260,10 +260,13 @@ ok(renderFake(bundleCard ? bundleCard.comp({ view: 'summary' }) : null) === null
 const pageCard = renderFake(bundleCard ? bundleCard.comp({ view: 'page' }) : null)
 ok(!!pageCard && pageCard.props && pageCard.props.className === 'smem-plugin-card',
   '插件页的 page 视图渲染出 smem-plugin-card 卡片')
-ok(textOf(pageCard).indexOf('侧栏入口') >= 0 && textOf(pageCard).indexOf('在侧栏显示「记忆管理」入口') >= 0,
-  '卡片里有标题「侧栏入口」与开关文案')
-ok(textOf(pageCard).indexOf('默认开启') >= 0 && textOf(pageCard).indexOf('设置 → 记忆管理') >= 0,
-  '卡片说明写明默认开启、设置页入口保留')
+ok(textOf(pageCard).indexOf('界面入口') >= 0 && textOf(pageCard).indexOf('两个都显示') >= 0,
+  '卡片是「界面入口」折叠行，收起时显示当前状态「两个都显示」')
+let summaryEl = null
+walkFake(pageCard, (n) => {
+  if (!summaryEl && n.type === 'button' && n.props && n.props['aria-expanded'] !== undefined) summaryEl = n
+})
+ok(!!summaryEl && summaryEl.props['aria-expanded'] === 'false', '卡片默认收起（aria-expanded=false）')
 
 // 旧宿主：该槽 0.1.7+ 才有，inject 直接抛错 —— apply 必须照常完成，设置页 / 侧栏入口一个都不能丢。
 {
@@ -302,6 +305,43 @@ ok(textOf(pageCard).indexOf('默认开启') >= 0 && textOf(pageCard).indexOf('�
     '旧宿主：侧栏入口照常注册')
   ok(!oldLive.some((r) => r.spec && r.spec.name === 'plugins.bundle.config'),
     '旧宿主：没有 plugins.bundle.config 条目（静默跳过）')
+}
+
+// 2.7.0：旧宿主没有 sidebar.panellist —— 能力探测必须接住抛错，设置页入口照常，apply 不炸。
+{
+  const noSidebarLive = []
+  const ctxNoSidebar = {
+    remote: { $mount() {} },
+    slots: {
+      inject(name, cb) {
+        if (name === 'sidebar.panellist') throw new Error('unknown slot: sidebar.panellist')
+        const disposeEntry = typeof cb === 'function' ? cb() : null
+        return () => { if (typeof disposeEntry === 'function') disposeEntry() }
+      },
+      register(spec, comp) {
+        const rec = { spec, comp }
+        noSidebarLive.push(rec)
+        return () => {
+          const i = noSidebarLive.indexOf(rec)
+          if (i >= 0) noSidebarLive.splice(i, 1)
+        }
+      },
+    },
+    get: () => undefined,
+  }
+  const noSidebarMod = loaded.factory(requireFn)
+  let noSidebarErr = null
+  try {
+    await noSidebarMod.apply(ctxNoSidebar)
+  } catch (e) { noSidebarErr = e }
+  ok(!noSidebarErr, '没有 sidebar.panellist 的宿主：apply 不抛错',
+    noSidebarErr ? (noSidebarErr.stack || '').split('\n').slice(0, 3).join(' | ') : '')
+  ok(!!noSidebarLive.find((r) => r.spec && r.spec.name === 'settings.section' && r.spec.id === 'sage-mem'),
+    '没有 sidebar.panellist 的宿主：设置页 section 照常注册（不锁死入口）')
+  ok(!noSidebarLive.some((r) => r.spec && r.spec.name === 'sidebar.panellist'),
+    '没有 sidebar.panellist 的宿主：侧栏条目不存在')
+  ok(!noSidebarLive.some((r) => r.spec && r.spec.name === 'main'),
+    '没有 sidebar.panellist 的宿主：main 槽也不注册（不留下半状态）')
 }
 
 // ── 3. 描述符对表：客户端挂的 vs 宿主 manifest ────────────────────────────────

@@ -8,6 +8,45 @@
 ---
 
 
+## 2.7.0
+
+**主题：界面入口三选一 —— 两个入口都能留，也都能只留一个。**
+
+版本判定：2.7.0（MINOR）｜理由：新增用户可感知的**选择项**（界面入口三选一），记忆文件格式、remote 方法集、注入行为不变；设置文件只增不改｜运行时源文件 8（`lib/settings.js` / `lib/index.js` / `lib/typert.host.js` / `client/78-entry-visibility.js` 新建 + `60-autodream-panel.js` / `76-sidebar-entry.js` / `80-apply.js` / `55-i18n-memory.js` / `40-styles.js` / `scripts/build-client.mjs`）+ 产物重建（`lib/client.js`）｜一版一件事：「入口可以只留一个，但至少留一个」
+
+### 行为变更
+
+- 插件详情页（「插件 → sage-mem」）原来那张「侧栏入口」卡片，换成**默认收起的「界面入口」折叠行**：收起时显示标题 + 当前状态，展开后是三个单选项与说明。
+- 面板「记忆管理 → 自动整理 → 设置」里原来的侧栏 checkbox 也换成同一组三选一。
+- 三个选项：**两个都显示（默认）/ 只显示侧栏 / 只显示设置页**。至少保留一个 —— 由三选一本身保证，不存在「都不显示」的状态。
+- 选「只显示侧栏」：设置弹窗里的「记忆管理」section **立即注销**；选「只显示设置页」：侧栏图标与 main 面板**立即摘掉**；改回「两个都显示」立即恢复。全部不用刷新、不用重启。
+- 宿主没有 `sidebar.panellist` 槽（或注入抛错）时：「只显示侧栏」置灰并写明原因，设置页入口**照常保留**；即使设置文件里存的是 `sidebar`，也会回落到设置页——不会出现一个入口都没有。
+- 旧设置文件自动迁移：`ui.sidebarEntry: true → entry: both`、`false → entry: settings`；落盘只写 `ui.entry`，旧字段不再写出。
+- stale host（客户端已更新、宿主模块还是 2.6.0）：识别为旧接口，三选一里「只显示侧栏」置灰并提示重启 DSH；保存退回旧写法 `sidebarEntry`。
+- `memory/getSettings` 的 `ui` 现在返回 `{ entry, sidebarEntry }`；`sidebarEntry` 是 **2.6.0 客户端的兼容派生值**（= `entry !== 'settings'`），不是新的事实来源。
+- `memory/setSettings` 同时接受 `{ ui: { entry } }` 与 `{ ui: { sidebarEntry } }`；两个键同时给且语义冲突 → 拒绝（不静默取一个）。
+
+### 不变
+
+- 记忆文件格式、frontmatter、检索与注入行为、配置键、remote 方法集**全部不变**。
+- 默认行为不变：升级后仍是两个入口都显示（老用户不会突然少一个入口）。
+- 设置页 section 的 `id / order / label` 与 `settings.memory.starmap` 子槽声明不变（sage-starmap 等第三方视图的挂载点不搬）。
+- `ui` 改动仍不进 `restartRequired`：它是客户端行为，立即生效。
+
+### 新增测试
+
+- `test/panel-api-test.mjs` 第 7 组重写：默认 `entry=both` + 派生 `sidebarEntry`；旧字段 true / false 两条迁移；坏枚举回落；非法枚举 / 非布尔 / 两键冲突 / 未知键 / 空对象全部拒绝且不写盘；落盘只写 `entry`；旧写法仍被接受；limits + ui 同补丁；typert strict schema 往返（新枚举接受、旧布尔接受、非法值在 schema 层拒绝）。
+- `test/client-render-test.mjs` 第 20、21 组重写（+24 条）：默认两个入口；存 settings 时侧栏 0 条、面板切回两个 / 只留侧栏立即增删；存 sidebar 时设置页 section 不注册、从侧栏页面切回立即恢复；无 `sidebar.panellist` 宿主 + 存 sidebar → 设置页兜底、选项置灰、降级提示可见；旧接口（无 `ui.entry`）→ 侧栏选项置灰、保存退回 `sidebarEntry`；插件页折叠行默认收起 / 展开三选一 / 状态与选中态跟随 / 保存失败回原值且槽位不动。
+- `test/client-exec-test.mjs`（+4 条）：折叠行文案与 `aria-expanded=false`；没有 `sidebar.panellist` 的宿主上 apply 不抛错、设置页 section 照常注册、main 不残留半状态。
+- 合计：`npm test` **4659 passed / 0 failed**（2.6.0 是 4634，本版 +25）。
+
+### 实测
+
+- `npm test`：4659 passed / 0 failed（本机 Windows，Node 24）。
+- 界面快照 3 屏重生成（CSS 内联进快照，三屏哈希都会变）；展示图重出（`docs/images/autodream-settings.png` 的「设置」段变了）。
+- 隔离 DSH 实例 + 无头浏览器实测：默认两个入口；只显示侧栏 / 只显示设置页两侧立即增删；刷新后保持；**在设置弹窗里切换「只显示侧栏」时，弹窗自动回落到「通用设置」，不白屏、不报错**。
+- 关于 `settings.memory.starmap` 子槽：它从 1.8.0 起就只声明、未渲染（Section 没有调用 `renderSlot`，见 70-memory-panel.js 的注释）。这是**既有现状**，2.7.0 没有改；因此注销设置页 section 不会丢任何当前可见的第三方视图。让子槽真正渲染是后续独立事项。
+
 ## 2.6.0
 
 **主题：库健康能把「要修的东西」一键复制成提示词，交给智能体去修。**

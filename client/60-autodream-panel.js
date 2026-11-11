@@ -42,9 +42,9 @@
 			const sLimitsDraft = react.useState(null); const limitsDraft = sLimitsDraft[0], setLimitsDraft = sLimitsDraft[1];
 			const sSaveBusy = react.useState(false); const saveBusy = sSaveBusy[0], setSaveBusy = sSaveBusy[1];
 			const sReservedNew = react.useState(""); const reservedNew = sReservedNew[0], setReservedNew = sReservedNew[1];
-			// ── 1.8.0 侧栏入口开关（客户端行为：改完立刻生效，不需要重启）──
-			const sSidebarBusy = react.useState(false); const sidebarBusy = sSidebarBusy[0], setSidebarBusy = sSidebarBusy[1];
-			const sSidebarErr = react.useState(""); const sidebarErr = sSidebarErr[0], setSidebarErr = sSidebarErr[1];
+			// ── 2.7.0 界面入口三选一（客户端行为：改完立刻生效，不需要重启）──
+			const sEntryBusy = react.useState(false); const entryBusy = sEntryBusy[0], setEntryBusy = sEntryBusy[1];
+			const sEntryErr = react.useState(""); const entryErr = sEntryErr[0], setEntryErr = sEntryErr[1];
 
 			// 派生量放在 effect 之前：下面几个 effect 的依赖数组要在渲染期就能取到值。
 			const c = cfg || {};
@@ -59,8 +59,11 @@
 			const fixedReserved = ((memSet && memSet.reserved) || []).filter(function (n) {
 				return extraLower.indexOf(String(n).toLowerCase()) < 0;
 			});
-			// 默认开：宿主没回 ui 字段（旧版本）或值不是布尔，都按「开」显示。
-			const sidebarEntryOn = !(memSet && memSet.ui && memSet.ui.sidebarEntry === false);
+			// 入口模式：新字段优先，旧 sidebarEntry 兜底；坏值 / 旧宿主一律按「两个都显示」。
+			// 存了 sidebar 但当前宿主不支持侧栏时，界面按 settings 显示并给一条降级提示。
+			const entryModeValue = entryModeFromSettings(memSet);
+			const entryShown = entryModeValue === "sidebar" && !sidebarEntryAvailable() ? "settings" : entryModeValue;
+			const entryIsDegraded = entryModeValue === "sidebar" && !sidebarEntryAvailable();
 
 			react.useEffect(function () {
 				if (!remote) { setErr(t("ad.err.remoteUnavailable")); return undefined; }
@@ -192,28 +195,29 @@
 			}
 
 			/**
-			 * 侧栏入口开关（1.8.0）。
+			 * 界面入口三选一（2.7.0）。
 			 *
-			 * 顺序是「先写设置、成功后再动槽位」：设置没落盘就不该让界面先变一个样。
-			 * 失败只报错、不改任何东西 —— checkbox 的勾选状态由 memSet 派生，于是自动回到原值。
-			 * 成功后调 `setSidebarEntry`：**立即**增删侧栏槽位，不刷新、不重启。
+			 * 顺序仍是「先写设置、成功后再动槽位」：设置没落盘就不该让界面先变一个样。
+			 * 失败只报错、不改任何东西 —— 选项由 memSet 派生，于是自动回到原值。
+			 * 成功后 saveEntryMode 内部会调 applyEntryMode：**立即**增删槽位，不刷新、不重启。
 			 */
-			function saveSidebarEntry(next) {
+			function saveEntry(next) {
 				if (!memRemote || typeof memRemote.setSettings !== "function") {
-					setSidebarErr(t("ad.err.noSetSettings"));
+					setEntryErr(t("entry.err.noSetSettings"));
 					return;
 				}
-				if (sidebarBusy) return;
-				setSidebarBusy(true); setSidebarErr(""); setNotice("");
-				Promise.resolve(memRemote.setSettings({ ui: { sidebarEntry: !!next } })).then(function (out) {
-					setSidebarBusy(false);
-					// 与 saveLimits 同款：setSettings 是 {ok, settings, restartRequired} 形状，不要过 unwrap。
-					if (out && out.ok === false) { setSidebarErr(out.error || t("ad.err.saveRejected")); return; }
-					if (out && out.settings) setMemSet(out.settings);
+				if (entryBusy) return;
+				setEntryBusy(true); setEntryErr(""); setNotice("");
+				saveEntryMode(memRemote, next).then(function (out) {
+					setEntryBusy(false);
+					if (!out || out.ok === false) {
+						setEntryErr((out && out.error) || t("ad.err.saveRejected"));
+						return;
+					}
+					if (out.settings) setMemSet(out.settings);
 					else loadMemSettings();
-					setSidebarEntry(!!next);
-					setNotice(!!next ? t("ad.notice.sidebarOn") : t("ad.notice.sidebarOff"));
-				}, function (e) { setSidebarBusy(false); setSidebarErr(detail(e)); });
+					setNotice(t("entry.notice.saved"));
+				}, function (e) { setEntryBusy(false); setEntryErr(detail(e)); });
 			}
 
 			/**
@@ -506,24 +510,24 @@
 				]),
 				]) : null,
 				segOf === "settings" ? h("div", { key: "seg-set" }, [
-				// 1.8.0：侧栏入口开关。默认开；关掉只影响侧栏那个图标，
-				// 「设置 → 记忆管理」这个入口永远在（它注册在 80-apply，和这个开关无关）。
-				h("div", { className: "smem-autodream-sec", key: "sidebar-entry" }, [
+				// 2.7.0：界面入口三选一。至少保留一个（三选一从类型上就排除了「都不显示」）。
+				// 这里与插件详情页共用同一个 EntryChooser 与 applyEntryMode。
+				h("div", { className: "smem-autodream-sec", key: "entry" }, [
 					h("div", { className: "smem-autodream-row", key: "h" }, [
-						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, t("ad.sidebar.title")),
-						h("span", { className: "smem-status", key: "s" }, sidebarEntryOn ? t("ad.sidebar.on") : t("ad.sidebar.off")),
+						h("span", { key: "t", style: { fontWeight: "600", fontSize: "12.5px" } }, t("entry.title")),
+						h("span", { className: "smem-status", key: "s" }, entryStatusLabel(entryShown)),
 					]),
-					h("div", { className: "smem-autodream-note", key: "n" }, t("ad.sidebar.note")),
-					h("label", { className: "smem-check", key: "row" }, [
-						h("input", {
-							type: "checkbox", key: "c",
-							checked: sidebarEntryOn,
-							disabled: sidebarBusy,
-							onChange: function (e) { saveSidebarEntry(!!(e.target && e.target.checked)); },
-						}),
-						h("span", { key: "l" }, t("ad.sidebar.label")),
-					]),
-					sidebarErr ? h("div", { className: "smem-autodream-note smem-ad-warn", key: "err" }, sidebarErr) : null,
+					h("div", { className: "smem-autodream-note", key: "n" }, t("entry.subtitle")),
+					h(EntryChooser, {
+						key: "opts", mode: entryShown, busy: entryBusy,
+						sidebarOk: sidebarEntryAvailable(), modernApi: entryApiModern,
+						onPick: saveEntry,
+					}),
+					(entryIsDegraded || entryApiModern === false)
+						? h("div", { className: "smem-autodream-note smem-ad-warn", key: "deg" },
+							t(entryApiModern === false ? "entry.legacyHost" : "entry.degraded"))
+						: null,
+					entryErr ? h("div", { className: "smem-autodream-note smem-ad-warn", key: "err" }, entryErr) : null,
 				]),
 				// 自动归档那一段（三档策略 + 三个阈值）**已挪到「自动归档」页签**（v0.9.9）：
 				// 归档是确定性规则、不调模型，和这一页的「让模型整理」不是一件事；

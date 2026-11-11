@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.6.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.7.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -81,10 +81,10 @@ Most memory schemes take the "SQLite + a long-running worker" route: once memori
 
 The UI also carries four more capabilities (all of them optional): the memory management page, type and tag filtering, the timeline (an entries list by default, with an optional star-map view), and audit & archiving.
 
-**Since 1.8.0, memory management is also reachable from the sidebar**: a 「记忆管理」(memory management) icon appears in the sidebar and switches the central panel to this page (with a "back to conversation" control at the top).
-It can be turned off in the settings page under 「记忆管理 → 自动做梦 → 设置」(on by default; applies immediately, no restart);
-**since 1.8.2 the same toggle also lives on the plugin's detail page** (「插件 → sage-mem」card) and applies immediately too;
-**turning it off only removes the sidebar icon — the 「设置 → 记忆管理」 entry always stays**.
+**Since 2.7.0 the interface entry is a three-way choice**: show both (default), sidebar only, or settings only — **at least one entry always stays on**.
+The sidebar entry (1.8.0) switches the central panel to this page with one click (with a "back to conversation" control at the top); the settings entry is 「设置 → 记忆管理」.
+The switch lives in the 「界面入口」 disclosure on the plugin's detail page (「插件 → sage-mem」), and the same options are in the panel under 「自动整理 → 设置」; changes apply immediately, no restart.
+When the host does not support the sidebar slot, "sidebar only" is disabled and the plugin falls back to the settings entry; old settings files migrate automatically (sidebar on → both, off → settings only).
 Since 1.8.2 the plugin also ships its own icon (a golden stack of memory cards) instead of the generic square.
 
 The memory management page's file list also has an **Open memory folder** button: it opens the

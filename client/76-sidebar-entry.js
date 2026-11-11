@@ -46,7 +46,7 @@
 
 		/** 卡片里的错误文案：remote 可能 reject 一个字符串 / 对象 / Error，尽量展开成人话。 */
 		function pluginCardErr(e) {
-			if (!e) return t("pluginCard.saveFailed");
+			if (!e) return t("entry.err.saveFailed");
 			if (e instanceof Error) return e.message || String(e);
 			try {
 				const s = JSON.stringify(e);
@@ -72,20 +72,16 @@
 			const ctx = props && props.ctx;
 			// 必须走 stableRemote：真实宿主里 ctx.get() 每次返回新对象，进依赖数组会无限重跑。
 			const remote = stableRemote(ctx, "remote.memory");
-			const sOn = react.useState(true); const on = sOn[0], setOn = sOn[1];
+			const sOpen = react.useState(false); const open = sOpen[0], setOpen = sOpen[1];
+			const sMode = react.useState("both"); const mode = sMode[0], setMode = sMode[1];
 			const sBusy = react.useState(false); const busy = sBusy[0], setBusy = sBusy[1];
 			const sErr = react.useState(""); const err = sErr[0], setErr = sErr[1];
 
 			react.useEffect(function () {
-				if (!remote || typeof remote.getSettings !== "function") return undefined;
 				let alive = true;
-				Promise.resolve(remote.getSettings()).then(function (out) {
-					if (!alive) return;
-					const loaded = unwrap(out) || {};
-					// 旧宿主没有 ui 字段 / 值不是布尔 → 保持默认「开」，不弹错、不阻塞界面。
-					if (loaded.ui && typeof loaded.ui.sidebarEntry === "boolean") setOn(loaded.ui.sidebarEntry);
-				}, function () {
-					// 读设置失败也按「开」显示：这里只是插件页的一张卡片，不该因为它报红。
+				readEntrySettings(remote).then(function (loaded) {
+					if (!alive || !loaded) return;
+					setMode(entryDisplayMode());
 				});
 				return function () { alive = false; };
 			}, [remote]);
@@ -95,25 +91,15 @@
 
 			function toggle(next) {
 				if (busy) return;
-				if (!remote || typeof remote.setSettings !== "function") {
-					setErr(t("pluginCard.noSetSettings"));
-					return;
-				}
 				setBusy(true); setErr("");
-				Promise.resolve(remote.setSettings({ ui: { sidebarEntry: !!next } })).then(function (out) {
+				// saveEntryMode 负责「先写设置、成功后再动槽位」；失败时界面由服务端返回值派生。
+				saveEntryMode(remote, next).then(function (out) {
 					setBusy(false);
-					// setSettings 是 { ok, settings, restartRequired } 形状，不要过 unwrap。
-					if (out && out.ok === false) {
-						setErr(out.error || t("error.saveRejected"));
+					if (!out || out.ok === false) {
+						setErr((out && out.error) || t("entry.err.saveFailed"));
 						return;
 					}
-					const settings = out && out.settings ? out.settings : null;
-					const applied = settings && settings.ui && typeof settings.ui.sidebarEntry === "boolean"
-						? settings.ui.sidebarEntry
-						: !!next;
-					setOn(applied);
-					// 写盘成功之后才动槽位：设置没落盘时界面不该先变一个样。
-					setSidebarEntry(!!next);
+					setMode(entryDisplayMode());
 				}, function (e) {
 					setBusy(false);
 					setErr(pluginCardErr(e));
@@ -121,22 +107,36 @@
 			}
 
 			return h("div", { className: "smem-plugin-card" }, [
-				h("div", { className: "smem-plugin-card-head", key: "h" }, [
-					h("span", { className: "smem-plugin-card-title", key: "t" }, t("pluginCard.title")),
-					h("span", { className: "smem-plugin-card-status", key: "s" }, on ? t("pluginCard.on") : t("pluginCard.off")),
+				h("button", {
+					type: "button", className: "smem-entry-summary", key: "sum",
+					"aria-expanded": open ? "true" : "false",
+					onClick: function () { setOpen(!open); },
+				}, [
+					h("span", { className: "smem-plugin-card-title", key: "t" }, t("entry.title")),
+					h("span", { className: "smem-plugin-card-status", key: "s" }, entryStatusLabel(mode)),
+					h("svg", {
+						key: "i", className: "smem-entry-chevron", width: 14, height: 14,
+						viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true",
+						style: { transform: open ? "rotate(180deg)" : "rotate(0deg)" },
+					}, h("path", {
+						d: "M4 6.5 8 10.5 12 6.5", stroke: "currentColor", strokeWidth: "1.6",
+						strokeLinecap: "round", strokeLinejoin: "round",
+					})),
 				]),
-				h("label", { className: "smem-check smem-plugin-card-check", key: "row" }, [
-					h("input", {
-						type: "checkbox", key: "c",
-						checked: on,
-						disabled: busy,
-						onChange: function (e) { toggle(!!(e.target && e.target.checked)); },
+				open ? h("div", { className: "smem-entry-body", key: "body" }, [
+					h("div", { className: "smem-plugin-card-note", key: "sub" }, t("entry.subtitle")),
+					h(EntryChooser, {
+						key: "opts", mode: mode, busy: busy,
+						sidebarOk: sidebarEntryAvailable(), modernApi: entryApiModern,
+						onPick: toggle,
 					}),
-					h("span", { key: "l" }, t("pluginCard.label")),
-				]),
-				h("div", { className: "smem-plugin-card-note", key: "n" },
-					t("pluginCard.note")),
-				err ? h("div", { className: "smem-plugin-card-err", key: "e" }, err) : null,
+					h("div", { className: "smem-plugin-card-note", key: "note" }, t("entry.note")),
+					(entryDegraded() || entryApiModern === false)
+						? h("div", { className: "smem-plugin-card-note smem-ad-warn", key: "deg" },
+							t(entryApiModern === false ? "entry.legacyHost" : "entry.degraded"))
+						: null,
+					err ? h("div", { className: "smem-plugin-card-err", key: "e" }, err) : null,
+				]) : null,
 			]);
 		}
 
@@ -175,28 +175,44 @@
 			]);
 		}
 
-		/** 注册两个槽位（幂等：已经注册就什么都不做）。 */
+		/**
+		 * 注册两个槽位（幂等：已经注册就什么都不做）。
+		 *
+		 * 2.7.0：返回布尔值 —— 侧栏是可选入口，旧宿主没有 sidebar.panellist 时
+		 * inject 会抛错。这里必须自己接住并**反序清理**已经注册成功的槽位，
+		 * 否则会留下「侧栏条目录入了、main 却没注册」的半状态。
+		 */
 		function registerSidebarEntry() {
-			if (sidebarDispose !== null || !sidebarCtx) return true;
+			if (sidebarDispose !== null) return true;
+			if (!sidebarCtx) return false;
 			const ctx = sidebarCtx;
 			const handles = [];
-			// 侧栏 list 槽：只给图标与 label，按钮由宿主自己画。
-			handles.push(ctx.slots.inject("sidebar.panellist", function () {
-				return ctx.slots.register({
-					name: "sidebar.panellist",
-					id: SIDEBAR_ENTRY_ID,
-					order: 20,
-					label: () => t("sidebar.label"),
-				}, SidebarEntryIcon);
-			}));
-			// 中央主区 keyed 槽：key 与侧栏 id 相同；inject 面把「返回会话」交给页面组件。
-			handles.push(ctx.slots.inject("main", function () {
-				return ctx.slots.register({
-					name: "main",
-					key: SIDEBAR_ENTRY_ID,
-					inject: function () { return { backToConversation: backToConversation }; },
-				}, MemoryPanelPage);
-			}));
+			try {
+				// 侧栏 list 槽：只给图标与 label，按钮由宿主自己画。
+				handles.push(ctx.slots.inject("sidebar.panellist", function () {
+					return ctx.slots.register({
+						name: "sidebar.panellist",
+						id: SIDEBAR_ENTRY_ID,
+						order: 20,
+						label: () => t("sidebar.label"),
+					}, SidebarEntryIcon);
+				}));
+				// 中央主区 keyed 槽：key 与侧栏 id 相同；inject 面把「返回会话」交给页面组件。
+				handles.push(ctx.slots.inject("main", function () {
+					return ctx.slots.register({
+						name: "main",
+						key: SIDEBAR_ENTRY_ID,
+						inject: function () { return { backToConversation: backToConversation }; },
+					}, MemoryPanelPage);
+				}));
+			} catch (e) {
+				for (let i = handles.length - 1; i >= 0; i--) {
+					const dispose = handles[i];
+					if (typeof dispose !== "function") continue;
+					try { dispose(); } catch (inner) { /* 清理失败不掩盖原始错误 */ }
+				}
+				return false;
+			}
 			sidebarDispose = handles;
 			return true;
 		}

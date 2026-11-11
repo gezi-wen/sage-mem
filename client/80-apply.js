@@ -20,38 +20,26 @@
 				document.head.appendChild(tag);
 			}
 			setupI18n(ctx);
-			ctx.slots.inject("settings.section", () =>
-				ctx.slots.register(
-					{
-						name: "settings.section",
-						id: "sage-mem",
-						order: 20,
-						label: () => t("section.label"),
-						// 声明「记忆星图」子槽：sage-starmap 向它注入星空视图，
-						// 记忆管理页用 renderSlot 渲染。声明 children 后 shell 才会
-						// 向本 section 组件传入 renderSlot。
-						children: { "settings.memory.starmap": { kind: "list", scope: "root" } },
-					},
-					(props) => react.createElement(Section, { ...props, ctx }),
-				),
-			);
-			// ── 1.8.0 侧栏入口：先记住 ctx，再读一次设置决定注不注册 ──────────────
-			// 设置页 section **永远**保留（关闭侧栏入口只是少一个入口，不是少一个设置页）。
-			// 读失败 / 旧宿主没有 ui 字段 / 值坏掉 → 一律按「开」处理，绝不阻塞界面。
+
+			// ── 2.7.0 界面入口三选一 ────────────────────────────────────────────
+			// 先读一次设置，决定注册哪一侧；读失败 / 旧宿主没有 ui.entry / 值坏掉
+			// → 一律按「两个都显示」处理，绝不阻塞界面。
+			// 设置页 section 不再无条件注册：只显示侧栏时它会被注销（78-entry-visibility）。
 			sidebarCtx = ctx;
-			let sidebarEnabled = true;
+			let initialMode = "both";
 			try {
 				const mem = typeof ctx.get === "function" ? ctx.get("remote.memory") : null;
 				if (mem && typeof mem.getSettings === "function") {
 					const loaded = unwrap(await mem.getSettings()) || {};
-					if (loaded.ui && loaded.ui.sidebarEntry === false) sidebarEnabled = false;
+					entryApiModern = hasModernEntryApi(loaded);
+					initialMode = entryModeFromSettings(loaded);
 				}
 			} catch (e) {
-				sidebarEnabled = true;
+				initialMode = "both";
 			}
-			setSidebarEntry(sidebarEnabled);
+			applyEntryMode(initialMode);
 
-			// ── 1.8.2 插件详情页的「侧栏入口」卡片 ──────────────────────────────
+			// ── 1.8.2 / 2.7.0 插件详情页的「界面入口」折叠行 ────────────────────
 			// `plugins.bundle.config` 是 keyed 槽，key = 本 bundle 的 **package name**（sage-mem）。
 			// 宿主在插件页的 description 与「包含的组件」行之间渲染它；ownerProps 形如
 			// `{ view: "summary" | "page" }`，卡片里自己再判一次（summary 返回 null）。

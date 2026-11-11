@@ -43,6 +43,7 @@ export const CLIENT_PARTS = [
   'client/74-filter-bar.js', // 1.5.2：筛选条（只吃 props，语义在 Section）
   'client/70-memory-panel.js', // 记忆管理 Section：文件列表 / 筛选 / 归档 / 工具面板 / tab
   'client/76-sidebar-entry.js', // 1.8.0：侧栏入口（sidebar.panellist + main 整页 + 即时开关）
+  'client/78-entry-visibility.js', // 2.7.0：界面入口三选一（能力探测 / 槽位增删 / EntryChooser）
   'client/80-apply.js', // inject + apply(ctx) + 收尾
 ]
 

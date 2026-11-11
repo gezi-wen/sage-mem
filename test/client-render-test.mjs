@@ -269,7 +269,7 @@ function makeMemoryRemote(active, archived, raw) {
     },
     getSettings() {
       st.calls.push(['getSettings'])
-      return Promise.resolve(st.settings || { limits: {}, pendingLimits: {}, restartRequired: false, reserved: ['memory.md', 'session-log.md'], reservedExtra: [], ui: { sidebarEntry: true } })
+      return Promise.resolve(st.settings || { limits: {}, pendingLimits: {}, restartRequired: false, reserved: ['memory.md', 'session-log.md'], reservedExtra: [], ui: { entry: 'both', sidebarEntry: true } })
     },
     // 更新检查：默认「没有新版」，所以不进面板也不会让任何既有断言多出一条横幅
     checkUpdate() {
@@ -294,7 +294,7 @@ function makeMemoryRemote(active, archived, raw) {
     },
     setSettings(patch) {
       st.calls.push(['setSettings', patch])
-      const cur = st.settings || { limits: {}, pendingLimits: {}, restartRequired: false, reserved: ['memory.md', 'session-log.md'], reservedExtra: [], ui: { sidebarEntry: true } }
+      const cur = st.settings || { limits: {}, pendingLimits: {}, restartRequired: false, reserved: ['memory.md', 'session-log.md'], reservedExtra: [], ui: { entry: 'both', sidebarEntry: true } }
       const next = JSON.parse(JSON.stringify(cur))
       if (patch && patch.limits) {
         next.pendingLimits = Object.assign({}, next.pendingLimits, patch.limits)
@@ -305,9 +305,16 @@ function makeMemoryRemote(active, archived, raw) {
         next.reserved = ['memory.md', 'session-log.md'].concat(patch.reserved.map((x) => String(x).toLowerCase()))
         next.restartRequired = true
       }
-      // 1.8.0：ui 是客户端行为，写进去但**不**把 restartRequired 抬成 true。
-      if (patch && patch.ui && typeof patch.ui.sidebarEntry === 'boolean') {
-        next.ui = { sidebarEntry: patch.ui.sidebarEntry }
+      // 1.8.0 / 2.7.0：ui 是客户端行为，写进去但**不**把 restartRequired 抬成 true。
+      // 与真宿主同一套迁移：entry 优先，旧 sidebarEntry 按 true→both / false→settings。
+      if (patch && patch.ui) {
+        const curEntry = next.ui && next.ui.entry ? next.ui.entry : 'both'
+        const entry = typeof patch.ui.entry === 'string'
+          ? patch.ui.entry
+          : typeof patch.ui.sidebarEntry === 'boolean'
+            ? (patch.ui.sidebarEntry ? 'both' : 'settings')
+            : curEntry
+        next.ui = { entry: entry, sidebarEntry: entry !== 'settings' }
       }
       st.settings = next
       const forced = !!(patch && (patch.limits || Array.isArray(patch.reserved)))
@@ -726,6 +733,9 @@ async function loadClient(rt, remotes) {
       // 真的可注销：inject 返回清理器，register 返回的清理器会把条目从 regs 里摘掉。
       // 1.8.0 的侧栏开关靠这两个句柄工作，假槽位必须支持「注销后重注册」而不是只能追加。
       inject: (name, cb) => {
+        // 2.7.0：模拟「宿主没有这个槽」—— 侧栏能力探测必须能接住抛错。
+        const support = (remotes && remotes.slotSupport) || {}
+        if (support[name] === false) throw new Error('unknown slot: ' + name)
         let disposeEntry = null
         if (typeof cb === 'function') disposeEntry = cb()
         return () => { if (typeof disposeEntry === 'function') disposeEntry() }
@@ -759,7 +769,10 @@ async function loadClient(rt, remotes) {
   for (const el of fakeDoc._created) {
     if (el.textContent && capturedCss.indexOf(el.textContent) < 0) capturedCss.push(el.textContent)
   }
-  const comp = regs.find((r) => r.spec && r.spec.name === 'settings.section' && r.spec.id === 'sage-mem').comp
+  // 2.7.0：入口模式为「只显示侧栏」时 settings.section 本来就不注册 —— comp 允许缺省，
+  // 需要渲染面板的用例从 main 槽取组件。
+  const sec = regs.find((r) => r.spec && r.spec.name === 'settings.section' && r.spec.id === 'sage-mem')
+  const comp = sec ? sec.comp : null
   return { comp, mounts, regs, ctx, clip: fakeClip, timers: fakeTimers }
 }
 
@@ -931,6 +944,8 @@ const LIMITS_FIXTURE = {
   restartRequired: true,
   reserved: ['memory.md', 'session-log.md', 'project_notes.md'],
   reservedExtra: ['project_notes.md'],
+  // 2.7.0：默认设置形状跟着新接口走（entry 在、sidebarEntry 派生）。旧接口另有专门用例。
+  ui: { entry: 'both', sidebarEntry: true },
 }
 
 const STAR_META = {  'user_alpha.md': { kind: 'user', title: '甲', desc: '用户偏好', mtimeMs: FIXED_NOW - 86400000 },
@@ -3051,13 +3066,13 @@ async function main() {
     ok(legacyTxt.indexOf('不是检索没命中') < 0, '旧账没有抑制时不显示解释（不制造噪音）')
   }
 
-  // ── 20. 1.8.0 侧栏「记忆管理」入口（可开关，additive）────────────────────
-  group('20. 1.8.0 侧栏「记忆管理」入口：默认开 / 关掉不注册（设置页仍在）/ 开关即时增删')
+  // ── 20. 2.7.0 界面入口三选一：启动行为 / 降级 / 旧接口 ───────────────────
+  group('20. 界面入口三选一：默认两个 / 只留一侧 / 无侧栏降级 / 旧接口')
   {
     const sidebarRegs = (regs) => regs.filter((r) => r.spec && r.spec.name === 'sidebar.panellist')
     const mainRegs = (regs) => regs.filter((r) => r.spec && r.spec.name === 'main')
     const settingsRegs = (regs) => regs.filter((r) => r.spec && r.spec.name === 'settings.section')
-    /** 打开「自动整理 → 自动做梦 → 设置」分段（注入参数与侧栏开关都在这里）。 */
+    /** 打开「自动整理 → 自动做梦 → 设置」分段（界面入口与注入参数都在这里）。 */
     async function openAdSettings(rt, C) {
       let tree = await rt.settle(C, {})
       click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '自动整理')[0])
@@ -3065,26 +3080,23 @@ async function main() {
       click(all(tree, (n) => n.type === 'button' && byClass('smem-subtab')(n) && textOf(n) === '设置')[0])
       return rt.settle(C, {})
     }
-    const sidebarBox = (tree) => all(all(tree, (n) => n.type === 'label' && byClass('smem-check')(n))[0] || {}, (n) => n.type === 'input')[0]
+    const radios = (tree) => all(tree, (n) => n.type === 'input' && n.props && n.props.type === 'radio')
+    const radio = (tree, value) => radios(tree).find((n) => n.props && n.props.value === value)
+    const lastSet = (mem) => mem.st.calls.filter((c) => c[0] === 'setSettings').pop()
 
-    // 20a 默认开：两个槽位都注册，且设置页 section 还在
+    // 20a 默认 both：两个槽位都注册，设置页 section 也在
     {
       const rt = makeReact()
       const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
       const A = await loadClient(rt, { memory: mem })
       ok(settingsRegs(A.regs).length === 1, '20a 默认：设置页 section 注册')
       ok(sidebarRegs(A.regs).length === 1 && sidebarRegs(A.regs)[0].spec.id === 'sage-mem',
-        '20a 默认开：侧栏注册了 sidebar.panellist（id=sage-mem）')
+        '20a 默认：侧栏注册了 sidebar.panellist（id=sage-mem）')
       ok(mainRegs(A.regs).length === 1 && mainRegs(A.regs)[0].spec.key === 'sage-mem',
-        '20a 默认开：main 槽 key=sage-mem（与侧栏 id 相同，宿主才不会抛缺 key）')
-      const icon = sidebarRegs(A.regs)[0].comp({ size: 18 })
-      ok(icon.type === 'svg' && icon.props.width === 18 && icon.props.height === 18,
-        '20a 侧栏图标是 size 见方的内联 svg')
+        '20a 默认：main 槽 key=sage-mem（与侧栏 id 相同，宿主才不会抛缺 key）')
 
-      // 渲染中央主区整页：返回会话 + 复用 Section
       let backCalls = 0
-      const mainComp = mainRegs(A.regs)[0].comp
-      const page = await rt.settle(mainComp, { backToConversation: () => { backCalls++ } })
+      const page = await rt.settle(mainRegs(A.regs)[0].comp, { backToConversation: () => { backCalls++ } })
       ok(treeText(page).indexOf('记忆管理') >= 0, '20a main 页面渲染出记忆管理 Section')
       const back = all(page, (n) => n.type === 'button' && textOf(n) === '返回会话')[0]
       ok(!!back, '20a main 页面页顶有「返回会话」按钮')
@@ -3092,58 +3104,113 @@ async function main() {
       ok(backCalls === 1, '20a 点「返回会话」调用了宿主注入的 props.backToConversation')
     }
 
-    // 20b 设置里就是关：启动时侧栏不注册，但设置页 section 必须仍在（additive 的核心判据）
+    // 20b 只显示设置页：侧栏不注册；面板里切回两个 / 只留侧栏都立即生效
     {
       const rt = makeReact()
       const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
       mem.st.settings = {
         limits: { ...LIMITS_FIXTURE.limits }, pendingLimits: { ...LIMITS_FIXTURE.pendingLimits },
         restartRequired: false, reserved: ['memory.md', 'session-log.md'], reservedExtra: [],
-        ui: { sidebarEntry: false },
+        ui: { entry: 'settings', sidebarEntry: false },
       }
       const B = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
       ok(sidebarRegs(B.regs).length === 0 && mainRegs(B.regs).length === 0,
-        '20b 设置里关着：启动时侧栏 / main 一个槽位都不注册')
-      ok(settingsRegs(B.regs).length === 1, '20b 关掉侧栏入口后：设置页 section 仍然注册（设置入口不消失）')
+        '20b 只显示设置页：启动时侧栏 / main 一个槽位都不注册')
+      ok(settingsRegs(B.regs).length === 1, '20b 只显示设置页：设置页 section 在')
 
       let tree = await openAdSettings(rt, B.comp)
-      const box0 = sidebarBox(tree)
-      ok(!!box0 && box0.props.checked === false, '20b 设置页的复选框显示「已关闭」状态',
-        JSON.stringify(box0 && box0.props))
-      ok(!!all(tree, (n) => n.type === 'label' && byClass('smem-check')(n))[0], '20b 设置区域出现「在侧栏显示「记忆管理」入口」一行')
-      const note = treeText(tree)
-      ok(note.indexOf('关闭后「设置 → 记忆管理」这个入口仍然保留') >= 0, '20b 副文案说明关闭后设置页入口仍在')
-      ok(note.indexOf('默认开启') >= 0, '20b 副文案说明默认开启')
+      ok(!!radio(tree, 'settings') && radio(tree, 'settings').props.checked === true,
+        '20b 面板里「只显示设置页」选中')
+      ok(!!radio(tree, 'sidebar') && radio(tree, 'sidebar').props.disabled === false,
+        '20b 侧栏可用时「只显示侧栏」可选')
 
-      // 打开：写设置 → 立刻注册两个槽位（不刷新、不重启）
-      box0.props.onChange({ target: { checked: true } })
+      radio(tree, 'both').props.onChange()
       tree = await rt.settle(B.comp, {})
-      const setOn = mem.st.calls.filter((c) => c[0] === 'setSettings').pop()
-      ok(!!setOn && JSON.stringify(setOn[1]) === JSON.stringify({ ui: { sidebarEntry: true } }),
-        '20b 勾上后调 setSettings({ui:{sidebarEntry:true}})', JSON.stringify(setOn && setOn[1]))
+      const setBoth = lastSet(mem)
+      ok(!!setBoth && JSON.stringify(setBoth[1]) === JSON.stringify({ ui: { entry: 'both' } }),
+        '20b 选两个都显示 → setSettings({ui:{entry:both}})', JSON.stringify(setBoth && setBoth[1]))
       ok(sidebarRegs(B.regs).length === 1 && mainRegs(B.regs).length === 1,
-        '20b 打开后**立刻**注册侧栏 + main（不需要刷新）')
-      ok(sidebarBox(tree).props.checked === true, '20b 勾选状态跟着设置走')
-      ok(settingsRegs(B.regs).length === 1, '20b 打开后设置页 section 仍只有一份（没有被重复注册）')
+        '20b 切到两个都显示：侧栏 + main 立即注册')
+      ok(settingsRegs(B.regs).length === 1, '20b 设置页 section 仍只有一份')
+      ok(radio(tree, 'both').props.checked === true, '20b 选中态跟着设置走')
 
-      // 关回去：dispose 后不残留
-      sidebarBox(tree).props.onChange({ target: { checked: false } })
+      radio(tree, 'sidebar').props.onChange()
       tree = await rt.settle(B.comp, {})
-      ok(sidebarRegs(B.regs).length === 0 && mainRegs(B.regs).length === 0,
-        '20b 再关掉后：dispose 立即生效，侧栏 / main 条目不残留')
-      ok(settingsRegs(B.regs).length === 1, '20b 关掉后设置页 section 依旧在（永远保留）')
-      const setOff = mem.st.calls.filter((c) => c[0] === 'setSettings').pop()
-      ok(!!setOff && JSON.stringify(setOff[1]) === JSON.stringify({ ui: { sidebarEntry: false } }),
-        '20b 取消勾选调 setSettings({ui:{sidebarEntry:false}})')
-
-      // 再打开一次：重新注册不重复
-      sidebarBox(tree).props.onChange({ target: { checked: true } })
-      tree = await rt.settle(B.comp, {})
-      ok(sidebarRegs(B.regs).length === 1 && mainRegs(B.regs).length === 1,
-        '20b 再打开：重新注册恰好各一份（不重复、不残留）')
+      ok(settingsRegs(B.regs).length === 0, '20b 切到只显示侧栏：设置页 section 立即注销')
+      ok(sidebarRegs(B.regs).length === 1 && mainRegs(B.regs).length === 1, '20b 侧栏仍在')
     }
 
-    // 20c 旧宿主（getSettings 没有 ui 字段）：按默认「开」处理，不阻塞界面
+    // 20c 只显示侧栏：设置页 section 不注册；从侧栏页面切回设置页立即恢复
+    {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      mem.st.settings = {
+        limits: { ...LIMITS_FIXTURE.limits }, pendingLimits: { ...LIMITS_FIXTURE.pendingLimits },
+        restartRequired: false, reserved: ['memory.md', 'session-log.md'], reservedExtra: [],
+        ui: { entry: 'sidebar', sidebarEntry: true },
+      }
+      const C = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
+      ok(settingsRegs(C.regs).length === 0, '20c 只显示侧栏：设置页 section 不注册')
+      ok(sidebarRegs(C.regs).length === 1 && mainRegs(C.regs).length === 1, '20c 侧栏 / main 在')
+
+      const panel = mainRegs(C.regs)[0].comp
+      let tree = await openAdSettings(rt, panel)
+      ok(radio(tree, 'sidebar').props.checked === true, '20c 面板里「只显示侧栏」选中')
+
+      radio(tree, 'settings').props.onChange()
+      tree = await rt.settle(panel, {})
+      ok(settingsRegs(C.regs).length === 1, '20c 切回只显示设置页：section 立即恢复')
+      ok(sidebarRegs(C.regs).length === 0 && mainRegs(C.regs).length === 0, '20c 侧栏 / main 立即摘掉')
+    }
+
+    // 20d 宿主没有侧栏槽 + 文件里存着 sidebar：不能两个入口都没有
+    {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      mem.st.settings = {
+        limits: { ...LIMITS_FIXTURE.limits }, pendingLimits: { ...LIMITS_FIXTURE.pendingLimits },
+        restartRequired: false, reserved: ['memory.md', 'session-log.md'], reservedExtra: [],
+        ui: { entry: 'sidebar', sidebarEntry: true },
+      }
+      const D = await loadClient(rt, {
+        memory: mem, autodream: makeAutodreamRemote(),
+        slotSupport: { 'sidebar.panellist': false },
+      })
+      ok(sidebarRegs(D.regs).length === 0, '20d 侧栏槽注入抛错：侧栏不注册')
+      ok(settingsRegs(D.regs).length === 1, '20d 侧栏不可用 + 存了 sidebar：设置页 section 兜底注册（不锁死）')
+
+      const tree = await openAdSettings(rt, D.comp)
+      ok(radio(tree, 'settings').props.checked === true, '20d 降级时界面按「只显示设置页」显示')
+      ok(radio(tree, 'sidebar').props.disabled === true, '20d 侧栏选项置灰')
+      ok(treeText(tree).indexOf('当前宿主不支持侧栏入口') >= 0, '20d 降级提示可见')
+    }
+
+    // 20e 旧接口（stale host）：没有 ui.entry，只能二选一；保存退回 sidebarEntry
+    {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      mem.st.settings = {
+        limits: { ...LIMITS_FIXTURE.limits }, pendingLimits: { ...LIMITS_FIXTURE.pendingLimits },
+        restartRequired: false, reserved: ['memory.md', 'session-log.md'], reservedExtra: [],
+        ui: { sidebarEntry: true },
+      }
+      const E = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
+      ok(settingsRegs(E.regs).length === 1 && sidebarRegs(E.regs).length === 1,
+        '20e 旧接口：两个入口照旧注册')
+
+      let tree = await openAdSettings(rt, E.comp)
+      ok(radio(tree, 'sidebar').props.disabled === true, '20e 旧接口下「只显示侧栏」置灰')
+      ok(treeText(tree).indexOf('重启 DSH 后可选') >= 0, '20e 旧接口提示写明重启后可选项')
+
+      radio(tree, 'settings').props.onChange()
+      tree = await rt.settle(E.comp, {})
+      const setLegacy = lastSet(mem)
+      ok(!!setLegacy && JSON.stringify(setLegacy[1]) === JSON.stringify({ ui: { sidebarEntry: false } }),
+        '20e 旧接口保存退回 sidebarEntry', JSON.stringify(setLegacy && setLegacy[1]))
+      ok(sidebarRegs(E.regs).length === 0, '20e 选只显示设置页后侧栏摘掉')
+    }
+
+    // 20f 旧宿主（getSettings 没有 ui 字段）：按默认「两个都显示」，不阻塞界面
     {
       const rt = makeReact()
       const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
@@ -3151,21 +3218,25 @@ async function main() {
         limits: { ...LIMITS_FIXTURE.limits }, pendingLimits: { ...LIMITS_FIXTURE.pendingLimits },
         restartRequired: false, reserved: ['memory.md', 'session-log.md'], reservedExtra: [],
       }
-      const C = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
-      ok(sidebarRegs(C.regs).length === 1 && mainRegs(C.regs).length === 1,
-        '20c 旧宿主没有 ui 字段：按默认「开」注册，不阻塞界面')
+      const F = await loadClient(rt, { memory: mem, autodream: makeAutodreamRemote() })
+      ok(sidebarRegs(F.regs).length === 1 && mainRegs(F.regs).length === 1,
+        '20f 旧宿主没有 ui 字段：按默认「两个都显示」注册')
     }
   }
 
-  // ── 21. 1.8.2 插件详情页的「侧栏入口」卡片（plugins.bundle.config）────────
-  group('21. 1.8.2 插件页「侧栏入口」卡片：summary 空 / page 渲染 / 即时增删 / 失败回原值')
+  // ── 21. 2.7.0 插件详情页的「界面入口」折叠行（plugins.bundle.config）────────
+  group('21. 插件页「界面入口」折叠行：默认收起 / 三选一 / 即时增删 / 失败回原值')
   {
     const cardRegs = (regs) => regs.filter((r) => r.spec && r.spec.name === 'plugins.bundle.config')
     const sidebarRegs = (regs) => regs.filter((r) => r.spec && r.spec.name === 'sidebar.panellist')
     const mainRegs = (regs) => regs.filter((r) => r.spec && r.spec.name === 'main')
-    const cardBox = (tree) => all(tree, (n) => n.type === 'input' && n.props && n.props.type === 'checkbox')[0]
+    const settingsRegs = (regs) => regs.filter((r) => r.spec && r.spec.name === 'settings.section')
+    const summary = (tree) => all(tree, (n) => n.type === 'button' && n.props && n.props['aria-expanded'] !== undefined)[0]
+    const radios = (tree) => all(tree, (n) => n.type === 'input' && n.props && n.props.type === 'radio')
+    const radio = (tree, value) => radios(tree).find((n) => n.props && n.props.value === value)
+    const lastSet = (mem) => mem.st.calls.filter((c) => c[0] === 'setSettings').pop()
 
-    // 21a 注册 / summary 空 / page 渲染 / 真实 handler 即时增删
+    // 21a 注册 / summary 空 / 默认收起 / 展开三选一 / 真实 handler 即时增删
     {
       const rt = makeReact()
       const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
@@ -3178,65 +3249,61 @@ async function main() {
       ok(await rt.settle(C, { view: 'summary' }) === null,
         '21a summary 视图返回 null（摘要位不渲染卡片）')
 
-      const tree = await rt.settle(C, { view: 'page' })
+      let tree = await rt.settle(C, { view: 'page' })
       ok(!!all(tree, byClass('smem-plugin-card'))[0], '21a page 视图渲染出 smem-plugin-card 卡片')
-      ok(treeText(tree).indexOf('侧栏入口') >= 0, '21a 卡片标题是「侧栏入口」')
-      ok(treeText(tree).indexOf('在侧栏显示「记忆管理」入口') >= 0, '21a 卡片里有开关文案')
-      ok(treeText(tree).indexOf('默认开启') >= 0 &&
-        treeText(tree).indexOf('关闭后「设置 → 记忆管理」入口仍然保留') >= 0,
-        '21a 卡片说明写明默认开启、关闭后设置页入口保留')
-      ok(!!cardBox(tree) && cardBox(tree).props.checked === true,
-        '21a 挂载时 getSettings 回来的 ui.sidebarEntry=true 派生为勾选')
-      ok(mem.st.calls.some((c) => c[0] === 'getSettings'), '21a 卡片挂载时调了 getSettings 取开关状态')
+      ok(treeText(tree).indexOf('界面入口') >= 0, '21a 卡片标题是「界面入口」')
+      ok(treeText(tree).indexOf('两个都显示') >= 0, '21a 收起时状态显示「两个都显示」')
+      ok(radios(tree).length === 0, '21a 默认收起：三个选项不渲染')
+      ok(!!summary(tree) && summary(tree).props['aria-expanded'] === 'false', '21a 折叠箭头 aria-expanded=false')
 
-      // 关：写设置 → 立刻摘掉两个侧栏槽位
-      cardBox(tree).props.onChange({ target: { checked: false } })
-      const t2 = await rt.settle(C, { view: 'page' })
-      const setOff = mem.st.calls.filter((c) => c[0] === 'setSettings').pop()
-      ok(!!setOff && JSON.stringify(setOff[1]) === JSON.stringify({ ui: { sidebarEntry: false } }),
-        '21a 取消勾选调 setSettings({ui:{sidebarEntry:false}})', JSON.stringify(setOff && setOff[1]))
+      summary(tree).props.onClick()
+      tree = await rt.settle(C, { view: 'page' })
+      ok(radios(tree).length === 3, '21a 展开后是三个单选项')
+      ok(radio(tree, 'both').props.checked === true, '21a 当前模式选中')
+      ok(treeText(tree).indexOf('至少保留一个') >= 0, '21a 副标题写明至少保留一个')
+
+      radio(tree, 'sidebar').props.onChange()
+      tree = await rt.settle(C, { view: 'page' })
+      const setSb = lastSet(mem)
+      ok(!!setSb && JSON.stringify(setSb[1]) === JSON.stringify({ ui: { entry: 'sidebar' } }),
+        '21a 选只显示侧栏 → setSettings({ui:{entry:sidebar}})', JSON.stringify(setSb && setSb[1]))
+      ok(settingsRegs(A.regs).length === 0, '21a 只显示侧栏：设置页 section 立即注销')
+      ok(sidebarRegs(A.regs).length === 1 && mainRegs(A.regs).length === 1, '21a 侧栏 + main 仍在')
+      ok(treeText(tree).indexOf('只显示侧栏') >= 0, '21a 状态文案跟随')
+
+      radio(tree, 'settings').props.onChange()
+      tree = await rt.settle(C, { view: 'page' })
       ok(sidebarRegs(A.regs).length === 0 && mainRegs(A.regs).length === 0,
-        '21a 关闭后**立刻**摘掉侧栏 + main（不需要刷新 / 重启）')
-      ok(cardBox(t2).props.checked === false && treeText(t2).indexOf('已关闭') >= 0,
-        '21a 勾选态与状态文案跟着服务端回传的设置走')
+        '21a 选只显示设置页：侧栏 + main 立即摘掉')
+      ok(settingsRegs(A.regs).length === 1, '21a 设置页 section 立即恢复')
 
-      // 开：再写一次 → 立刻恢复
-      cardBox(t2).props.onChange({ target: { checked: true } })
-      const t3 = await rt.settle(C, { view: 'page' })
-      const setOn = mem.st.calls.filter((c) => c[0] === 'setSettings').pop()
-      ok(!!setOn && JSON.stringify(setOn[1]) === JSON.stringify({ ui: { sidebarEntry: true } }),
-        '21a 勾上调 setSettings({ui:{sidebarEntry:true}})')
-      ok(sidebarRegs(A.regs).length === 1 && mainRegs(A.regs).length === 1 &&
-        cardBox(t3).props.checked === true,
-        '21a 重新开启后**立刻**恢复侧栏 + main（各一份，不重复）')
+      radio(tree, 'both').props.onChange()
+      tree = await rt.settle(C, { view: 'page' })
+      ok(sidebarRegs(A.regs).length === 1 && settingsRegs(A.regs).length === 1,
+        '21a 切回两个都显示：两侧各一份（不重复、不残留）')
     }
 
-    // 21b setSettings 失败：报错、勾选态回原值、槽位一个都不动
+    // 21b setSettings 失败：报错、选择回原值、槽位一个都不动
     {
       const rt = makeReact()
       const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
-      mem.st.settings = {
-        limits: { ...LIMITS_FIXTURE.limits }, pendingLimits: { ...LIMITS_FIXTURE.pendingLimits },
-        restartRequired: false, reserved: ['memory.md', 'session-log.md'], reservedExtra: [],
-        ui: { sidebarEntry: false },
-      }
       mem.setSettings = function () {
         mem.st.calls.push(['setSettings', 'refused'])
         return Promise.resolve({ ok: false, error: '磁盘只读，拒绝写入' })
       }
       const B = await loadClient(rt, { memory: mem })
       const reg = cardRegs(B.regs)[0]
-      ok(sidebarRegs(B.regs).length === 0, '21b 设置里关着：启动时侧栏不注册')
-
-      const before = await rt.settle(reg.comp, { view: 'page' })
-      ok(cardBox(before).props.checked === false, '21b 卡片显示关着')
-      cardBox(before).props.onChange({ target: { checked: true } })
-      const after = await rt.settle(reg.comp, { view: 'page' })
-      ok(cardBox(after).props.checked === false,
-        '21b 保存失败：勾选态回到原值（由服务端 settings 派生，不乐观更新）')
-      ok(treeText(after).indexOf('磁盘只读，拒绝写入') >= 0, '21b 保存失败：错误文案可见')
-      ok(sidebarRegs(B.regs).length === 0 && mainRegs(B.regs).length === 0,
-        '21b 保存失败：侧栏 / main 槽位一个都没动')
+      const C = reg.comp
+      let tree = await rt.settle(C, { view: 'page' })
+      summary(tree).props.onClick()
+      tree = await rt.settle(C, { view: 'page' })
+      radio(tree, 'settings').props.onChange()
+      tree = await rt.settle(C, { view: 'page' })
+      ok(radio(tree, 'both').props.checked === true,
+        '21b 保存失败：选择回到原值（由服务端 settings 派生，不乐观更新）')
+      ok(treeText(tree).indexOf('磁盘只读，拒绝写入') >= 0, '21b 保存失败：错误文案可见')
+      ok(sidebarRegs(B.regs).length === 1 && settingsRegs(B.regs).length === 1,
+        '21b 保存失败：两侧槽位一个都没动')
     }
   }
 
@@ -3614,11 +3681,12 @@ async function main() {
     // 25b 设置段（注入参数 / 保留名 / 高级）
     tree = await gotoSeg(rt, C, tree, 'Settings')
     let t2 = treeText(tree)
-    ok(t2.indexOf('Sidebar entry') >= 0 && t2.indexOf('Injection limits') >= 0 &&
-      t2.indexOf('Reserved-name protection') >= 0 && t2.indexOf('Advanced') >= 0,
-      '设置段是英文（侧栏入口 / 注入参数 / 保留名 / 高级）')
-    ok(t2.indexOf('侧栏入口') < 0 && t2.indexOf('记忆注入参数') < 0 && t2.indexOf('保留名保护名单') < 0 &&
-      t2.indexOf('高级设置') < 0, '设置段没有残留中文文案')
+    ok(t2.indexOf('Interface entries') >= 0 && t2.indexOf('Show both') >= 0 &&
+      t2.indexOf('Injection limits') >= 0 && t2.indexOf('Reserved-name protection') >= 0 &&
+      t2.indexOf('Advanced') >= 0,
+      '设置段是英文（界面入口三选一 / 注入参数 / 保留名 / 高级）')
+    ok(t2.indexOf('界面入口') < 0 && t2.indexOf('两个都显示') < 0 && t2.indexOf('记忆注入参数') < 0 &&
+      t2.indexOf('保留名保护名单') < 0 && t2.indexOf('高级设置') < 0, '设置段没有残留中文文案')
     ok(t2.indexOf('Save injection limits') >= 0, '保存按钮也走了字典')
 
     // 25c 记录段（回滚点 / 整理记录 / 历史报告）
