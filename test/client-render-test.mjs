@@ -3776,6 +3776,44 @@ async function main() {
     ok(treeText(tree).indexOf('锁表读不出来') < 0, '【反向对照】锁表正常 → 不出现警告')
   }
 
+  // ── 27. 2.8.0：`settings.memory.starmap` 子槽真的渲染 ──────────────────────
+  // 1.8.0 起这个子槽只声明、不渲染：第三方按契约注入的视图一个像素都不出现。
+  group('27. 2.8.0 子槽渲染：settings.memory.starmap 注入的视图出现在设置页里')
+  {
+    const mk = async (props) => {
+      const rt = makeReact()
+      const { comp: C } = await loadClient(rt, {
+        memory: makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED),
+        autodream: makeAutodreamRemote(),
+      })
+      const tree = await rt.settle(C, props || {})
+      return tree
+    }
+
+    const calls = []
+    const owners = []
+    const tree = await mk({ renderSlot: (key, owner) => { calls.push(key); owners.push(owner); return '第三方视图：星图覆盖层' } })
+    ok(calls.length >= 1 && calls.every((k) => k === 'settings.memory.starmap'),
+      `renderSlot 被调用且键名正确（${calls.join(',')}）`)
+    // owner 必须是对象：官方对 root scope 子槽的调用形状就是 `renderSlot(key, {})`。
+    // 少传一个参数在真宿主上可能被 scope 检查直接拒掉 —— 这类「参数少一个」正是 2.1.21 的教训。
+    ok(owners.every((o) => o !== null && typeof o === 'object' && !Array.isArray(o)),
+      `owner 传的是对象（${JSON.stringify(owners[0])}）`)
+    ok(treeText(tree).indexOf('第三方视图：星图覆盖层') >= 0, '注入的内容真的进了界面树')
+    ok(all(tree, byClass('smem-extra-slot')).length === 1, '挂在 .smem-extra-slot 容器里（有分隔，不跟底部仓库链接挤在一起）')
+
+    const empty = await mk({ renderSlot: () => null })
+    ok(all(empty, byClass('smem-extra-slot')).length === 0, '【反向对照】没有占用者 → 不渲染空容器')
+
+    const legacy = await mk({})
+    ok(all(legacy, byClass('smem-extra-slot')).length === 0, '【反向对照】旧外壳没有 renderSlot → 不出现空容器')
+    ok(treeText(legacy).indexOf('记忆') >= 0, '【反向对照】旧外壳上设置页主体照常渲染')
+
+    const boom = await mk({ renderSlot: () => { throw new Error('third-party boom') } })
+    ok(all(boom, byClass('smem-extra-slot')).length === 0, '【反向对照】第三方 renderSlot 抛错 → 静默跳过，不拖垮设置页')
+    ok(treeText(boom).indexOf('记忆') >= 0, '第三方抛错后设置页仍然完整')
+  }
+
   console.log(`\n结果：${pass} passed, ${fail} failed`)
   process.exit(fail ? 1 : 0)
 }

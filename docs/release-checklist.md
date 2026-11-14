@@ -122,6 +122,12 @@ dsh --profile web --patch $yml --port 0 --no-open
 `package.json.dsh.compatibility.dshReleases`（`release-test.mjs` 第 6 组看着）——
 **看到那组红，先去比对 `engines` / `dshReleases`，别去改断言。**
 
+⚠️ **`dshReleases` 是死字段，别再往里加版本**（2026-11-14 复核）：0.2.1-alpha.4 起宿主门禁**只看
+`engines.dsh`**，在桌面安装的 `@deepseek-ai/*` 全部 `.js` 里 grep 不到任何读取 `dshReleases` 的代码。
+它现在只起两个作用：① 双语 README 兼容表的对拍目标 ② 历史上「跑过探针」的记录。
+**新宿主版本不要往里补**（补了不会让插件变成「compatible」，只会让人以为验证过了）——
+真要声明兼容，改 `engines.dsh` 并写清「声明 ≠ 该构建跑过端到端探针」。
+
 ## 7. 推上去（release）
 
 ```bash

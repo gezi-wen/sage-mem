@@ -106,9 +106,10 @@
 						order: 20,
 						label: function () { return t("section.label"); },
 						// 声明「记忆星图」子槽（沿用 1.8.0 的契约）：sage-starmap 之类的
-						// 第三方插件向它注入视图。⚠️ 现状：Section 还没有调用 renderSlot，
-						// 所以这个子槽目前只声明、不渲染（2.7.0 未改；渲染它是独立事项）。
-						// 保留声明是为了不破坏第三方插件的注入面。
+						// 第三方插件向它注入视图。2.8.0 起 `Section` 真的调 `renderSlot` 了
+						// （之前只声明、不渲染 —— 注进来的东西一个像素都不出现）。
+						// ⚠️ 连带后果：注销这个 section 时子槽跟着没（「只显示侧栏」那一档），
+						// 界面文案里已点明（`entry.sidebarHidesSlot`）。
 						children: { "settings.memory.starmap": { kind: "list", scope: "root" } },
 					}, function (props) {
 						return react.createElement(Section, { ...props, ctx: ctx });

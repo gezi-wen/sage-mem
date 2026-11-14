@@ -229,6 +229,8 @@
 			".smem-autodream-note{font-size:11.5px;color:var(--dsw-alias-label-secondary);line-height:1.5;}",
 			// 2.7.1（Q04）：上限设置的诊断清单 —— 逐条列宿主的原话，缩进浅一点、行距紧一点。
 			".smem-diag-list{margin:4px 0 4px 16px;padding:0;font-size:11.5px;line-height:1.6;color:var(--dsw-alias-label-secondary);}",
+			// 2.8.0（子槽）：第三方向 settings.memory.starmap 注入的视图挂在这里，空的时候不占位置。
+			".smem-extra-slot{margin-top:14px;padding-top:12px;border-top:0.5px solid var(--dsw-alias-border-l2);}",
 			".smem-autodream-list{display:flex;flex-direction:column;gap:6px;}",
 			".smem-report{border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:6px 9px;font-size:12px;cursor:pointer;background:transparent;color:inherit;text-align:left;font-family:inherit;}",
 			".smem-report:hover{border-color:var(--dsw-alias-border-l2);}",

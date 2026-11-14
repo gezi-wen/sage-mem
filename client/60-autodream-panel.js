@@ -531,6 +531,12 @@
 						? h("div", { className: "smem-autodream-note smem-ad-warn", key: "deg" },
 							t(entryApiModern === false ? "entry.legacyHost" : "entry.degraded"))
 						: null,
+					// 2.8.0：子槽接上渲染之后，「只显示侧栏」会连带把别人注入进来的视图一起藏掉
+					// （设置页 section 一注销，挂在它下面的 `settings.memory.starmap` 就没了）。
+					// 这不是 bug，但选这一档的人得先知道 —— 所以只在选中的时候写一句。
+					entryModeValue === "sidebar" && !entryIsDegraded
+						? h("div", { className: "smem-autodream-note", key: "slotloss" }, t("entry.sidebarHidesSlot"))
+						: null,
 					entryErr ? h("div", { className: "smem-autodream-note smem-ad-warn", key: "err" }, entryErr) : null,
 				]),
 				// 自动归档那一段（三档策略 + 三个阈值）**已挪到「自动归档」页签**（v0.9.9）：

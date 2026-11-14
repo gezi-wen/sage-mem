@@ -1,3 +1,27 @@
+		/**
+		 * 渲染 `settings.memory.starmap` 子槽（2.8.0）。
+		 *
+		 * 1.8.0 起这个子槽就**只声明不渲染**（`Section` 从没调过 `renderSlot`）：
+		 * 第三方按契约往里面注入视图，一个像素都不会出现。接上之后：
+		 *   - `renderSlot` 是宿主经 props 传进来的（声明了 children 才有），旧外壳可能没有 → 判类型；
+		 *   - 返回 null / false 表示没有占用者 —— 此时**不占版面**（空 div 也会破坏间距）；
+		 *   - 出任何异常都吞掉：这是个可选面，绝不能让第三方把整个设置页拖垮。
+		 * ⚠️ 连带后果（2.7.0 的入口三选一带来的）：「只显示侧栏」会把设置页 section 注销，
+		 * 于是注入到这里的内容也跟着消失 —— 所以那一档的文案里点明了一句（`entry.sidebarHidesSlot`）。
+		 */
+		function renderMemoryExtraSlot(props) {
+			if (!props || typeof props.renderSlot !== "function") return null;
+			try {
+				// owner 传 `{}`：官方对 root scope 的子槽就是这么调的（`renderSlot("shell.overlay", {})`、
+				// `renderSlot("main", {}, …)`）—— 少传一个参数在对 scope 做检查的宿主上可能直接抛。
+				const node = props.renderSlot("settings.memory.starmap", {});
+				if (node === null || node === undefined || node === false) return null;
+				return h("div", { className: "smem-extra-slot", key: "extra-slot" }, node);
+			} catch (e) {
+				return null;
+			}
+		}
+
 		function Section(props) {
 			// 走 stableRemote：真实宿主里 `ctx.get()` 每次返回新对象（issue #3 的成因）。
 			// 这个面板的 effect 依赖是 `[]`、暂时不会爆，但引用稳定是**所有**面板的共同前提。
@@ -1460,6 +1484,9 @@
 							h(AuditPanel, { key: "audit", report: audit, busy: auditBusy, onRun: runAudit, standalone: true }),
 						])
 					: h("div", { className: "smem-view", key: "files" }, filesView),
+				// 2.8.0：第三方注入的视图（`settings.memory.starmap` 子槽）。没有占用者时是 null，
+				// 一个 div 都不出 —— 所以默认安装下界面与 2.7.0 逐像素相同。
+				renderMemoryExtraSlot(props),
 				// 2.6.0：复制成功的回执铺在视口下方中央（`position:fixed`，不吃点击，10s 自收，
 				// 也能自己点 × 关）。渲染在 `.smem-root` 直属层 —— 别塞进带进场动画的
 				// `.smem-view`（那个祖先有 transform，`fixed` 会被改写定位）。
