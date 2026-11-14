@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.8.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.9.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -165,7 +165,7 @@ The state directory (configuration, ledger, rollback points, conflict queue) def
 
 Every image below is **rendered from the UI code in this repository** (the same CSS, the same component tree; the data is demo data for illustration, not a real memory directory).
 
-Since 2.5.0 the panel has **four tabs: Files | Timeline | Automation | Health** — split by what you want to do, not by which data source feeds it: autodream and auto-archive are two cards on one "Automation" screen, conflicts and the audit are two cards on one "Health" screen. Editing opens a right-hand drawer, and every action that touches a file on disk asks in a modal dialog.
+Since 2.5.0 the panel has four tabs: Files | Timeline | Automation | Health; 2.9.0 adds a fifth, **Lab** — split by what you want to do, not by which data source feeds it: autodream and auto-archive are two cards on one "Automation" screen, conflicts and the audit are two cards on one "Health" screen. Editing opens a right-hand drawer, and every action that touches a file on disk asks in a modal dialog.
 
 Since 1.9.0 the memory-management surface follows the harness language (**Settings → General → Language**); memory content itself stays in whatever language it was written in, 2.1.0 extended that to the autodream (run / settings / records) and auto-archive cards; the timeline / star-map screen is the only panel still Chinese until the next i18n batch.
 
@@ -192,6 +192,8 @@ Since 1.9.0 the memory-management surface follows the harness language (**Settin
 ![Health: conflicts that need your call on top, machine-scanned structural problems below](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/audit.png)
 
 *Health — one screen answers "is anything wrong with this library": the **conflict queue on top** (a finite list that needs your decision: which of two contradictory statements is void) and the **audit below** (dangling index entries, missing index entries, broken links and the rest, reported in red by category). "Points to an archived memory" is only a hint — it does not count as a problem, and there is **no one-click fix**: which one to change is your call. The audit only reports and never modifies. When there is really something to deal with, the badge gets a **「复制修复提示词」(copy fix prompt)** button next to it (2.6.0): it turns what this screen needs into one prompt in your clipboard — **the audit problems and the pending conflicts are written as two separate sections** (fix these / only advise on those), so you can paste it to the agent and let it work. A receipt appears at the bottom afterwards — it closes itself in 10 seconds, closes as soon as you switch tabs, and you can dismiss it by hand.*
+
+*Lab (2.9.0, sits after Health) — only switches that change **which memories are picked**, all off by default. Today it holds one: **MMR de-duplication**. When one topic takes every injection slot, it subtracts each candidate's similarity to what is already picked before choosing. It only changes **which items are picked** (never the score, never a file, never a pinned baseline memory) and returns candidates as-is when they fit the slots. Why it is off by default: in the offline comparison it never fired (the IDF gate already keeps candidates under 10), and in a stress run with the gate disabled duplication fell only 4.5% while wrong picks rose 24% — it knows "different", not "irrelevant". Read the three notes on that page before turning it on; **if memories seem to go missing, switch it off and restart**.
 
 ![Update notice: a single banner, only when there really is a new version](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/update-banner.png)
 

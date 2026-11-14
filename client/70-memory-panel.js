@@ -1211,6 +1211,9 @@
 					// 库健康 = 体检（机器扫）＋ 冲突（要人裁决）。两者回答的是同一句话，
 					// 所以并成一屏；没有 conflict 面的旧宿主只少一张卡，页签照常在。
 					h("button", { type: "button", className: "smem-tab" + (tab === "health" ? " smem-tab--on" : ""), key: "a", role: "tab", "aria-selected": tab === "health" ? "true" : "false", onClick: openHealthTab }, t("tab.health")),
+					// 2.9.0：实验性设置单开一页（只放会改变**选材**的开关；见 64-lab-settings.js 开头）。
+					// 排在库健康之后：先看「库有没有事」，再决定「要不要动实验性开关」。
+					h("button", { type: "button", className: "smem-tab" + (tab === "lab" ? " smem-tab--on" : ""), key: "l", role: "tab", "aria-selected": tab === "lab" ? "true" : "false", onClick: function () { setTab("lab"); } }, t("tab.lab")),
 				]),
 				// 四个 tab 共用的一条头部带：我在哪 · 目录状态 · 活动/归档计数 · 体检徽标 · 待重启徽标 · 主操作。
 				// 层级形状固定：导航＝下划线（.smem-tabs）、筛选＝chip、动作＝按钮，三种不混用。
@@ -1483,6 +1486,8 @@
 								: null,
 							h(AuditPanel, { key: "audit", report: audit, busy: auditBusy, onRun: runAudit, standalone: true }),
 						])
+					: tab === "lab"
+					? h("div", { className: "smem-stack smem-view", key: "lab" }, [h(LabSettingsPanel, { key: "lab-card", ctx: props.ctx })])
 					: h("div", { className: "smem-view", key: "files" }, filesView),
 				// 2.8.0：第三方注入的视图（`settings.memory.starmap` 子槽）。没有占用者时是 null，
 				// 一个 div 都不出 —— 所以默认安装下界面与 2.7.0 逐像素相同。

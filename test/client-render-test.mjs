@@ -1927,12 +1927,13 @@ async function main() {
     ok(!!badge && textOf(badge).indexOf('4 个问题') >= 0,
       `任何 tab 下头部都有「体检 4 个问题」徽标（实际：${badge ? textOf(badge) : '没有'}）`)
 
-    // 页签顺序（2.5.0：六个收成四个）：库里的事只有一屏 —— 「库健康」= 体检（机器扫）＋
-    // 冲突（要人裁决）。这里故意**不**给 conflict 面：旧宿主的能力降级路径只剩体检一张卡，
-    // 页签数量与名字却不变（少一张卡 ≠ 少一个页签）。
+    // 页签顺序（2.5.0：六个收成四个；2.9.0：加「实验性」成为五个）：库里的事只有一屏 ——
+    // 「库健康」= 体检（机器扫）＋冲突（要人裁决）。这里故意**不**给 conflict 面：旧宿主的
+    // 能力降级路径只剩体检一张卡，页签数量与名字却不变（少一张卡 ≠ 少一个页签）。
+    // 实验性排在最后：它是「选材」开关，先看库有没有事，再决定要不要动它。
     const tabLabels = all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n)).map(textOf)
-    ok(JSON.stringify(tabLabels) === JSON.stringify(['文件列表', '时间线', '自动整理', '库健康']),
-      `旧宿主（无 conflict 面）：四页签、库健康排在最后（实际：${tabLabels.join(' / ')}）`)
+    ok(JSON.stringify(tabLabels) === JSON.stringify(['文件列表', '时间线', '自动整理', '库健康', '实验性']),
+      `旧宿主（无 conflict 面）：五页签、实验性排在最后（实际：${tabLabels.join(' / ')}）`)
     ok(!all(tree, (n) => n.type === 'button' && byClass('smem-tool-badge')(n) && textOf(n).indexOf('冲突') === 0)[0],
       '旧宿主（无 conflict 面）：凑不出一颗冲突徽标')
 
@@ -2207,20 +2208,20 @@ async function main() {
   }
 
   // ── 8d. 「自动整理」一屏里包含「自动归档」：写明用处 + 两档策略 + 阈值可改 ──────
-  group('8d. 自动整理 → 自动归档卡：用处 + 两档策略 + 阈值可改（四页签）')
+  group('8d. 自动整理 → 自动归档卡：用处 + 两档策略 + 阈值可改（五页签）')
   {
     const rt = makeReact()
     const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
     const ad = makeAutodreamRemote()
-    // 2.0.0 的宿主有 conflict 面；2.5.0 把冲突并进「库健康」，页签只剩四个（有意更改的快照断言）。
+    // 2.0.0 的宿主有 conflict 面；2.5.0 把冲突并进「库健康」，页签只剩四个；2.9.0 又加了第五个「实验性」（有意更改的快照断言）。
     const cf = makeConflictRemote({ items: CONFLICT_ITEMS })
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad, conflict: cf })
     let tree = await rt.settle(C, {})
 
     const tabBtns = (t) => all(t, (n) => n.type === 'button' && byClass('smem-tab')(n))
     const tabs = tabBtns(tree).map(textOf)
-    ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '时间线', '自动整理', '库健康']),
-      `四页签、库健康排在最后（实际：${tabs.join(' / ')}）`)
+    ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '时间线', '自动整理', '库健康', '实验性']),
+      `五页签、实验性排在最后（实际：${tabs.join(' / ')}）`)
 
     // 自动归档与自动做梦现在同屏（两张模块卡堆叠），断言必须在**这张卡里**找，
     // 不能拿整棵树找 —— 否则「三个阈值输入框」会被隔壁自动做梦的数字框挤成 8 个。
@@ -2820,7 +2821,7 @@ async function main() {
 
     // 15b tab 语义与分组分隔
     ok((all(tree, byClass('smem-tabs'))[0] || { props: {} }).props.role === 'tablist', 'tab 栏有 role=tablist')
-    ok(all(tree, (n) => n.type === 'button' && n.props.role === 'tab').length === 4, '四个 tab 都带 role=tab')
+    ok(all(tree, (n) => n.type === 'button' && n.props.role === 'tab').length === 5, '五个 tab 都带 role=tab')
     ok(all(tree, byClass('smem-tabs-sep')).length === 1, 'tab 栏恰好一个分组分隔（看 ｜ 设置·自动化）')
 
     // 15c 动作分组：编辑 ｜ 其余；最后一个是危险动作
@@ -3387,13 +3388,13 @@ async function main() {
       return { rt, C, tree, mem, cf }
     }
 
-    // 23a 四页签 + 徽标常显 + 点徽标切页（2.5.0：冲突并进「库健康」，页签不再是六个）
+    // 23a 五页签 + 徽标常显 + 点徽标切页（2.5.0：冲突并进「库健康」，页签不再是六个）
     {
       const { rt, C, tree: t0, cf } = await mkRuntimes()
       let tree = t0
       const tabs = all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n)).map(textOf)
-      ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '时间线', '自动整理', '库健康']),
-        `四页签、库健康排在最后（实际：${tabs.join(' / ')}）`)
+      ok(JSON.stringify(tabs) === JSON.stringify(['文件列表', '时间线', '自动整理', '库健康', '实验性']),
+        `五页签、实验性排在最后（实际：${tabs.join(' / ')}）`)
       // 先回文件列表再看徽标（徽标必须每个 tab 下都在，不能只在冲突页上有）
       click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '文件列表')[0])
       tree = await rt.settle(C, {})
@@ -3667,8 +3668,8 @@ async function main() {
     const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad, conflict: cf, locale: makeEnLocale() })
     let tree = await rt.settle(C, {})
     const tabs = all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n)).map(textOf)
-    ok(JSON.stringify(tabs) === JSON.stringify(['Files', 'Timeline', 'Automation', 'Health']),
-      `四个页签全部是英文（实际：${tabs.join(' / ')}）`)
+    ok(JSON.stringify(tabs) === JSON.stringify(['Files', 'Timeline', 'Automation', 'Health', 'Lab']),
+      `五个页签全部是英文（实际：${tabs.join(' / ')}）`)
     const hasCjk = (s) => /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(s)
 
     // 25a 自动整理 → 自动做梦 · 运行段

@@ -308,6 +308,54 @@ group('7. ui.entry：默认两个都显示、旧字段迁移、严格校验、ty
     '非布尔旧字段在 typert schema 层就被拒')
 }
 
+// ── 8. 2.9.0 实验性 MMR：默认关 / 落盘 / 生效与待生效分离 / 严格校验 / typert 往返 ──
+group('8. experimental.mmr：默认关、写盘、待生效与已生效分离、严格校验')
+{
+  // 环境变量若在跑测试的机器上被设过，默认值就不是 0 了 —— 这里先清掉，测的是「默认」。
+  delete process.env.SAGE_MEM_MMR
+  const e0 = await gw.getSettings()
+  ok(e0.experimental && e0.experimental.mmr === 0, '默认 mmr=0（实验性功能默认关）', JSON.stringify(e0.experimental))
+  ok(e0.pendingExperimental && e0.pendingExperimental.mmr === 0, 'pendingExperimental 与已生效值同源', JSON.stringify(e0.pendingExperimental))
+
+  const set = await gw.setSettings({ experimental: { mmr: 35 } })
+  ok(set.ok === true && set.restartRequired === true, '写入 mmr=35 成功并提示重启', JSON.stringify({ ok: set.ok, rr: set.restartRequired }))
+  const disk = JSON.parse(readFileSync(SETTINGS_FILE, 'utf8'))
+  ok(disk.experimental && disk.experimental.mmr === 35, '落到 settings.json.experimental.mmr', JSON.stringify(disk.experimental))
+  ok(disk.ui !== undefined && disk.limits !== undefined, '同一份文件里的 limits / ui 没被这次写入挤掉', JSON.stringify(Object.keys(disk)))
+
+  const e1 = await gw.getSettings()
+  ok(e1.pendingExperimental.mmr === 35 && e1.experimental.mmr === 0,
+    '待生效 35、已生效仍 0（模块加载时固化的值要重启才变）', JSON.stringify({ pending: e1.pendingExperimental, active: e1.experimental }))
+
+  const before = readFileSync(SETTINGS_FILE, 'utf8')
+  const bads = [
+    ['越界', { experimental: { mmr: 101 } }, 'must be an integer in [0, 100]'],
+    ['负值', { experimental: { mmr: -1 } }, 'must be an integer in [0, 100]'],
+    ['类型不对', { experimental: { mmr: '七十' } }, 'must be a number'],
+    ['未知键', { experimental: { nope: 1 } }, 'unknown experimental setting'],
+    ['不是对象', { experimental: 70 }, 'must be an object'],
+  ]
+  for (const [label, patch, expect] of bads) {
+    const r = await gw.setSettings(patch)
+    ok(r.ok === false && String(r.error).includes(expect), `拒绝：${label}（含 "${expect}"）`, JSON.stringify(r))
+  }
+  ok(readFileSync(SETTINGS_FILE, 'utf8') === before, '被拒的这批一次都没写盘（settings.json 逐字节未变）')
+
+  // typert 层：result 与 patch 两侧都声明了 experimental —— 只加一侧会被 strict 静默剥掉。
+  const { TYPERT } = await import(new URL('typert.host.js', LIB).href)
+  const inv = new Map(TYPERT.invocations.map((i) => [i.method, i]))
+  const rs = inv.get('getSettings').result.schema.safeParse(await gw.getSettings())
+  ok(rs.success, 'getSettings 返回值（含 experimental / pendingExperimental）过 strict schema', rs.success ? '' : JSON.stringify(rs.error.issues.slice(0, 4)))
+  const patchCodec = inv.get('setSettings').parameters[0].codec.schema
+  ok(patchCodec.safeParse({ experimental: { mmr: 35 } }).success, 'patch schema 认得 experimental.mmr')
+  ok(patchCodec.safeParse({ experimental: { mmr: '70' } }).success === false, 'patch schema 拒非数字')
+  // zod 默认是 strip 不是 reject：未知键会被静默**剥掉**（parse 成功、字段消失），
+  // 真正的拦截在宿主 `parseExperimentalPatch`（上面那条 `unknown experimental setting` 已验）。
+  // 断言语义写清楚，免得下一个人以为 schema 会拒。
+  const stripped = patchCodec.safeParse({ experimental: { nope: 1 } })
+  ok(stripped.success === true && stripped.data.experimental.nope === undefined, 'patch schema 把未知键剥掉（不让它进 host），不是拒')
+}
+
 rmSync(sandbox, { recursive: true, force: true })
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
