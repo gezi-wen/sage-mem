@@ -1851,7 +1851,9 @@ async function main() {
     ok(gl && gl._shaders.some((s) => /aFresh = 1\.0/.test(s.src)),
       'shader 里编译进了「悬停把暗星点亮」（aFresh = 1.0）')
     const verts = gl ? parseVerts(gl) : []
-    const drawn = verts.filter((v) => v.birth > 0) // birth<0 是远景尘星，不参与
+    // 2.7.2：顶点里的 birth 现在是**相对时间**（最老那颗星 = 0），
+    // 所以判据从 `> 0` 改成 `>= 0` —— 远景尘星仍是 -1（不参与回放）。
+    const drawn = verts.filter((v) => v.birth >= 0)
     const core = drawn.filter((v) => v.a === 1 && v.idx >= 0)
     // Float32Array 里的 0.26 不是精确的 0.26，比较得给容差
     const pad = drawn.filter((v) => Math.abs(v.a - 0.26) < 0.001 && v.idx === -1)
@@ -3711,6 +3713,67 @@ async function main() {
     ok(t5.indexOf('保存归档条件') < 0 && t5.indexOf('闲置多少天算可以归档') < 0,
       '自动归档卡 · 设置段没有残留中文文案')
     ok(!hasCjk(t5), '自动归档卡 · 设置段整段无中文')
+  }
+
+  // ── 26. 2.7.1：Q04 / Q05 的诊断字段真的上了面板 ────────────────────────────
+  // 这两个字段宿主早就在回（Q04 的 `limitDiagnostics`、Q05 的 `lockedUnknown` / `lockedError`），
+  // 但界面一直只让它们进日志 —— 用户那边看到的是「改了的设置没生效」「清单里全是未锁定」。
+  group('26. 2.7.1 诊断上屏：上限设置的每条问题 + 锁表未知不许装作「都没锁」')
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const DIAG = [
+      '读 settings.json 失败（ENOENT），本次按环境变量/默认值生效',
+      'maxResults 必须是 1..30 的整数，收到 99',
+    ]
+    mem.st.settings = {
+      limits: { maxResults: 10, maxChars: 1500, maxBaseline: 8, maxSessionBytes: 61440, staleDays: 1 },
+      pendingLimits: { maxResults: 10, maxChars: 1500, maxBaseline: 8, maxSessionBytes: 61440, staleDays: 1 },
+      restartRequired: false,
+      limitDiagnostics: DIAG,
+      reserved: ['memory.md', 'session-log.md'],
+      reservedExtra: [],
+    }
+    const ad = makeAutodreamRemote()
+    const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad })
+    let tree = await rt.settle(C, {})
+    click(btn(tree, '自动整理')[0])
+    tree = await rt.settle(C, {})
+    tree = await gotoSeg(rt, C, tree, '设置')
+    const limCard = all(tree, (n) => n.props && n.props.key === 'limits')[0]
+    ok(!!limCard, '（前提）注入参数那张卡渲染出来了')
+    const cardText = limCard ? treeText(limCard) : ''
+    ok(cardText.indexOf('上限设置里有 2 条问题') >= 0, '标题带条数（宿主给几条就写几条）')
+    ok(DIAG.every((d) => cardText.indexOf(d) >= 0), '宿主给的诊断原话逐条出现（不改写、不吞）')
+    ok(limCard && all(limCard, (n) => n.type === 'li').length === 2, '是列表（逐条 li），不是糊成一坨的一段话')
+    ok(cardText.indexOf('环境变量与 settings.json') >= 0, '写清了「只改面板里的值不够」')
+
+    // 反向对照：诊断消失后这一块**一个节点都不留**（干净库上不多长一截）
+    delete mem.st.settings.limitDiagnostics
+    click(btnHas(tree, '保存注入参数')[0])
+    tree = await rt.settle(C, {})
+    ok(treeText(tree).indexOf('上限设置里有') < 0, '【反向对照】没有诊断 → 整块不渲染')
+
+    // Q05：锁表读不出来 → 候选面板必须如实标「未知」
+    mem.st.cand = Object.assign({}, CANDIDATES, { lockedUnknown: true, lockedError: 'lock table: EACCES' })
+    click(btn(tree, '文件列表')[0])
+    tree = await rt.settle(C, {})
+    tree = await openTool(rt, C, tree, '归档候选')
+    const candText = treeText(tree)
+    ok(candText.indexOf('锁表读不出来') >= 0, '候选面板如实说「锁表读不出来」')
+    ok(candText.indexOf('lock table: EACCES') >= 0, '把宿主的原话带出来（不是一句笼统的「出错了」）')
+    ok(candText.indexOf('未知') >= 0 && candText.indexOf('自动归档会直接拒绝执行') >= 0,
+      '写清了「状态未知」+「自动归档会拒绝」，没退化成「都没锁」')
+
+    // 反向对照：锁表正常时不出现这句（在候选面板里点「刷新」重取一次）
+    mem.st.cand = Object.assign({}, CANDIDATES, { lockedUnknown: false, lockedError: null })
+    const capPanel = all(tree, byClass('smem-tool-panel--cap'))[0]
+    const beforeRefresh = mem.st.calls.filter((c) => c[0] === 'archiveCandidates').length
+    click(all(capPanel, (n) => n.type === 'button' && textOf(n) === '刷新')[0])
+    tree = await rt.settle(C, {})
+    ok(mem.st.calls.filter((c) => c[0] === 'archiveCandidates').length === beforeRefresh + 1,
+      '（前提）「刷新」真的重拉了一次候选')
+    ok(treeText(tree).indexOf('锁表读不出来') < 0, '【反向对照】锁表正常 → 不出现警告')
   }
 
   console.log(`\n结果：${pass} passed, ${fail} failed`)

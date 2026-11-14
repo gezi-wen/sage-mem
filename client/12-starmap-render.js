@@ -75,9 +75,10 @@
 			"uniform float uTime;",
 			"uniform float uHoverIdx;",
 			"uniform float uRevealT;",
+			"uniform float uFadeMs;",
 			"float revealFactor(){",
 			"  if (vBirth < 0.0) return 1.0;",
-			"  float t = clamp((uRevealT - vBirth) / 900.0, 0.0, 1.0);",
+			"  float t = clamp((uRevealT - vBirth) / uFadeMs, 0.0, 1.0);",
 			"  return t * t * (3.0 - 2.0 * t);",
 			"}",
 			"void main(){",
@@ -122,9 +123,10 @@
 			"varying vec4 vColor;",
 			"varying float vBirth;",
 			"uniform float uRevealT;",
+			"uniform float uFadeMs;",
 			"void main(){",
 			"  if (vBirth < 0.0){ gl_FragColor = vColor; return; }",
-			"  float t = clamp((uRevealT - vBirth) / 900.0, 0.0, 1.0);",
+			"  float t = clamp((uRevealT - vBirth) / uFadeMs, 0.0, 1.0);",
 			"  t = t * t * (3.0 - 2.0 * t);",
 			"  gl_FragColor = vec4(vColor.rgb, vColor.a * t);",
 			"}",
@@ -152,6 +154,44 @@
 
 		const SMAP_CORNERS = [-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1];
 		const SMAP_ATTR_SIZE = { aCorner: 2, aMeta0: 3, aColor: 4, aMeta1: 3, aBirth: 1 };
+
+		/**
+		 * 诞生回放的**数值域**（Q15 尾巴 / 2.7.2）。
+		 *
+		 * 为什么不能把 epoch 毫秒直接喂给 shader：`vBirth` 是 Float32 顶点属性，`uRevealT`
+		 * 也是 Float32 uniform —— 1.7e12 这个量级的 ulp = 2^(40-23) ≈ 131072 ms，而渐亮窗口
+		 * 只有 900 ms。两个数各自舍入之后，`uRevealT - vBirth` 要么 ≤ 0 要么 ≫ 窗口，
+		 * 于是 WebGL 后端里每颗星其实都是**瞬亮**；canvas2d 兜底路径用 double 不受影响，
+		 * 所以肉眼看不出差异 —— 这正是一个藏了五版的精度问题。
+		 *
+		 * 修法两层：① 时间域压到**最老的那颗星**（base = 最小 mtime），birth 存相对值，
+		 * 最大量级只剩「最老的记忆有多老」；② 窗口按跨度取 `max(900, span/40)`，
+		 * 保证窗口 ≫ 1 ulp（跨度越大时间轴越粗，但 900ms 的固定窗口对粗时间轴毫无意义）。
+		 *
+		 * @param {Array<{star?:{mtimeMs?:number}}>} pts 参与绘制的可见点
+		 * @returns {{base:number, span:number, fadeMs:number}} base=0 表示没有任何时间信息
+		 */
+		function starmapRevealDomain(pts) {
+			const list = Array.isArray(pts) ? pts : [];
+			let mn = Infinity;
+			let mx = -Infinity;
+			for (const p of list) {
+				const m = p && p.star && typeof p.star.mtimeMs === "number" ? p.star.mtimeMs : 0;
+				if (m > 0) {
+					if (m < mn) mn = m;
+					if (m > mx) mx = m;
+				}
+			}
+			if (!isFinite(mn)) return { base: 0, span: 1, fadeMs: 900 };
+			const span = Math.max(mx - mn, 1);
+			return { base: mn, span: span, fadeMs: starmapFadeMs(span) };
+		}
+
+		/** 渐亮窗口：至少 900ms；跨度大时取跨度的 1/40（18s 回放走完整段，观感仍是逐颗点亮）。 */
+		function starmapFadeMs(span) {
+			const s = typeof span === "number" && isFinite(span) && span > 0 ? span : 1;
+			return Math.max(900, s / 40);
+		}
 
 		function pushStarQuad(arr, cx, cy, r, rgb, aBase, twPhase, fresh, idx, birth) {
 			for (let v = 0; v < 6; v++) {
@@ -191,8 +231,8 @@
 				gl.viewport(0, 0, canvasEl.width, canvasEl.height);
 				const pal = starmapPalette();
 				const progBg = glProgram(gl, SMAP_BG_VS, smapBgFs(pal.bgGl[0], pal.bgGl[1]), ["aPos"], ["uRes", "uTime"]);
-				const progStar = glProgram(gl, SMAP_STAR_VS, SMAP_STAR_FS, ["aCorner", "aMeta0", "aColor", "aMeta1", "aBirth"], ["uRes", "uTime", "uHoverIdx", "uRevealT"]);
-				const progLine = glProgram(gl, SMAP_LINE_VS, SMAP_LINE_FS, ["aPos", "aColor", "aBirth"], ["uRes", "uRevealT"]);
+				const progStar = glProgram(gl, SMAP_STAR_VS, SMAP_STAR_FS, ["aCorner", "aMeta0", "aColor", "aMeta1", "aBirth"], ["uRes", "uTime", "uHoverIdx", "uRevealT", "uFadeMs"]);
+				const progLine = glProgram(gl, SMAP_LINE_VS, SMAP_LINE_FS, ["aPos", "aColor", "aBirth"], ["uRes", "uRevealT", "uFadeMs"]);
 
 				// 背景全屏两三角(clip space 直给)
 				const bgQuadBuf = gl.createBuffer();
@@ -222,17 +262,22 @@
 				// 脏标记：canvas 晚于 visibility effect 挂载时（JSX 分支决定 ref 时序），
 				// setGeometry 可能从未被调过——render 前自动补传，顺序无关。
 				let geoDirty = true;
+				// 诞生回放的时间域（base / span / 渐亮窗口）：由 uploadStars 现算，
+				// 顶点里的 birth、uniform 的 uRevealT 与 uFadeMs 三处必须共用同一份。
+				let revealDomain = { base: 0, span: 1, fadeMs: 900 };
 
 				function uploadStars() {
 					const arr = [];
 					const nowMs = Date.now();
+					revealDomain = starmapRevealDomain(layout.pts.filter(function (p, i) { return !!visBox.flags[i]; }));
 					for (let i = 0; i < layout.pts.length; i++) {
 						if (!visBox.flags[i]) continue;
 						const p = layout.pts[i];
 						const meta = KIND_META[p.star.kind] || KIND_META.special;
 						const arch = p.star.archived === true;
 						const fresh = p.star.mtimeMs > 0 && nowMs - p.star.mtimeMs < FRESH_MS ? 1 : 0;
-						const birth = p.star.mtimeMs > 0 ? p.star.mtimeMs : 0;
+						// -1 在着色器里是「没有诞生时刻，永远全亮」（尘星也是这条分支）。
+						const birth = p.star.mtimeMs > 0 ? p.star.mtimeMs - revealDomain.base : -1;
 						if (arch) {
 							// 归档星 = 暗星，两层画：
 							//   ① 一层很淡的冷色底盘（走 dust 分支：不带星芒、不参与 hover），
@@ -261,7 +306,8 @@
 						const hot = hoverLineIdx >= 0 && (ln[0] === hoverLineIdx || ln[1] === hoverLineIdx);
 						const mul = hot ? 1 : 0.72;
 						const al = hot ? 0.6 : 0.22;
-						const birth = Math.max(a.star.mtimeMs || 0, b.star.mtimeMs || 0);
+						const birthAbs = Math.max(a.star.mtimeMs || 0, b.star.mtimeMs || 0);
+						const birth = birthAbs > 0 ? birthAbs - revealDomain.base : -1;
 						arr.push(a.x, a.y, c[0] * mul, c[1] * mul, c[2] * mul, al, birth);
 						arr.push(b.x, b.y, c[0] * mul, c[1] * mul, c[2] * mul, al, birth);
 					}
@@ -275,10 +321,12 @@
 					gl.drawArrays(gl.TRIANGLES, 0, count);
 				}
 
-				let revealT = null; // null = 全亮；数字 = 诞生回放的当前时刻
+				let revealT = null; // null = 全亮；数字 = 诞生回放的当前时刻（墙钟 ms）
 				function render(phase) {
 					if (geoDirty) { uploadStars(); uploadLines(); geoDirty = false; }
-					const rt = revealT === null ? 8.7e15 : revealT;
+					// 全亮用一个足够大的哨兵（1e30 在 Float32 里仍可表示，且远大于任何跨度）；
+					// 回放时刻换算到与顶点里的 birth 同一个时间域 —— 两边的差才是精度问题的所在。
+					const rt = revealT === null ? 1e30 : revealT - revealDomain.base;
 					gl.viewport(0, 0, canvasEl.width, canvasEl.height);
 					// 背景:不透明
 					gl.disable(gl.BLEND);
@@ -296,6 +344,7 @@
 						gl.useProgram(progLine.prog);
 						gl.uniform2f(progLine.uni.uRes, W, H);
 						gl.uniform1f(progLine.uni.uRevealT, rt);
+						gl.uniform1f(progLine.uni.uFadeMs, revealDomain.fadeMs);
 						gl.bindBuffer(gl.ARRAY_BUFFER, lineBuf);
 						if (progLine.attr.aPos >= 0) { gl.enableVertexAttribArray(progLine.attr.aPos); gl.vertexAttribPointer(progLine.attr.aPos, 2, gl.FLOAT, false, 28, 0); }
 						if (progLine.attr.aColor >= 0) { gl.enableVertexAttribArray(progLine.attr.aColor); gl.vertexAttribPointer(progLine.attr.aColor, 4, gl.FLOAT, false, 28, 8); }
@@ -307,6 +356,7 @@
 					gl.uniform1f(progStar.uni.uTime, phase);
 					gl.uniform1f(progStar.uni.uHoverIdx, hoverBox.idx);
 					gl.uniform1f(progStar.uni.uRevealT, rt);
+					gl.uniform1f(progStar.uni.uFadeMs, revealDomain.fadeMs);
 					drawQuad(progStar, dustBuf, dustCount);
 					if (starCount > 0) drawQuad(progStar, starBuf, starCount);
 				}
@@ -345,6 +395,10 @@
 			canvasEl.width = W * SCALE;
 			canvasEl.height = H * SCALE;
 			const nowMs = Date.now();
+			// 与 WebGL 路径共用同一份时间域（只取 fadeMs 用；这里都是 double，不存在精度问题，
+			// 但窗口长度必须一致 —— 否则两条路径的点亮节奏对不上，真机上看就是两套动画）。
+			const domain = starmapRevealDomain(layout.pts.filter(function (p, i) { return !!visBox.flags[i]; }));
+			const fadeMs = domain.fadeMs;
 			function render(phase) {
 				const c2d = canvasEl.getContext("2d");
 				if (!c2d) return;
@@ -380,7 +434,7 @@
 					const birth = Math.max(a.star.mtimeMs || 0, b.star.mtimeMs || 0);
 					let lrv = 1;
 					if (rt !== null) {
-						const lt = Math.max(0, Math.min(1, (rt - birth) / 900));
+						const lt = Math.max(0, Math.min(1, (rt - birth) / fadeMs));
 						lrv = lt * lt * (3 - 2 * lt);
 						if (lrv <= 0) continue;
 					}
@@ -397,7 +451,7 @@
 					const meta = KIND_META[p.star.kind] || KIND_META.special;
 					let rv = 1;
 					if (rt !== null && p.star.mtimeMs > 0) {
-						const st = Math.max(0, Math.min(1, (rt - p.star.mtimeMs) / 900));
+						const st = Math.max(0, Math.min(1, (rt - p.star.mtimeMs) / fadeMs));
 						rv = st * st * (3 - 2 * st);
 						if (rv <= 0) continue;
 					}

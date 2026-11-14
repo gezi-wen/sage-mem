@@ -1174,6 +1174,15 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 					? h("div", { className: "smem-empty", key: "empty" },
 							"按当前阈值没有可归档的 —— 要么闲置天数还没到该类型的阈值，要么台账里还没有访问记录。")
 					: h("div", { className: "smem-cand-list", key: "list" }, [
+							// 2.7.1（Q05 尾巴）：锁表读不出来时**不许装作「都没锁」**。
+							// 宿主 2.1.12 起就在 archiveCandidates 的结果里带 lockedUnknown / lockedError，
+							// 但那两个字段一直只在日志里 —— 面板照样把整张清单画成「全部未锁定」。
+							// 这里如实标出来：自动归档会直接拒绝，手动归档要不要继续由人自己判断。
+							c.lockedUnknown === true
+								? h("div", { className: "smem-cand-note smem-ad-warn", key: "lockunknown", role: "status" },
+										"⚠ 锁表读不出来" + (c.lockedError ? "（" + String(c.lockedError) + "）" : "") +
+										"：下面每一条的锁定状态都是「未知」（不是「都没锁」）。自动归档会直接拒绝执行；手动归档前请自己确认。")
+								: null,
 							h("div", { className: "smem-cand-note", key: "note" },
 								"候选只按「多久没被注入过」算。归档 = 移进 archive/（不删），随时可以恢复。"),
 							offNow

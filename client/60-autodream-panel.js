@@ -59,6 +59,10 @@
 			const fixedReserved = ((memSet && memSet.reserved) || []).filter(function (n) {
 				return extraLower.indexOf(String(n).toLowerCase()) < 0;
 			});
+			// 2.7.1（Q04 尾巴）：宿主从 2.1.11 起就在 getSettings 里带 `limitDiagnostics`
+			// —— 坏 JSON / 逐项越界 / 环境变量写错都在这份数组里。以前它只进日志，
+			// 面板上看不见，于是「我改的值怎么没生效」只能靠猜。现在就地摊开逐条列。
+			const limitDiag = Array.isArray(memSet && memSet.limitDiagnostics) ? memSet.limitDiagnostics : [];
 			// 入口模式：新字段优先，旧 sidebarEntry 兜底；坏值 / 旧宿主一律按「两个都显示」。
 			// 存了 sidebar 但当前宿主不支持侧栏时，界面按 settings 显示并给一条降级提示。
 			const entryModeValue = entryModeFromSettings(memSet);
@@ -542,6 +546,17 @@
 					memSet && memSet.restartRequired
 						? h("div", { className: "smem-autodream-note smem-ad-warn", key: "rw" }, t("ad.limits.restartWarn"))
 						: h("div", { className: "smem-autodream-note", key: "rn" }, t("ad.limits.restartNote")),
+					// 2.7.1（Q04）：诊断逐条列出来。文案不猜原因 —— 数组里每一条都是宿主的原话
+					// （「读 settings.json 失败（ENOENT）」「maxResults 必须是 1..20 的整数」…）。
+					limitDiag.length
+						? h("div", { className: "smem-autodream-note smem-ad-warn", key: "diag", role: "status" }, [
+								h("div", { key: "t", style: { fontWeight: "600" } }, t("ad.limits.diagTitle", { count: limitDiag.length })),
+								h("ul", { key: "ul", className: "smem-diag-list" }, limitDiag.map(function (d, i) {
+									return h("li", { key: "diag-" + i }, String(d));
+								})),
+								h("div", { key: "n", className: "smem-status" }, t("ad.limits.diagNote")),
+							])
+						: null,
 					// 五个参数排两列（一行两个）：同样的信息，行数少一半，扫读反而更清楚。
 					h("div", { className: "smem-ad-grid2", key: "grid" }, LIMIT_FIELDS.map(function (f) {
 						const cur = memSet && memSet.limits ? memSet.limits[f.key] : null;

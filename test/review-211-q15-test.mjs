@@ -44,7 +44,9 @@ const group = (t) => console.log('\n── ' + t + ' ──')
 /** 假时钟：performance.now 从 1000 起（单调）；Date.now 故意给 epoch —— 修前混用立刻露馅。 */
 const CLOCK_START = 1000
 const EPOCH_NOW = 1700000000000
-const FULL_BRIGHT = 8.7e15
+// 2.7.2：全亮哨兵改成 1e30（不再是原来的 8.7e15）—— 顶点里的 birth 现在存的是**相对**时间，
+// 「全亮」必须用一个无论如何都远大于跨度的值，而不是一个和基准绑定的常数。
+const FULL_BRIGHT = 1e30
 const BG_PROG = 1 // makeWebGLRenderer 里第一个创建的程序就是背景
 
 const STARS = [
@@ -217,6 +219,43 @@ async function main() {
     ok(bgPhases().length === before + 1, `回到可见后补画 1 帧（${before} → ${bgPhases().length}）`)
     advance(20)
     ok(frames.pending() === 0, '恢复补帧后重新静止，没有常驻空转')
+  }
+
+  // ── 6. Float32 精度：时间域压到「相对最老那颗星」（2.7.2，Q15 边界里那条尾巴）──
+  group('6. 回放时间域：相对基准 + 窗口 ≫ 1 ulp（修前把 epoch ms 喂 Float32 = 瞬亮）')
+  {
+    const gl = node().gl
+    const ulp = (v) => Math.pow(2, Math.floor(Math.log2(Math.abs(v))) - 23)
+    // 顶点里的 birth：星点/尘星每顶点 13 个 float（corners 2 + meta0 3 + color 4 + meta1 3 + birth 1，
+    // 6 顶点一颗 → 长度必定是 78 的倍数）；星座线每顶点 7 个（xy + rgb + a + birth，2 顶点一条线 → 14 的倍数）。
+    const births = []
+    for (const buf of gl._bufferData) {
+      if (!Array.isArray(buf) || buf.length === 0) continue
+      const stride = buf.length % 78 === 0 ? 13 : buf.length % 14 === 0 ? 7 : 0
+      if (!stride) continue
+      for (let i = stride - 1; i < buf.length; i += stride) births.push(buf[i])
+    }
+    ok(births.length > 0, `从真顶点数据里读到了 birth 属性（${births.length} 个顶点）`)
+    const known = births.filter((v) => v >= 0)
+    const maxBirth = known.length ? Math.max.apply(null, known) : 0
+    const span = Math.max.apply(null, STARS.map((s) => s.mtimeMs)) - Math.min.apply(null, STARS.map((s) => s.mtimeMs))
+    ok(maxBirth <= span, `birth 存的是相对值（最大 ${maxBirth} ≤ 跨度 ${span}；修前是 1.7e12 量级的 epoch）`)
+    ok(known.length >= 3 && new Set(known).size >= 3, '不同记忆的 birth 彼此不同（没被舍入成同一个数）')
+
+    const starProg = gl._uniforms.find((u) => u.name === 'uRevealT').prog
+    const fades = uniformSeries(gl, 'uFadeMs', starProg)
+    ok(fades.length > 0, 'uFadeMs 真的写进了着色器（渐亮窗口不再是写死的 900）')
+    const fadeMs = fades[fades.length - 1]
+    ok(fadeMs >= 900 && Math.abs(fadeMs - span / 40) < 1, `窗口按跨度取（${fadeMs}；下限仍是 900）`)
+
+    // 判据本身：窗口必须是 1 个 ulp 的很多倍，否则这段渐变在 Float32 里根本不存在。
+    const ratio = fadeMs / ulp(maxBirth)
+    ok(ratio > 100, `窗口 / ulp(max birth) = ${ratio.toFixed(0)} ≫ 1（渐亮窗口在 Float32 里真的存在）`)
+
+    // 反向对照一：修前那套（绝对 epoch ms + 固定 900ms）窗口只有 0.007 个 ulp —— 判据不是恒真。
+    ok(900 / ulp(EPOCH_NOW) < 0.01, `【反向对照】修前口径 900 / ulp(epoch) = ${(900 / ulp(EPOCH_NOW)).toFixed(4)} < 0.01（等于瞬亮）`)
+    // 反向对照二：窗口没有大到把「逐颗点亮」改成整体渐亮。
+    ok(fadeMs < span / 2, `窗口 ${fadeMs} 仍远小于跨度 ${span}（回放仍是逐颗点亮）`)
   }
 
   console.log(`\n结果：${pass} passed, ${fail} failed`)

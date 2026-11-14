@@ -227,6 +227,8 @@
 			".smem-num:focus{border-color:var(--dsw-alias-brand-primary,#4d76e6);}",
 			".smem-status{font-size:12px;color:var(--dsw-alias-label-secondary);}",
 			".smem-autodream-note{font-size:11.5px;color:var(--dsw-alias-label-secondary);line-height:1.5;}",
+			// 2.7.1（Q04）：上限设置的诊断清单 —— 逐条列宿主的原话，缩进浅一点、行距紧一点。
+			".smem-diag-list{margin:4px 0 4px 16px;padding:0;font-size:11.5px;line-height:1.6;color:var(--dsw-alias-label-secondary);}",
 			".smem-autodream-list{display:flex;flex-direction:column;gap:6px;}",
 			".smem-report{border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:6px 9px;font-size:12px;cursor:pointer;background:transparent;color:inherit;text-align:left;font-family:inherit;}",
 			".smem-report:hover{border-color:var(--dsw-alias-border-l2);}",
