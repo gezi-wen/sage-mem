@@ -51,7 +51,7 @@ const RULES = [
   { literal: "'memory.md'", allow: ['shared/md-name.js'], why: '索引规范名只在 shared/md-name.js（其余用 INDEX_FILE_KEY）' },
   { literal: 'MAX_FILE_BYTES =', allow: ['shared/limits.js'], why: '512 KB 上限只在 shared/limits.js 定义' },
   { literal: 'MAX_RAW_BYTES =', allow: ['shared/limits.js'], why: '4 MB 上限只在 shared/limits.js 定义' },
-  // 2.10.0 体积治理：三条软线同样只许一处。判据是「字面量 + =」，所以别处写
+  // 2.10.1 体积治理：三条软线同样只许一处。判据是「字面量 + =」，所以别处写
   // `const X = 8 * 1024` 这种照抄数字的写法它拦不住（现有两条规则同病，已知洞）。
   { literal: 'TRIM_WARN_BYTES =', allow: ['shared/limits.js'], why: '8 KB 提醒线只在 shared/limits.js 定义' },
   { literal: 'TRIM_FORCE_BYTES =', allow: ['shared/limits.js'], why: '16 KB 强制线只在 shared/limits.js 定义' },

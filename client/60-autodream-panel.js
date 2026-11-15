@@ -44,7 +44,7 @@
 			// ── 2.7.0 界面入口三选一（客户端行为：改完立刻生效，不需要重启）──
 			const sEntryBusy = react.useState(false); const entryBusy = sEntryBusy[0], setEntryBusy = sEntryBusy[1];
 			const sEntryErr = react.useState(""); const entryErr = sEntryErr[0], setEntryErr = sEntryErr[1];
-			// ── 2.10.0「不参与整理的文件」那一块的界面状态 ──
+			// ── 2.10.1「不参与整理的文件」那一块的界面状态 ──
 			// **放在宿主里**是有意的：chips 与勾选面板必须是同一份选择（见 65 分片的头注），
 			// 而且这个 hook 的位置在「运行 / 设置 / 记录」三段里恒定 —— 子面板只在设置段出现，
 			// 它自己持状态就会在两段之间错位（宿主渲染器按位置存 hook 状态）。
@@ -56,7 +56,7 @@
 			const last = (st && st.lastResult) || null;
 			const route = (st && st.route) || null;
 			const rollbackScope = c.rollbackScope === "all" ? "all" : "files";
-			// 2.10.0：保留名名单（保护名单）整块交给 65-tidy-scope.js —— 它同时管
+			// 2.10.1：保留名名单（保护名单）整块交给 65-tidy-scope.js —— 它同时管
 			// 「chips 上立即落盘」与「勾选面板按保存落盘」，状态只有一份 draft。
 			// 这里不再派生 extraReserved / fixedReserved：**两套状态是这一块以前最脏的地方**。
 			// 2.7.1（Q04 尾巴）：宿主从 2.1.11 起就在 getSettings 里带 `limitDiagnostics`
@@ -252,7 +252,7 @@
 			/**
 			 * 保存保护名单的入口**已经搬进 65-tidy-scope.js**（`TidyScopePanel` 的 `put`）。
 			 *
-			 * 为什么搬：2.10.0 起这份名单同时决定「注入时跳过」与「体积治理时跳过」，
+			 * 为什么搬：2.10.1 起这份名单同时决定「注入时跳过」与「体积治理时跳过」，
 			 * 于是它需要两种编辑方式（chips 上点一下 / 勾选面板一次改多个）。两处各自
 			 * 持一份状态会打架 —— 现在只有 `tidyState` 一份（就在上面的 hook 里），
 			 * 子面板只读它、只按 props 回调改它；这一层负责把宿主回执里的 settings
@@ -592,7 +592,7 @@
 						h("span", { className: "smem-status", key: "c" }, t("ad.reserved.subtitle")),
 					]),
 					h("div", { className: "smem-autodream-note", key: "n" }, t("ad.reserved.note")),
-					// 2.10.0（契约 §6）：整块（chips + 手输入口 + 勾选面板 + 回执）由 65 分片渲染。
+					// 2.10.1（契约 §6）：整块（chips + 手输入口 + 勾选面板 + 回执）由 65 分片渲染。
 					// 这里只把宿主回执收到的 settings 接回来 —— 面板内保存完不会再各自刷新一遍。
 					h(TidyScopePanel, {
 						key: "tidy",

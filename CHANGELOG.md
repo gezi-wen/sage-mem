@@ -8,11 +8,13 @@
 ---
 
 
-## 2.10.0
+## 2.10.1
 
 **主题：记忆越写越大时，插件不再只是「提醒一句」—— 三条线、两条处置、三个执行面，超线必须当场二选一。**
 
-版本判定：2.10.0（MINOR）｜理由：新增对外能力面（主智能体的 `trim_memory`、自动做梦的 `archive_segment` 与「阶段 3.5」、设置页的「不参与整理的文件」勾选块、库健康的两类新审计），而**检索与注入行为零改动**（文件被裁后变短是唯一间接变化）｜运行时源文件 16（新增 `lib/memory/{size-policy,trim-plan,trim-archive}.js` 与 `lib/autodream/size-tools.js`；改 `lib/shared/{limits,codes}.js`、`lib/memory/{write-protocol,scan}.js`、`lib/tools/memory-tools.js`、`lib/assembly/tools-mount.js`、`lib/autodream/{tools,audit,report,prompt,util}.js`、`lib/typert.host.js`）+ 客户端 3（`65-tidy-scope.js` 新增、`60-autodream-panel.js`、`55-i18n-memory.js`）+ 构建清单 + 产物重建｜一版一件事：「超线记忆的处置变成流程里的必答题」
+> **版本号说明**：`2.10.0` 曾在 2026-11-14 做过一次内部试发并撤销。npm **不允许重发已撤销的版本号**（会回 `E400 Cannot publish over previously published version`），所以正式版编成 **2.10.1** —— 内容是本功能的完整版本（另含一次对外文字的脱敏修正）。
+
+版本判定：2.10.1（PATCH 位；能力面属 MINOR，但 `2.10.0` 号已被占用）｜理由：新增对外能力面（主智能体的 `trim_memory`、自动做梦的 `archive_segment` 与「阶段 3.5」、设置页的「不参与整理的文件」勾选块、库健康的两类新审计），而**检索与注入行为零改动**（文件被裁后变短是唯一间接变化）｜运行时源文件 16（新增 `lib/memory/{size-policy,trim-plan,trim-archive}.js` 与 `lib/autodream/size-tools.js`；改 `lib/shared/{limits,codes}.js`、`lib/memory/{write-protocol,scan}.js`、`lib/tools/memory-tools.js`、`lib/assembly/tools-mount.js`、`lib/autodream/{tools,audit,report,prompt,util}.js`、`lib/typert.host.js`）+ 客户端 3（`65-tidy-scope.js` 新增、`60-autodream-panel.js`、`55-i18n-memory.js`）+ 构建清单 + 产物重建｜一版一件事：「超线记忆的处置变成流程里的必答题」
 
 ### 行为变更
 

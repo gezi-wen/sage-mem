@@ -133,7 +133,7 @@ group('1. ToolDefinition 形状（宿主契约）')
   ok(readMemory.parameters.required.includes('name'), 'read_memory 必填 name')
   ok(Array.isArray(searchMemory.parameters.properties.scope.enum), 'search_memory 的 scope 是枚举')
 
-  // 2.10.0：trim_memory 同一条宿主契约，但**不是**只读工具 —— 可并发必须为 false。
+  // 2.10.1：trim_memory 同一条宿主契约，但**不是**只读工具 —— 可并发必须为 false。
   ok(trimMemory.name === 'trim_memory', 'trim_memory: name 正确')
   ok(typeof trimMemory.description === 'string' && trimMemory.description.length > 20, 'trim_memory: description 够长')
   ok(trimMemory.parameters.additionalProperties === false, 'trim_memory: 参数封闭')
@@ -153,9 +153,9 @@ group('2. ctx.inject 注册（宿主有 tools）')
   new MemoryGateway(ctx)
   ok(Array.isArray(ctx.injectedDeps) && ctx.injectedDeps.includes('tools'),
     '用 ctx.inject(["tools"], …) 挂子 fiber（不是 static inject）', JSON.stringify(ctx.injectedDeps))
-  ok(ctx.registered.length === 3, '注册了三个工具（2.10.0：多了 trim_memory）', String(ctx.registered.length))
+  ok(ctx.registered.length === 3, '注册了三个工具（2.10.1：多了 trim_memory）', String(ctx.registered.length))
   // ⚠️ 下面这条的**名字**被 docs/1.0.0-contract.md 的 3.1 钉着（contract-binding-test 按名字找回断言）。
-  // 2.10.0 多了第三个工具，但「两个检索工具都注册了」这句话仍然成立 —— 所以名字不改，
+  // 2.10.1 多了第三个工具，但「两个检索工具都注册了」这句话仍然成立 —— 所以名字不改，
   // 判据拆成「两个检索工具都在」+ 下面另一条「集合正好是这三个」。
   const registeredNames = ctx.registered.map((d) => d.name)
   ok(registeredNames.includes('search_memory') && registeredNames.includes('read_memory'),

@@ -53,12 +53,12 @@ group('1. 组合根体积（1.2.0 验收线；2.0.0 按 D21 的契约位置调�
   const ctorLines = start >= 0 && end > start ? src.slice(start, end).split('\n').length : Infinity
   ok(ctorLines <= 60, `MemoryGateway 构造函数 ≤ 60 行（实际 ${ctorLines}；1.1.0 是 540）`, `start=${start} end=${end}`)
   const maxFile = all.filter((f) => f.rel !== 'client.js').reduce((a, b) => (a.lines >= b.lines ? a : b))
-  // 900 → 950（1.7.0）→ 1100（2.0.0）→ 1120（2.10.0 体积治理）：
+  // 900 → 950（1.7.0）→ 1100（2.0.0）→ 1120（2.10.1 体积治理）：
   // `memory/recallDebug` 与 6 条 `conflict.*` 的 strict schema，以及本版审计新增的
   // `oversize` / `indexOversize` 两类字段，都是**传输契约**，必须与它镜像的 payload
   // 放在同一个 manifest 文件里（typert 的 strict 会把没声明的字段剥掉，搬走就是面板
   // 与模型面口径分叉）。这条护栏防的是「往 lib 里塞逻辑」，不是防 schema 行数
-  // （39 条 invocation 的字段声明本来就会长）。所以 2.10.0 只放宽这 20 行并写明理由。
+  // （39 条 invocation 的字段声明本来就会长）。所以 2.10.1 只放宽这 20 行并写明理由。
   ok(maxFile.lines <= 1120, `lib/ 下单文件 ≤ 1120 行（最大 ${maxFile.rel} ${maxFile.lines} 行；client.js 是构建产物不计）`)
   ok(!/function createSessionInjectState\s*\(/.test(src), '注入状态不再定义在组合根里（已搬到 recall/state.js）')
 }

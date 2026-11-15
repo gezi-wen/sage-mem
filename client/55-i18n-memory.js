@@ -488,7 +488,7 @@
 			"ad.err.reservedDup": "名单里已经有 {name} 了",
 			"ad.note.modelCatalogUnavailable": "模型目录不可用（{error}）—— 请在下面手填 provider 与 model。",
 
-			// ── 2.10.0 体积治理：不参与整理的文件（65-tidy-scope.js）──
+			// ── 2.10.1 体积治理：不参与整理的文件（65-tidy-scope.js）──
 			"ad.tidyScope.title": "不参与整理的文件",
 			"ad.tidyScope.count": "已保护 {on} / 共 {total} 个",
 			"ad.tidyScope.note1": "勾上的文件在体积治理时不会被裁剪或压缩 —— 自动做梦与 trim_memory 都按这份名单跳过。",
@@ -1041,7 +1041,7 @@
 			"ad.err.reservedDup": "{name} is already in the list",
 			"ad.note.modelCatalogUnavailable": "The model catalog is unavailable ({error}) — enter provider and model below by hand.",
 
-			// ── 2.10.0 size governance: files excluded from tidying (65-tidy-scope.js) ──
+			// ── 2.10.1 size governance: files excluded from tidying (65-tidy-scope.js) ──
 			"ad.tidyScope.title": "Files excluded from tidying",
 			"ad.tidyScope.count": "{on} of {total} protected",
 			"ad.tidyScope.note1": "Checked files are never trimmed or compressed by size governance — Autodream and trim_memory both skip this list.",
