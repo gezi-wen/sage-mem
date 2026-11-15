@@ -37,6 +37,8 @@ function walk(dir) {
 
 const all = walk(LIB).map((p) => ({ rel: relative(LIB, p).replace(/\\/g, '/'), src: readFileSync(p, 'utf8'), lines: readFileSync(p, 'utf8').split('\n').length }))
 const importsOf = (src) => [...src.matchAll(/^import[^\n]*from\s+'([^']+)'/gm)].map((m) => m[1])
+/** 去掉注释再判「源码里有没有那种调用」——注释里提到 `fs` 不该算违规。 */
+const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
 
 // ── 1. 组合根体积 ───────────────────────────────────────────────
 group('1. 组合根体积（1.2.0 验收线；2.0.0 按 D21 的契约位置调整）')
@@ -142,6 +144,37 @@ group('4. typert 契约：39 条 invocation 仍指 lib/index.js')
   const CLIENT_RESERVED_METHODS = new Set(['remove'])
   const clash = TYPERT.invocations.filter((i) => CLIENT_RESERVED_METHODS.has(i.method)).map((i) => i.id)
   ok(clash.length === 0, '没有任何 remote 方法名撞上宿主客户端命名空间的保留名', clash.join(','))
+}
+
+// ── 5. 纯逻辑层不许碰 IO（2.10.2 模块化的第二件） ──────────────────
+// 为什么单列一组：`size-policy.js`（判据）与 `trim-plan.js`（切分）是「同一句话只许说一次」
+// 的落点 —— 写入回执、库健康审计、工具面三处消费者共用它们。一旦有人在里面
+// `import fs`（哪怕只想瞄一眼磁盘），它就再也不能对着字符串做单测，还会在 import 时
+// 带上环境依赖；而**写盘的安全性只该由 `memory/trim-archive.js` 一处承担**
+// （写序见 docs/size-governance-contract.md §3）。
+//
+// 与第 2 组的分工：那组管「谁能认识谁」（依赖方向），本组管「能不能碰环境」（纯度）。
+group('5. 纯逻辑层：判据与切分不许 import fs')
+{
+  const PURE = ['memory/size-policy.js', 'memory/trim-plan.js']
+  for (const rel of PURE) {
+    const f = all.find((x) => x.rel === rel)
+    ok(!!f, `${rel} 存在（守卫的靶子）`)
+    if (!f) continue
+    const imps = importsOf(f.src)
+    const nodeImports = imps.filter((i) => i.startsWith('node:') || i === 'fs' || i === 'fs/promises')
+    ok(nodeImports.length === 0,
+      `${rel} 零 node 内建 import（纯函数：可对字符串断言、import 时不读环境）`,
+      nodeImports.join(','))
+    // 静态 import 拦住了，还要拦绕法：`await import('node:fs')` 与 `require('fs')`。
+    ok(!/(?:await\s+import|\brequire)\s*\(\s*['"](?:node:)?fs(?:\/promises)?['"]/.test(stripComments(f.src)),
+      `${rel} 没有 require / 动态 import fs 的绕法`)
+  }
+  // 【反向对照】真正写盘的那个模块**必须**能用 node 内建 —— 否则上面两条可能只是「谁都不许」。
+  const io = all.find((x) => x.rel === 'memory/trim-archive.js')
+  ok(!!io && importsOf(io.src).some((i) => i.startsWith('node:')),
+    '【反向对照】写盘的 trim-archive.js 允许 import node 内建（判据是「纯逻辑层」而不是「所有文件」）',
+    io ? importsOf(io.src).join(',') : '文件不存在')
 }
 
 console.log(`\n结果：${pass} passed, ${fail} failed`)

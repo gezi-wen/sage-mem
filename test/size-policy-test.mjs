@@ -3,7 +3,7 @@
  * 体积治理判据的断言（`lib/memory/size-policy.js`，2.10.1 A 片）。
  *
  * 为什么这套件几乎全在盯**边界**：体积治理出错的样子不是崩溃，是「差一个字节」——
- * `8*1024-1` 与 `8*1024` 归到同一档，用户就会看到「明明没到 8 KB 也提醒我」；
+ * `16*1024-1` 与 `16*1024` 归到同一档，用户就会看到「明明没到 16 KB 也提醒我」；
  * CRLF 忘了剥 `\r`，Windows 上写出来的索引每一行都多一个字，240 那条线整体偏一位。
  * 所以每一组都成对写：`n-1` 与 `n` 各一条，围栏里与围栏外各一条，CRLF 与 LF 各一条。
  *
@@ -65,8 +65,8 @@ const linesOf = (...rows) => rows.join('\n')
 // ── 1. 四条线只有一处定义，且软线在硬闸门之下 ──────────────────────
 group('1. 常量（唯一来源 shared/limits.js）')
 {
-  ok(TRIM_WARN_BYTES === 8 * 1024, `TRIM_WARN_BYTES = 8 KB（实际 ${TRIM_WARN_BYTES}）`)
-  ok(TRIM_FORCE_BYTES === 16 * 1024, `TRIM_FORCE_BYTES = 16 KB（实际 ${TRIM_FORCE_BYTES}）`)
+  ok(TRIM_WARN_BYTES === 16 * 1024, `TRIM_WARN_BYTES = 16 KB（实际 ${TRIM_WARN_BYTES}）`)
+  ok(TRIM_FORCE_BYTES === 40 * 1024, `TRIM_FORCE_BYTES = 40 KB（实际 ${TRIM_FORCE_BYTES}）`)
   ok(INDEX_LINE_CHARS === 240, `INDEX_LINE_CHARS = 240（实际 ${INDEX_LINE_CHARS}）`)
   ok(INDEX_DOC_BYTES === 24 * 1024, `INDEX_DOC_BYTES = 24 KB（实际 ${INDEX_DOC_BYTES}）`)
   ok(TRIM_WARN_BYTES < TRIM_FORCE_BYTES, '提醒线在强制线之下（否则 warn 永远走不到）')
@@ -129,8 +129,8 @@ group('3. classifySize 三档（边界成对写）')
     'bytes 缺失 → 当 0（审计直接叫它，不许抛）')
   ok(classifySize({ bytes: NaN }).level === 'ok' && classifySize({ bytes: -1 }).level === 'ok',
     'NaN / 负数 → 当 0')
-  ok(classifySize({ bytes: '8192' }).level === 'ok', '字符串 "8192" 不认（只收数字，避免隐式转换把闸门判松）')
-  ok(classifySize({ bytes: 8192.9 }).bytes === 8192, '小数向下取整（字节是整数，不留 8192.9 这种值）')
+  ok(classifySize({ bytes: '16384' }).level === 'ok', '字符串 "16384" 不认（只收数字，避免隐式转换把闸门判松）')
+  ok(classifySize({ bytes: 16384.9 }).bytes === 16384, '小数向下取整（字节是整数，不留 16384.9 这种值）')
 }
 
 // ── 4. indexFindings：长行 / 围栏 / CRLF / 整份体积 ─────────────────
@@ -204,7 +204,8 @@ group('5. sizeText')
   ok(sizeText(1023) === '1023 B', '1023 → 1023 B（B 档的边界）')
   ok(sizeText(1024) === '1 KB', '1024 → 1 KB（进位到 KB）')
   ok(sizeText(8192) === '8 KB', '8192 → 8 KB（整数 KB 不写成 8.0 KB）')
-  ok(sizeText(16384) === '16 KB', '16384 → 16 KB（文案里「超过 16 KB 强制线」靠它）')
+  ok(sizeText(16384) === '16 KB', '16384 → 16 KB（提醒线；文案里「超过 16 KB 提醒线」靠它）')
+  ok(sizeText(40960) === '40 KB', '40960 → 40 KB（2.10.2 的强制线）')
   ok(sizeText(24576) === '24 KB', '24576 → 24 KB')
   ok(sizeText(27034) === '26.4 KB', '27034 → 26.4 KB（契约里的例子）')
   ok(sizeText(1048576) === '1 MB', '1 MB → 1 MB（进位到 MB）')
@@ -216,13 +217,13 @@ group('5. sizeText')
 // ── 6. adviceText：一句话，且与 read_memory 回执那句逐字一致 ─────────
 group('6. adviceText')
 {
-  const force = adviceText({ bytes: 27034, kind: 'entry' })
-  ok(force === '这条 26.4 KB，超过 16 KB 强制线：按 sage-mem 技能的「体积治理」处置（裁段归档 / 压缩）',
+  const force = adviceText({ bytes: 44135, kind: 'entry' })
+  ok(force === '这条 43.1 KB，超过 40 KB 强制线：按 sage-mem 技能的「体积治理」处置（裁段归档 / 压缩）',
     'entry force 的句子与契约 §4 的 read_memory 回执逐字一致', force)
-  const warn = adviceText({ bytes: 8192, kind: 'entry' })
-  ok(warn.includes('超过 8 KB 提醒线') && warn.includes('裁段归档'), 'entry warn 说清「超了哪条线 + 怎么做」', warn)
+  const warn = adviceText({ bytes: 16384, kind: 'entry' })
+  ok(warn.includes('超过 16 KB 提醒线') && warn.includes('裁段归档'), 'entry warn 说清「超了哪条线 + 怎么做」', warn)
   const fine = adviceText({ bytes: 1024, kind: 'entry' })
-  ok(fine.includes('体积正常') && fine.includes('8 KB') && fine.includes('16 KB'),
+  ok(fine.includes('体积正常') && fine.includes('16 KB') && fine.includes('40 KB'),
     'entry ok 顺带报两条线（用户知道离得还有多远）', fine)
 
   const idxWarn = adviceText({ bytes: 12288, kind: 'index' })

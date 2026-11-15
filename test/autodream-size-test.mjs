@@ -73,9 +73,9 @@ const filler = (n, width) =>
 
 // ── 夹具：一条正常、一条提醒线、一条强制线、一条保留名、一份流水、一份索引 ──
 const SMALL_BODY = '## 现状\n\n- 一切正常\n'
-const WARN_BODY = `## 提醒线\n\n${filler(210, 14)}` // ≈ 210 × 48B ≈ 9.8 KB
-const FORCE_BODY = `## 强制线\n\n${filler(220, 30)}` // ≈ 220 × 96B ≈ 21 KB
-const RESERVED_BODY = `## 手写单副本\n\n${filler(220, 30)}` // 同样超强制线，但在保护名单里
+const WARN_BODY = `## 提醒线\n\n${filler(420, 14)}` // ≈ 420 × 59B ≈ 24 KB（2.10.2：提醒线 16 KB）
+const FORCE_BODY = `## 强制线\n\n${filler(410, 30)}` // ≈ 410 × 107B ≈ 43 KB（2.10.2：强制线 40 KB）
+const RESERVED_BODY = `## 手写单副本\n\n${filler(420, 30)}` // 同样超强制线，但在保护名单里
 const SESSION_LOG_BODY = filler(300, 30)
 
 writeFileSync(F('project_small.md'), entryText('project_small', 'project', SMALL_BODY, '小条目'), 'utf8')
@@ -105,11 +105,11 @@ group('1. 审计 oversize / indexOversize（保护名单与非条目不计）')
   ok(files.length === 2, `oversize 只收超线的两条（实际 ${j(files)}）`)
   const force = (report.oversize ?? []).find((o) => o.file === 'project_force.md')
   const warn = (report.oversize ?? []).find((o) => o.file === 'project_warn.md')
-  ok(!!force && force.level === 'force' && force.bytes >= 16 * 1024,
-    '21 KB 的条目判成 force（≥16 KB）', j(force))
-  ok(!!warn && warn.level === 'warn' && warn.bytes >= 8 * 1024 && warn.bytes < 16 * 1024,
-    '9.8 KB 的条目判成 warn（8~16 KB 之间）', j(warn))
-  ok(!files.includes(RESERVED_NAME), '保护名单里的文件不计入超线（哪怕它 21 KB）', j(files))
+  ok(!!force && force.level === 'force' && force.bytes >= 40 * 1024,
+    '43 KB 的条目判成 force（≥40 KB）', j(force))
+  ok(!!warn && warn.level === 'warn' && warn.bytes >= 16 * 1024 && warn.bytes < 40 * 1024,
+    '24 KB 的条目判成 warn（16~40 KB 之间）', j(warn))
+  ok(!files.includes(RESERVED_NAME), '保护名单里的文件不计入超线（哪怕它 44 KB）', j(files))
   ok(!files.includes('session-log.md'), '追加型流水不计入超线（它不是一条记忆）', j(files))
   ok(!files.includes('project_small.md'), '正常条目不出现在 oversize 里', j(files))
   ok(report.problems === 1, 'problems 只计强制线那一条（warn 只提示）', `problems=${report.problems}`)
@@ -118,7 +118,7 @@ group('1. 审计 oversize / indexOversize（保护名单与非条目不计）')
   ok((report.indexOversize[0]?.longLines ?? 0) >= 1, '索引超长里带「超长行有几行」',
     j(report.indexOversize[0]))
   const text = auditMod.formatAudit(report)
-  ok(text.includes('≥16 KB 必须处置'), 'formatAudit 的超线段标题带处置建议（≥16 KB 必须处置）')
+  ok(text.includes('≥40 KB 必须处置'), 'formatAudit 的超线段标题带处置建议（≥40 KB 必须处置）')
   ok(text.includes('· 必须处置') && text.includes('· 提醒'), '同一条超线段里逐行标出「必须处置 / 提醒」', text)
   ok(text.includes('索引过长') && text.includes('只报不改'), 'formatAudit 有「索引过长（只报不改）」那一节')
   ok(!text.includes(RESERVED_NAME), '保护名单里的文件不出现在审计文本里（不催人动它）', text.slice(0, 200))
@@ -167,7 +167,7 @@ group('1c. typert 审计 schema：新字段必须声明（strict 会剥掉没声
     unreadable: [],
     strays: [],
     validityHints: [],
-    oversize: [{ file: 'a.md', bytes: 20000, level: 'force' }],
+    oversize: [{ file: 'a.md', bytes: 44100, level: 'force' }],
     indexOversize: [{ file: 'MEMORY.md', bytes: 30000, longLines: 2 }],
     problems: 1,
   }
@@ -204,7 +204,7 @@ group('1c. typert 审计 schema：新字段必须声明（strict 会剥掉没声
     '阶段 3.5 排在阶段 4 之前')
   ok(applyPrompt.includes('archive_segment'), '改写模式的提示点名了 archive_segment（不点名模型不会用）')
   ok(applyPrompt.includes('write_memory'), '也给了拆不开时的另一条路（write_memory 压缩）')
-  ok(applyPrompt.includes('16 KB'), '写清了强制线的数值')
+  ok(applyPrompt.includes('40 KB'), '写清了强制线的数值')
   ok(applyPrompt.includes('reason'), '提醒裁段必须带 reason')
   ok(/说明为什么|说明为什么/.test(applyPrompt) && applyPrompt.includes('回报里'), '一条都没处置时要求回报说明为什么')
 
@@ -255,7 +255,7 @@ group('3. 整理声明与 manifest.trim')
       file: 'project_force.md',
       op: 'trim',
       reason: '旧方案已被现行方案取代',
-      beforeBytes: 20000,
+      beforeBytes: 44100,
       afterBytes: 9000,
       extra: { archivedFile: 'project_force-旧方案-20261115.md', segmentBytes: 11000 },
     }),
@@ -290,9 +290,9 @@ group('3. 整理声明与 manifest.trim')
     auditBefore: {
       problems: 2,
       oversize: [
-        { file: 'project_force.md', bytes: 20000, level: 'force' },
-        { file: 'project_warn.md', bytes: 9000, level: 'warn' },
-        { file: 'project_untouched.md', bytes: 18000, level: 'force' },
+        { file: 'project_force.md', bytes: 44100, level: 'force' },
+        { file: 'project_warn.md', bytes: 24000, level: 'warn' },
+        { file: 'project_untouched.md', bytes: 41000, level: 'force' },
       ],
       indexOversize: [{ file: 'MEMORY.md', bytes: 13000, longLines: 2 }],
     },
@@ -320,7 +320,7 @@ group('3. 整理声明与 manifest.trim')
   ok(md.includes('`project_force.md`') && md.includes('裁段归档'), '逐条给出文件与操作（裁段归档）', md.slice(0, 400))
   ok(md.includes('就地压缩'), '压缩那条也在表里（就地压缩）')
   ok(md.includes('旧方案已被现行方案取代'), '缘由逐条列出（人靠它判断裁得对不对）')
-  ok(md.includes('19.5KB → 8.8KB'), '体积变化按 before → after 给（KB）')
+  ok(md.includes('43.1KB → 8.8KB'), '体积变化按 before → after 给（KB）')
   ok(md.includes('archive/project_force-旧方案-20261115.md'), '裁段那条标出归档件落点')
   ok(md.includes('只报不改'), 'protected 的条目单列一句（不催人去动索引）')
   ok(md.includes('本趟没处置'), 'deferred 的条目单列一句', md.slice(0, 600))
@@ -351,8 +351,8 @@ group('3. 整理声明与 manifest.trim')
     changes: [],
     warnings: [],
     notes: [],
-    auditBefore: { problems: 1, oversize: [{ file: 'project_force.md', bytes: 20000, level: 'force' }], indexOversize: [] },
-    auditAfter: { problems: 1, oversize: [{ file: 'project_force.md', bytes: 20000, level: 'force' }], indexOversize: [] },
+    auditBefore: { problems: 1, oversize: [{ file: 'project_force.md', bytes: 44100, level: 'force' }], indexOversize: [] },
+    auditAfter: { problems: 1, oversize: [{ file: 'project_force.md', bytes: 44100, level: 'force' }], indexOversize: [] },
     finalText: '什么都没做。',
   })
   ok(decl2.manifest.trim.deferred === true, '超线条数没降 → deferred=true', j(decl2.manifest.trim))

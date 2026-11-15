@@ -8,6 +8,41 @@
 ---
 
 
+## 2.10.2
+
+**主题：把体积软线从 8 KB / 16 KB 抬到 16 KB / 40 KB，并更正 2.10.1 写错的一处依据。**
+
+版本判定：2.10.2（PATCH 位｜只调两个常量与文案，能力面与行为语义零改动）｜理由：改的是 `lib/shared/limits.js` 里两个常量（`TRIM_WARN_BYTES` 8 → 16 KB、`TRIM_FORCE_BYTES` 16 → 40 KB）与对外文字，没有新增能力面、没有新增配置项与环境变量，也没有数据格式或 `remote` 契约变化 —— 升级后观察到的唯一差别是「提醒来得晚」｜运行时源文件 8（`lib/shared/limits.js` 改的是两个常量；其余 7 个只改注释与文案 —— `lib/memory/{size-policy,write-protocol}.js`、`lib/autodream/{audit,prompt,report,size-tools}.js`、`lib/typert.host.js`，其中审计段标题、人读报告标题、自动做梦提示词与 `archive_segment` 的工具描述里的数字随之更新）+ 对外文档与技能 6 份（`README.md`、`README.en.md`、`CHANGELOG.md`、`.release-notes.md`、`skills/sage-mem/SKILL.md`、`docs/size-governance-contract.md`）+ 测试 4 份（3 份边界与夹具 + 1 份新增守卫）｜一版一件事：「把提醒从噪音改回提醒，并把上一版写错的依据改对」
+
+### 行为变更
+
+- 提醒线 8 KB → **16 KB**、强制线 16 KB → **40 KB**（唯一定义处仍是 `lib/shared/limits.js`；索引 240 字符 / 24 KB、512 KB 硬顶不变）。判级口径不变：`≥ 40 KB` 为 force（计入「库健康」problems）、`≥ 16 KB` 为 warn（只提示），`session-log.md` 与保护名单里的文件永远 skip。
+- **依据更正**：2.10.1 的说明写过「注入只读前 1500 字，所以大文件的后段对未来的自己静默失效」。这句只在两处成立 —— `baseline` 条目（不吃段落替换，仍读开头并受单条字数上限截断，契约 2.12 标「尽力」），以及某次注入只命中摘要、没命中正文时（那时给的是文件开头）。真实机制是普通条目**按 600 字块选段注入**（`lib/memory/chunks.js` → `lib/recall/select.js` → `lib/recall/compose.js`），一条大文件里相关的那段照样会被选中 —— **体积不影响命中**。体积影响的是另外三笔：读全文时模型要一次吞下整份（`read_memory` 没有分页）、自动做梦一轮要通读的超线条目越多越贵、条目越长裁段与压缩的编辑风险越大；此外「越长越可能是没整理过的堆积」本身是个值得处理的信号。抬线到 16 / 40 KB 也是同一个判断：8 KB 时一条正常的长条目几乎每次写入都在提醒，那是噪音。
+- 其他所有判定口径、工具（`trim_memory` / `archive_segment`）、审计字段（`oversize` / `indexOversize`）、`trim` 声明结构**全部不变** —— 本版只是这两个数字与随之而来的文案。
+
+### 不变
+
+- **检索与注入**：相关度打分、段落检索（600 字块）、IDF 证据门、5 项上限、`baseline` 排序、单场会话 60 KB 预算与「软上限」语义全部不变。本版对注入行为零影响。
+- **文件格式与既有 frontmatter 字段**、锁表、访问台账、冲突队列与裁决、整文件归档、回滚点与回滚行为全部不变；`remote` 方法集不变（只增字段的规则照旧）。
+- **索引线**（`MEMORY.md` 单行 240 字符 / 整份 24 KB，整份过半即 12 KB 开始提醒）与 512 KB 硬顶、保留名 4 MB 上限、流水与保护名单的 skip 语义全部不变。
+- **告警行为**：越提醒线仍只在写入日志与 `read_memory` 回执里留一行，**绝不拒写**；到强制线仍只计入 problems，由自动做梦在那一趟处置。
+- **没有新增环境变量**，阈值仍不是设置项（理由同 2.10.1：三档都要接 `pending → restartRequired → 两级 schema`）。
+
+### 新增测试
+
+- `test/size-policy-test.mjs` / `test/autodream-size-test.mjs` / `test/memory-tools-test.mjs` 的边界与夹具跟着新线走（16 KB / 40 KB 两个边界值本身算超，下方一个字节不算）。
+- `test/structure-test.mjs` 新增第 5 组「纯逻辑层：判据与切分不许 import fs」守卫：`memory/size-policy.js` 与 `memory/trim-plan.js` 零 node 内建 import（`require` / 动态 `import` 的绕法一并拦，判之前先剥注释），反向对照确认真正写盘的 `memory/trim-archive.js` 仍可用 node 内建。
+- 合计：`npm test` **5129 passed / 0 failed**（91 个套件；比 2.10.1 的 5121 净增 8 条 —— `structure-test` 新增 7 条守卫断言，`size-policy-test` 多一条「40960 → 40 KB」的格式化断言，其余套件条数不变）。
+
+### 实测
+
+- 全量 `node test/run.mjs`：91 个套件、**5129 passed / 0 failed**。
+- 夹具在**新线下的分级**（防「只改数字不改夹具」这种自欺）：`test/autodream-size-test.mjs` 的提醒线条目实测 **24.2 KB** → `warn`、强制线条目 **42.8 KB** → `force`、保护名单条目 **43.9 KB** → `skip`；`test/memory-tools-test.mjs` 的超线夹具 **25.3 KB** → `warn`（回执多一行 `ℹ 这条 …，超过 16 KB 提醒线…`）。
+- `node scripts/build-client.mjs`：`lib/client.js` 产物**逐字节未变**（本版没有任何界面文案改动，客户端快照无需重建）。
+- 结构守卫：`lib/typert.host.js` 1113 行、`lib/autodream/tools.js` 1097 行，仍在 1120 上限内 —— 本版没有往这两个文件加行（数字只改在注释与文案里）。
+
+---
+
 ## 2.10.1
 
 **主题：记忆越写越大时，插件不再只是「提醒一句」—— 三条线、两条处置、三个执行面，超线必须当场二选一。**

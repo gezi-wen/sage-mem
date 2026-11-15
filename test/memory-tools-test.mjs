@@ -320,14 +320,14 @@ group('7. trim_memory 落盘 + read_memory 超线提示')
   // read_memory：整份超过提醒线 → 回执末尾多一行提示（文案由 size-policy 出）
   writeFileSync(join(memDir, 'project_huge.md'), [
     '---', 'name: project_huge', 'description: 超线合成记忆', '---', '',
-    para('超线', 120),
+    para('超线', 320),
   ].join('\n'), 'utf8')
-  ok(statSync(join(memDir, 'project_huge.md')).size > 8 * 1024, '（前提）project_huge.md 确实超过 8 KB 提醒线')
+  ok(statSync(join(memDir, 'project_huge.md')).size > 16 * 1024, '（前提）project_huge.md 确实超过 16 KB 提醒线')
   const read = await readMemory.execute({ name: 'project_huge.md' })
   ok(read.ok === true, '（前提）超大记忆照常读得到')
   const rendered = readMemory.output.render({}, read)[0].text
   ok(rendered.includes('ℹ 这条'), '回执追加了体积提示', rendered.slice(-160))
-  ok(rendered.includes('8 KB') || rendered.includes('16 KB'), '提示里写了对照的那条线', rendered.slice(-160))
+  ok(rendered.includes('16 KB'), '提示里写了对照的那条线', rendered.slice(-160))
   const smallRead = await readMemory.execute({ name: 'reference_beta.md' })
   ok(!readMemory.output.render({}, smallRead)[0].text.includes('ℹ 这条'), '【反向对照】小文件不出现体积提示')
 }

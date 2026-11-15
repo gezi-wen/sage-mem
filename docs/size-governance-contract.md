@@ -1,14 +1,16 @@
 # 体积治理 · 模块契约（2.10.1 实现基准）
 
+> 2.10.2 起两条软线为提醒 16 KB / 强制 40 KB（2.10.1 落地时是 8 KB / 16 KB）；其余契约不变。
+
 > 本文件是实现的**唯一接口真相**。四个实现片各自只碰自己的文件，跨片调用只按这里的签名。
 > 设计与取舍（含被驳回的方案与代价）记在 `docs/decisions.md` 的 **D45**。
-> 违反依赖方向会被 `test/structure-test.mjs:64-93` 红掉：`memory/**` 不许 import `autodream/**`、`recall/**`、`assembly/**`、组合根。
+> 违反依赖方向会被 `test/structure-test.mjs` 第 2 组（依赖方向）红掉：`memory/**` 不许 import `autodream/**`、`recall/**`、`assembly/**`、组合根。
 
 ## 0. 三条线（唯一定义处 `lib/shared/limits.js`）
 
 ```js
-export const TRIM_WARN_BYTES  = 8 * 1024    // 提醒
-export const TRIM_FORCE_BYTES = 16 * 1024   // 强制处置
+export const TRIM_WARN_BYTES  = 16 * 1024   // 提醒 16 KB
+export const TRIM_FORCE_BYTES = 40 * 1024   // 强制处置 40 KB
 export const INDEX_LINE_CHARS = 240         // MEMORY.md 单行字符上限
 export const INDEX_DOC_BYTES  = 24 * 1024   // MEMORY.md 整份字节上限
 ```
@@ -110,7 +112,7 @@ export async function trimArchive(p)
 - `heading` 与 `startLine/endLine` 二选一，缺两个或都给 → 回文案错误（说明怎么填）。
 - `reason` 必填 ≥4 字。
 - 回执是**字符串**（工具面惯例）：成功给「已裁剪 <n> 字节到 archive/<file>，主文件 <a> → <b> 字节」；失败给 `错误：<code> — <一句处置建议>`。
-- `read_memory` 的回执在命中条目超线时**追加一行**：`ℹ 这条 26.4 KB，超过 16 KB 强制线：按 sage-mem 技能的「体积治理」处置（裁段归档 / 压缩）`。
+- `read_memory` 的回执在命中条目超线时**追加一行**：`ℹ 这条 43.1 KB，超过 40 KB 强制线：按 sage-mem 技能的「体积治理」处置（裁段归档 / 压缩）`。
 
 ## 5. 自动做梦挂点
 
@@ -133,7 +135,7 @@ export async function runArchiveSegment(args, deps)   // → string（永不抛�
 - 新数组 `oversize: [{file, bytes, level:'warn'|'force'}]`（只收 ≥ warn 的条目，**跳过 `isReserved` 与 `NON_ENTRY_FILES`**）。
 - 新数组 `indexOversize: [{file, bytes, longLines:number}]`（仅 `MEMORY.md`）。
 - `problems` 只加 `oversize` 里 `level==='force'` 的条数；`warn` 级与 `indexOversize` 只提示（照 `archivedLinks` 的写法）。
-- `formatAudit` 加两节，标题含处置建议（例如「超过 16 KB（必须处置）」/「索引过长（只报不改）」）。
+- `formatAudit` 加两节，标题含处置建议（例如「超过 40 KB（必须处置）」/「索引过长（只报不改）」）。
 
 ### 5.4 `lib/autodream/report.js`
 - manifest 顶层新键 `trim`：
@@ -147,7 +149,7 @@ export async function runArchiveSegment(args, deps)   // → string（永不抛�
 
 ### 5.5 `lib/autodream/prompt.js`
 - 用户提示在「阶段 3 整合」与「阶段 4 修剪与索引」之间插入 **「## 阶段 3.5 — 体积治理」**，内容要点：
-  - 超过 16 KB 的条目本趟必须处置；能拆成完整小节 → `archive_segment`；拆不开 → `write_memory` 压缩（结论前置、去重、删被推翻的）。
+  - 超过 40 KB 的条目本趟必须处置；能拆成完整小节 → `archive_segment`；拆不开 → `write_memory` 压缩（结论前置、去重、删被推翻的）。
   - `MEMORY.md`、`session-log.md`、保护名单里的文件**不算**（不许动）。
   - 裁段必须带 `reason`；工具会自动在主文件留指针。
   - 若确实一条都没处置，回报里说明为什么。
@@ -159,7 +161,7 @@ export async function runArchiveSegment(args, deps)   // → string（永不抛�
 oversize: z.array(z.object({ file: z.string(), bytes: z.number(), level: z.string() })).optional(),
 indexOversize: z.array(z.object({ file: z.string(), bytes: z.number(), longLines: z.number() })).optional(),
 ```
-**`test/structure-test.mjs:59` 的单文件上限同时从 1100 改到 1120**（文件头注释写明理由：审计新增两类字段是传输契约，不能搬走）。
+**`test/structure-test.mjs` 第 1 组的单文件行数上限同时从 1100 改到 1120**（文件头注释写明理由：审计新增两类字段是传输契约，不能搬走）。
 
 ## 6. 设置页「不参与整理的文件」（`client/`）
 

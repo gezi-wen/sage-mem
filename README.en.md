@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.10.1`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.10.2`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -75,7 +75,7 @@ Most memory schemes take the "SQLite + a long-running worker" route: once memori
 | **The model can look things up too** | Three tools are also given to the model (`search_memory` / `read_memory`, plus the disk-writing `trim_memory`), so it can go through memories on its own, read the original text by line, and cut a stale section out into the archive |
 | **Writes are not overwritten** | While you are editing and the model is changing things at the same time, the later write does not silently clobber the earlier one; the conflict is left as a pending record for you to decide which side to keep |
 | **Zero extra services** | No worker, no SQLite, no port, no long-running process, and no extra API key or cloud service (the only runtime dependency is the ordinary npm library `zod`) |
-| **Anti-bloat** | Rules guide the model in judging "is this worth storing": nothing without substance is stored, nothing derivable by reading the code / git is stored; the ones that did grow are flagged and dealt with along the 8 KB / 16 KB lines (see [size governance](#size-governance-what-to-do-when-a-memory-grows-too-big)) |
+| **Anti-bloat** | Rules guide the model in judging "is this worth storing": nothing without substance is stored, nothing derivable by reading the code / git is stored; the ones that did grow are flagged and dealt with along the 16 KB / 40 KB lines (see [size governance](#size-governance-what-to-do-when-a-memory-grows-too-big)) |
 | **Tidyable** | The optional "autodream" reads your memories through once: merges duplicates, fixes the index and broken links, and creates a rollback point before changing anything |
 | **Migration from Claude Code** | The persona (`CLAUDE.md` → `AGENTS.md`) is copied as-is; memories just need organizing into `.md` files under four types (see [the next section](#migrating-from-claude-code)) |
 | **Ships its own usage guide** | The package carries a skill (`skills/sage-mem/`): what a memory looks like, the four types, what not to store, the frontmatter pitfalls, how retrieval actually works, how to audit and fix a broken index. Installing the plugin is enough — the agent gets the instructions, no manual setup |
@@ -192,7 +192,7 @@ Since 1.9.0 the memory-management surface follows the harness language (**Settin
 
 ![Health: conflicts that need your call on top, machine-scanned structural problems below](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/audit.png)
 
-*Health — one screen answers "is anything wrong with this library": the **conflict queue on top** (a finite list that needs your decision: which of two contradictory statements is void) and the **audit below** (dangling index entries, missing index entries, broken links and the rest, reported in red by category). "Points to an archived memory" is only a hint — it does not count as a problem, and there is **no one-click fix**: which one to change is your call. The audit only reports and never modifies. Since 2.10.1 it has two size categories: **over-size memories** (16 KB or more counts as a problem; 8–16 KB is only a hint) and an **over-long index** (report only, see [size governance](#size-governance-what-to-do-when-a-memory-grows-too-big)). When there is really something to deal with, the badge gets a **「复制修复提示词」(copy fix prompt)** button next to it (2.6.0): it turns what this screen needs into one prompt in your clipboard — **the audit problems and the pending conflicts are written as two separate sections** (fix these / only advise on those), so you can paste it to the agent and let it work. A receipt appears at the bottom afterwards — it closes itself in 10 seconds, closes as soon as you switch tabs, and you can dismiss it by hand.*
+*Health — one screen answers "is anything wrong with this library": the **conflict queue on top** (a finite list that needs your decision: which of two contradictory statements is void) and the **audit below** (dangling index entries, missing index entries, broken links and the rest, reported in red by category). "Points to an archived memory" is only a hint — it does not count as a problem, and there is **no one-click fix**: which one to change is your call. The audit only reports and never modifies. Since 2.10.1 it has two size categories: **over-size memories** (40 KB or more counts as a problem; 16–40 KB is only a hint — 2.10.2 raised both lines from 8/16 KB) and an **over-long index** (report only, see [size governance](#size-governance-what-to-do-when-a-memory-grows-too-big)). When there is really something to deal with, the badge gets a **「复制修复提示词」(copy fix prompt)** button next to it (2.6.0): it turns what this screen needs into one prompt in your clipboard — **the audit problems and the pending conflicts are written as two separate sections** (fix these / only advise on those), so you can paste it to the agent and let it work. A receipt appears at the bottom afterwards — it closes itself in 10 seconds, closes as soon as you switch tabs, and you can dismiss it by hand.*
 
 *Lab (2.9.0, sits after Health) — only switches that change **which memories are picked**, all off by default. Today it holds one: **MMR de-duplication**. When one topic takes every injection slot, it subtracts each candidate's similarity to what is already picked before choosing. It only changes **which items are picked** (never the score, never a file, never a pinned baseline memory) and returns candidates as-is when they fit the slots. Why it is off by default: in the offline comparison it never fired (the IDF gate already keeps candidates under 10), and in a stress run with the gate disabled duplication fell only 4.5% while wrong picks rose 24% — it knows "different", not "irrelevant". Read the three notes on that page before turning it on; **if memories seem to go missing, switch it off and restart**.
 
@@ -350,14 +350,26 @@ If the memory directory cannot be read, or permissions are wrong → **it degrad
 
 ## Size Governance: What to Do When a Memory Grows Too Big
 
-Memories are files, and files only ever grow — while injection is capped (only the first 1500 characters of a memory are read by default), so whatever is written past that cap is, for your future self, as good as absent. "Too big" therefore needs a way out, and it cannot rely on anyone remembering to take it.
+Memories are files, and files only ever grow — so "too big" needs a way out, and it cannot rely on anyone remembering to take it.
+
+**First, a correction to something the previous version got wrong.** The 2.10.1 notes said injection only reads the first 1500 characters, so whatever is written past that cap is, for your future self, as good as absent. That holds in exactly two cases: `baseline` memories (they never go through paragraph replacement, so they are still read from the start and still cut off at the single-item character limit), and an injection that only hits the summary and never the body. Otherwise the body is injected **in 600-character blocks**, selected by relevance — the relevant passage of a large file is still picked, so **size does not affect what gets matched** (the mechanism is in [Retrieval and Injection](#retrieval-and-injection)).
+
+What size does affect is three other things:
+
+- **Reading the full text means putting all of it into the context.** `read_memory` has no paging, so a large file arrives in one piece.
+- **Autodream costs more.** The more over-line entries a run has to read through, the more time and tokens that run spends.
+- **Editing gets riskier.** The longer the file, the greater the chance a trim or a compression changes the wrong place or drops a fact that is still in force.
+
+And one more thing that is not a cost but is in itself a signal: **the longer a memory is, the more likely it is an un-tidied pile.**
+
+So the point of the lines is not "letting the tail into the context" — the relevant part of the tail gets in anyway. The point is those three costs, and that signal. 2.10.2 raising them to 16 KB / 40 KB uses the same reasoning: at 8 KB, an ordinary long memory trips the warning on nearly every write, and that is not a hint, it is noise.
 
 **Three lines** (defined in exactly one place, `lib/shared/limits.js`; the UI, the audit and the tools all read that one copy):
 
 | Quantity | Value | Who acts on it |
 |---|---|---|
-| Warning line | **8 KB** per memory | one line in the write log, one `ℹ` line in the `read_memory` receipt, listed as a hint by the audit |
-| Force line | **16 KB** per memory | counts as an audit problem; autodream has to deal with it in that run |
+| Warning line | **16 KB** per memory | one line in the write log, one `ℹ` line in the `read_memory` receipt, listed as a hint by the audit |
+| Force line | **40 KB** per memory | counts as an audit problem; autodream has to deal with it in that run |
 | Index line | `MEMORY.md` **240 characters** per line / **24 KB** whole file | **report only**: the index should be slimmed, but which entry to drop is your decision |
 
 **Two remedies, both leaving a trail**:
@@ -598,7 +610,7 @@ Module boundaries (since 1.2.0):
 - `lib/recall/` — the injection chain: selection (`select`) / rendering and budget (`compose`) / text (`text`) / session state (`state`)
 - `lib/assembly/` — the four mounts: autodream / retrieval tools / observation / write gate
 - `lib/memory/` — pure memory-layer functions and file operations. Size governance is three separate things inside it: `memory/size-policy` (the **pure verdict**: three tiers + advice + that one sentence of plain language), `memory/trim-plan` (the **pure split**: turning a selection into "archived file + remaining body + pointer", with six invariants), and `memory/trim-archive` (the **single** place that writes a cut: exclusive write of the archived file first, then a revision-guarded write of the main file, and if that fails the archived copy is retired to `.retired-*` rather than deleted); `lib/autodream/` — the autodream engine, where `autodream/size-tools` is the thin model-facing adapter (it only forwards `archive_segment` to `trim-archive` and never re-implements the disk order)
-- `lib/shared/` — zero-dependency cross-layer rules: file-name rule / local timestamps / the size lines (the 512 KB hard ceiling plus the three governance lines: 8 KB, 16 KB, and the index's 240 characters / 24 KB. **Exactly one copy each**; `test/duplication-test.mjs` turns red otherwise)
+- `lib/shared/` — zero-dependency cross-layer rules: file-name rule / local timestamps / the size lines (the 512 KB hard ceiling plus the three governance lines: 16 KB, 40 KB, and the index's 240 characters / 24 KB. **Exactly one copy each**; `test/duplication-test.mjs` turns red otherwise)
 - UI side: `client/*.js` is split per screen (`05-shared.js` holds the cross-screen primitives and type tables); `npm run build:client` concatenates them into `lib/client.js`
 - Dependency direction: `memory` never imports `autodream`, `recall` depends only on `memory`, `assembly` never imports the composition root (`test/structure-test.mjs` turns red if that changes)
 
@@ -643,7 +655,7 @@ No. Serialized writes guarantee only **in-process** ordering; there is no file l
 Yes, it is off by default. It and archiving are two different things: archiving is a deterministic rule (by idle days), calls no model and costs nothing.
 
 **What do I do when a memory file keeps growing?**
-Start with the **over-size memories** section under Health: 16 KB or more must be dealt with, 8–16 KB is only a hint. There are exactly two remedies — if it splits, **archive a segment** (the stale section moves into `archive/` and the main file keeps one pointer line with the reason at the original spot, recoverable at any time); if it does not split, **compress** it (conclusion first, de-duplicate, drop what has been overturned). The model has `trim_memory` to cut directly, and autodream handles anything over 16 KB on every run. If you do not want certain files touched, check them under 「自动整理 → 设置 → 不参与整理的文件」(Automation → Settings → files excluded from tidying). The index `MEMORY.md` is report-only and never rewritten automatically; `session-log.md` is out of scope. Details in [size governance](#size-governance-what-to-do-when-a-memory-grows-too-big).
+Start with the **over-size memories** section under Health: 40 KB or more must be dealt with, 16–40 KB is only a hint. There are exactly two remedies — if it splits, **archive a segment** (the stale section moves into `archive/` and the main file keeps one pointer line with the reason at the original spot, recoverable at any time); if it does not split, **compress** it (conclusion first, de-duplicate, drop what has been overturned). The model has `trim_memory` to cut directly, and autodream handles anything over 40 KB on every run. If you do not want certain files touched, check them under 「自动整理 → 设置 → 不参与整理的文件」(Automation → Settings → files excluded from tidying). The index `MEMORY.md` is report-only and never rewritten automatically; `session-log.md` is out of scope. Details in [size governance](#size-governance-what-to-do-when-a-memory-grows-too-big).
 
 **The plugin market says "the registry's latest is older than the installed version, updating would downgrade"?**
 That is a **stale `/latest` cache on the download-region mirror**, not a mis-published package: the mirror's full metadata (the document pnpm reads) already has the new version, while the `/<pkg>/latest` shortcut still serves an old one. Retry after a minute or two; if it persists, temporarily switch the market's download region to "Global" (the origin registry, registry.npmjs.org), update, then switch back. To check what is actually published: `npm view sage-mem dist-tags`.
