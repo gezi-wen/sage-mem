@@ -8,6 +8,55 @@
 ---
 
 
+## 2.10.0
+
+**主题：记忆越写越大时，插件不再只是「提醒一句」—— 三条线、两条处置、三个执行面，超线必须当场二选一。**
+
+版本判定：2.10.0（MINOR）｜理由：新增对外能力面（主智能体的 `trim_memory`、自动做梦的 `archive_segment` 与「阶段 3.5」、设置页的「不参与整理的文件」勾选块、库健康的两类新审计），而**检索与注入行为零改动**（文件被裁后变短是唯一间接变化）｜运行时源文件 16（新增 `lib/memory/{size-policy,trim-plan,trim-archive}.js` 与 `lib/autodream/size-tools.js`；改 `lib/shared/{limits,codes}.js`、`lib/memory/{write-protocol,scan}.js`、`lib/tools/memory-tools.js`、`lib/assembly/tools-mount.js`、`lib/autodream/{tools,audit,report,prompt,util}.js`、`lib/typert.host.js`）+ 客户端 3（`65-tidy-scope.js` 新增、`60-autodream-panel.js`、`55-i18n-memory.js`）+ 构建清单 + 产物重建｜一版一件事：「超线记忆的处置变成流程里的必答题」
+
+### 行为变更
+
+- **三条线有了唯一定义处**（`lib/shared/limits.js`，别处只 import）：提醒 **8 KB** / 强制 **16 KB** / 索引 `MEMORY.md` 单行 **240 字符**与整份 **24 KB**（整份到一半、即 12 KB 开始提醒）。**索引只报不改**；`session-log.md` 是保留名，走「原样读写」那条路（上限 4 MB）—— 体积规则不催这两者。
+- **两条处置，都必须留痕**：
+  - **裁段归档**：旧段落搬进 `archive/<原名>-<片段>-<YYYYMMDD>.md`，frontmatter 带 `archived_at` / `archived_reason` / `archived_from` / `archived_slice`；**主文件在原位置留一行带关键词的指针**，其余正文一字不动。归档区不在检索面里 —— 指针里那几个关键词是以后找回细节的唯一线索。被裁段与剩余正文各需 ≥ 1 KB。
+  - **压缩**：就地改短（结论前置、去重、删被推翻的），frontmatter 自动补 `compressed_at` / `compressed_reason` / `compressed_from_bytes`。
+- **三个执行面，口径同一份**：
+  - **主智能体**：新工具 `trim_memory(file, heading? | startLine/endLine, reason)` —— **会写盘、不可并发**（`isConcurrencySafe: false`，两个裁段并行会互相踩 revision）、**只裁不删**；`MEMORY.md` / `session-log.md` / 保护名单一律拒绝。`read_memory` 命中超线条目时回执多一行 `ℹ` 提示（说清多大、超了哪条线、下一步怎么做）。
+  - **自动做梦**：提示词新增**「阶段 3.5 — 体积治理」**；新工具 `archive_segment`（只在「直接改写」模式挂给模型，内部只转调裁段归档）；整理声明新增**「裁剪与压缩」**一节（manifest 顶层键 `trim`，不塞进 `changes` / `archive.archived` —— 那两处会被 64 KB 裁剪与回滚当成动作记录）；跑完核对**「强制线条数有没有下降」**，没降记 `trim.deferred` 并在报告里点名；`write_memory` 写回缩水 ≥ 20% 时宿主**自动**补压缩留痕（模型记不住字段，漏了就等于没留痕）。
+  - **人**：「库健康」多两类审计 —— `oversize`（≥ 8 KB 列出，**≥ 16 KB 计入问题**）与 `indexOversize`（**只报不改**，永不进 problems）；「自动整理 → 设置」里的**不参与整理的文件**勾选块（复用 `reserved` 名单，两个内置名不可取消，**保存后需重启 DSH 才生效**）。
+- **裁段的安全写序（顺序即安全，不许换）**：锁表未知即拒 → 保留名 / 非条目名拒 → 读快照拿 revision → **在这份快照上重算**（防 TOCTOU）→ **先排他写归档件**（撞名即拒，不覆盖不改名）→ 再用 revision 守卫改主文件 → 改主文件失败就把归档件**移动**成 `archive/.retired-<stamp>-<hex>.md`（**不删**）→ **不摘索引、不写访问台账**（文件还在，且裁剪不改变「最近用过吗」这个事实）。
+- 写入记忆越过软线时落一行「体积提醒」日志（**只提醒、绝不拒写**）；512 KB 硬顶照旧是唯一会拒写的那条线。
+- **明确不做**：物理压缩（gz/zip，归档件保持 `.md`，可读可捞回）、自动删除、给 `session-log.md` 裁剪、「不进检索」开关、把阈值做成设置项。
+- **两条已知边界，别指望不该有的东西**：① 主智能体用文件工具压缩时**没有拦截点** —— 压缩留痕只有自动做梦那条路是宿主自动补的，审计验不了手写那条；② **同一段在同一天裁第二次会报重名（`exists`）** —— 归档名带日期，换个标题再裁，或改用压缩。
+
+### 不变
+
+- **检索与注入**：相关度打分、IDF 证据门、5 项上限、`baseline` 排序、注入段名、单场会话 60 KB 预算与「软上限」语义**全部不变**。本版对注入行为零影响 —— 一条记忆被裁之后变短，是唯一的间接变化。
+- 记忆文件格式、既有 frontmatter 字段、`remote` 方法集（只增字段）、锁表、访问台账、冲突队列与裁决、**整文件归档**（`archive_memory` / 自动归档）、回滚点与回滚行为**全部不变**。
+- 512 KB 硬顶（保留名那条「原样读写」路径的 4 MB 上限）、索引「只报不改」都不变。
+- 阈值不是配置项：**没有新增环境变量**，也没有体积线的设置界面（理由：三档都要接 `pending → restartRequired → 两级 schema`，而改线的频率极低；一处常量 + 断言更省、也更不容易分叉）。
+
+### 新增测试
+
+- `test/size-policy-test.mjs`（98 条）：三档判定与边界值（恰好 8 KB / 16 KB 时的档位）、索引长行与整份体积、`skip` 类目（流水 / 保护名单永不计入问题）、`sizeText` / `adviceText` 的措辞与非法输入。
+- `test/trim-plan-test.mjs`（75 条）：六条不变量（frontmatter 必须留下、行号选择器不许碰 frontmatter、被裁段与剩余各 ≥ 1 KB、标题缺失 / 重名、归档名合法、指针只有一行）+ **往返还原**（把指针换回被裁段应还原原文件）。
+- `test/trim-archive-test.mjs`（76 条）：完整写序 —— 成功路径的四个回执数字、撞名 `exists`、`stale_revision`（一个字节不写）、`lock_unknown`、保留名 / 非条目名拒绝、改主文件失败后的**退役不删**。
+- `test/autodream-size-test.mjs`（89 条）：审计两数组与 `problems` 计数（只有 force 计入）、提示词含「阶段 3.5」、`trim` 声明渲染（含 `deferred`）、压缩留痕三个字段。
+- `test/structure-test.mjs` 的单文件行数上限 **1100 → 1120**：`auditReportSchema` 新增的 `oversize` / `indexOversize` 是**传输契约**（`strict` 下不声明就被剥掉），必须与它所镜像的 payload 同文件，而 `lib/typert.host.js` 恰好顶满 1100 —— 这两行搬不走，所以放宽 20 行。理由写在 `test/structure-test.mjs:56` 的注释里。
+- 合计：`npm test` **5121 passed / 0 failed** —— 四个新套件占 338 条（98 + 75 + 76 + 89），其余是既有套件的既有断言。
+
+### 实测
+
+- `npm test`：**5121 passed / 0 failed**（本机 Windows，Node 24；`node test/run.mjs` 退出码 0）。
+- 四个新套件单独跑：98 / 75 / 76 / 89，各自 0 failed。
+- `node test/release-test.mjs` 24 / 0、`node test/doc-consistency-test.mjs` 55 / 0、`node test/client-exec-test.mjs` 61 / 0（版本三处一致、双语 README 结构一致）。
+- **已知未验证（别当绿灯）**：
+  - **宿主 fs 真机路径**：`trim_memory` 经宿主工具服务注册之后的**真机**调用（真 DSH 实例里点一次裁剪）没有跑过；本版的证据是纯函数断言 + 本地临时目录上的写序断言，不是「真机已裁」。
+  - **跨进程并发**：写序只保证**进程内**串行（外加 revision 守卫挡住「中途被别人改过」）。两个 DSH 实例同时裁同一条记忆没测过 —— 与既有的「多个实例共用同一个记忆目录不保证安全」是同一条边界。
+  - **文件级回滚不清理归档件**：自动做梦回滚恢复的是记忆目录里的活条目，**`archive/` 下的归档件与退役件不在回滚范围内** —— 回滚之后主文件回到原样，但 `archive/` 里会多出那一份，需要人工捞回或清理。
+
+---
+
 ## 2.9.0
 
 **主题：注入名额被同族记忆挤占 —— 给一个解法，但默认不替你打开。**

@@ -488,6 +488,26 @@
 			"ad.err.reservedDup": "名单里已经有 {name} 了",
 			"ad.note.modelCatalogUnavailable": "模型目录不可用（{error}）—— 请在下面手填 provider 与 model。",
 
+			// ── 2.10.0 体积治理：不参与整理的文件（65-tidy-scope.js）──
+			"ad.tidyScope.title": "不参与整理的文件",
+			"ad.tidyScope.count": "已保护 {on} / 共 {total} 个",
+			"ad.tidyScope.note1": "勾上的文件在体积治理时不会被裁剪或压缩 —— 自动做梦与 trim_memory 都按这份名单跳过。",
+			"ad.tidyScope.note2": "内置的两个（索引 / 流水）不能取消；保存后需重启 DSH 才生效。",
+			"ad.tidyScope.builtin": "内置 · 不可取消",
+			"ad.tidyScope.missing": "文件不存在",
+			"ad.tidyScope.locked": "已锁定",
+			"ad.tidyScope.search": "搜索文件名…",
+			"ad.tidyScope.noMatch": "没有匹配的文件名",
+			"ad.tidyScope.save": "保存「不参与整理的文件」",
+			"ad.tidyScope.saving": "保存中…",
+			"ad.tidyScope.saved": "已保存不参与整理的文件 —— 需重启 DSH 才生效",
+			"ad.tidyScope.savedNow": "已保存（宿主说这次不用重启）",
+			"ad.tidyScope.restartHint": "保存后需重启 DSH 才生效",
+			"ad.tidyScope.dirty": "有未保存的改动",
+			"ad.tidyScope.noSettings": "宿主没有提供设置接口（版本偏旧）—— 这一块只能看，不能改",
+			"ad.tidyScope.errList": "读不到文件列表：{error}",
+			"ad.tidyScope.notApplied": "宿主回执里的名单与刚才保存的不一致 —— 刷新后再试一次",
+
 			// ── 2.1.0: auto-archive settings (62-archive-settings.js) ──
 			"archive.title": "自动归档做什么",
 			"archive.intro1": "闲置太久没被注入过的记忆，会被移进 archive/ —— 不删除，随时能恢复。这一页决定「多久算闲置」，以及要不要真的动手。",
@@ -1020,6 +1040,26 @@
 			"ad.err.reservedBadName": "A reserved name must be a .md file name (no path): {name}",
 			"ad.err.reservedDup": "{name} is already in the list",
 			"ad.note.modelCatalogUnavailable": "The model catalog is unavailable ({error}) — enter provider and model below by hand.",
+
+			// ── 2.10.0 size governance: files excluded from tidying (65-tidy-scope.js) ──
+			"ad.tidyScope.title": "Files excluded from tidying",
+			"ad.tidyScope.count": "{on} of {total} protected",
+			"ad.tidyScope.note1": "Checked files are never trimmed or compressed by size governance — Autodream and trim_memory both skip this list.",
+			"ad.tidyScope.note2": "The two built-in names (index / session log) cannot be unchecked; restart DSH for a save to take effect.",
+			"ad.tidyScope.builtin": "built-in, cannot uncheck",
+			"ad.tidyScope.missing": "file not found",
+			"ad.tidyScope.locked": "locked",
+			"ad.tidyScope.search": "Search file names…",
+			"ad.tidyScope.noMatch": "No matching file names",
+			"ad.tidyScope.save": "Save excluded-from-tidying files",
+			"ad.tidyScope.saving": "Saving…",
+			"ad.tidyScope.saved": "Saved — restart DSH for it to take effect",
+			"ad.tidyScope.savedNow": "Saved (the host says no restart is needed)",
+			"ad.tidyScope.restartHint": "Restart DSH for a save to take effect",
+			"ad.tidyScope.dirty": "Unsaved changes",
+			"ad.tidyScope.noSettings": "The host has no settings API (older version) — this block is read-only",
+			"ad.tidyScope.errList": "Could not read the file list: {error}",
+			"ad.tidyScope.notApplied": "The list the host returned differs from what was just saved — reload and try again",
 
 			// ── 2.1.0: auto-archive settings (62-archive-settings.js) ──
 			"archive.title": "What auto-archive does",

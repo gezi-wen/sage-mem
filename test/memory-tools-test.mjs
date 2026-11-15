@@ -13,7 +13,7 @@
  *
  * 用法: node memory-tools-test.mjs
  */
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -117,7 +117,7 @@ function makeCtx(options = {}) {
 // ═══ 1. 定义形状 ═══
 group('1. ToolDefinition 形状（宿主契约）')
 {
-  const { searchMemory, readMemory } = createMemoryTools(makeCtx())
+  const { searchMemory, readMemory, trimMemory } = createMemoryTools(makeCtx())
   for (const def of [searchMemory, readMemory]) {
     const n = def.name
     ok(typeof def.name === 'string' && def.name.length > 0, `${n}: name 非空`)
@@ -132,6 +132,17 @@ group('1. ToolDefinition 形状（宿主契约）')
   ok(searchMemory.parameters.required.includes('query'), 'search_memory 必填 query')
   ok(readMemory.parameters.required.includes('name'), 'read_memory 必填 name')
   ok(Array.isArray(searchMemory.parameters.properties.scope.enum), 'search_memory 的 scope 是枚举')
+
+  // 2.10.0：trim_memory 同一条宿主契约，但**不是**只读工具 —— 可并发必须为 false。
+  ok(trimMemory.name === 'trim_memory', 'trim_memory: name 正确')
+  ok(typeof trimMemory.description === 'string' && trimMemory.description.length > 20, 'trim_memory: description 够长')
+  ok(trimMemory.parameters.additionalProperties === false, 'trim_memory: 参数封闭')
+  ok(trimMemory.parameters.required.includes('file') && trimMemory.parameters.required.includes('reason'),
+    'trim_memory: file 与 reason 必填', JSON.stringify(trimMemory.parameters.required))
+  ok(!!trimMemory.parameters.properties.heading && !!trimMemory.parameters.properties.startLine &&
+    !!trimMemory.parameters.properties.endLine, 'trim_memory: heading / startLine / endLine 都是声明过的参数')
+  ok(trimMemory.output && typeof trimMemory.output.render === 'function', 'trim_memory: output.render 是函数（回执是字符串）')
+  ok(trimMemory.isConcurrencySafe?.() === false, 'trim_memory: 会写盘，不可并发')
 }
 
 // ═══ 2. 注册路径：health ═══
@@ -142,9 +153,15 @@ group('2. ctx.inject 注册（宿主有 tools）')
   new MemoryGateway(ctx)
   ok(Array.isArray(ctx.injectedDeps) && ctx.injectedDeps.includes('tools'),
     '用 ctx.inject(["tools"], …) 挂子 fiber（不是 static inject）', JSON.stringify(ctx.injectedDeps))
-  ok(ctx.registered.length === 2, '注册了两个工具', String(ctx.registered.length))
-  ok(ctx.registered.map((d) => d.name).sort().join(',') === 'read_memory,search_memory',
-    '注册的正是 search_memory 与 read_memory', JSON.stringify(ctx.registered.map((d) => d.name)))
+  ok(ctx.registered.length === 3, '注册了三个工具（2.10.0：多了 trim_memory）', String(ctx.registered.length))
+  // ⚠️ 下面这条的**名字**被 docs/1.0.0-contract.md 的 3.1 钉着（contract-binding-test 按名字找回断言）。
+  // 2.10.0 多了第三个工具，但「两个检索工具都注册了」这句话仍然成立 —— 所以名字不改，
+  // 判据拆成「两个检索工具都在」+ 下面另一条「集合正好是这三个」。
+  const registeredNames = ctx.registered.map((d) => d.name)
+  ok(registeredNames.includes('search_memory') && registeredNames.includes('read_memory'),
+    '注册的正是 search_memory 与 read_memory', JSON.stringify(registeredNames))
+  ok(registeredNames.slice().sort().join(',') === 'read_memory,search_memory,trim_memory',
+    '注册的集合是 search_memory / read_memory / trim_memory 三个（不多不少）', JSON.stringify(registeredNames))
   ok(ctx.warns.length === 0, '健康路径不刷警告', JSON.stringify(ctx.warns))
 }
 
@@ -223,6 +240,96 @@ group('5. 降级：注入链不受影响')
   new MemoryGateway(ctx)
   ok(ctx.warns.length >= 1 && ctx.warns.some((w) => w.includes('记忆注入不受影响')),
     '挂载失败留痕一次，且说明影响范围', JSON.stringify(ctx.warns))
+}
+
+// ═══ 6. trim_memory 参数面（契约 §4：缺两个或都给要回「怎么填」）═══
+group('6. trim_memory：参数校验只回文案、不写盘')
+{
+  seed()
+  const { trimMemory } = createMemoryTools(makeCtx())
+  const before = readdirSync(memDir).sort().join(',')
+
+  const noSel = await trimMemory.execute({ file: 'project_alpha.md', reason: '小节过时了' })
+  ok(noSel.ok === false && noSel.code === 'selector_missing', '两个选择器都不给 → selector_missing', JSON.stringify(noSel.code))
+  ok(String(noSel.text).includes('heading') && String(noSel.text).includes('startLine'), '回执说清 heading 与行区间怎么选', String(noSel.text))
+
+  const both = await trimMemory.execute({ file: 'project_alpha.md', heading: '故障记录', startLine: 1, endLine: 2, reason: '小节过时了' })
+  ok(both.ok === false && both.code === 'selector_conflict', '两个都给了 → selector_conflict', JSON.stringify(both.code))
+
+  const shortReason = await trimMemory.execute({ file: 'project_alpha.md', heading: '故障记录', reason: '短' })
+  ok(shortReason.ok === false && shortReason.code === 'reason_too_short', 'reason < 4 字 → reason_too_short', JSON.stringify(shortReason.code))
+
+  const badRange = await trimMemory.execute({ file: 'project_alpha.md', startLine: 9, endLine: 3, reason: '小节过时了' })
+  ok(badRange.ok === false && badRange.code === 'selector_invalid', 'endLine < startLine → selector_invalid', JSON.stringify(badRange.code))
+
+  const noFile = await trimMemory.execute({ reason: '小节过时了', heading: '故障记录' })
+  ok(noFile.ok === false && noFile.code === 'invalid_name', '缺 file → invalid_name', JSON.stringify(noFile.code))
+
+  ok(readdirSync(memDir).sort().join(',') === before, '校验失败一个文件都没动', readdirSync(memDir).join(','))
+  ok(trimMemory.output.render({}, noSel)[0].text.startsWith('错误：'), '失败也能渲染成「错误：<code> — …」', trimMemory.output.render({}, noSel)[0].text)
+}
+
+// ═══ 7. trim_memory 成功路径 + read_memory 的体积提示（与 B / A 片联调）═══
+group('7. trim_memory 落盘 + read_memory 超线提示')
+{
+  seed()
+  /** 一段可裁的正文：每行 100 字节左右，凑到明显超过 1 KB。 */
+  const para = (tag, n) => Array.from({ length: n }, (_, i) => `- ${tag} 第 ${i + 1} 条：这一段是旧结论，已经被后来的实现推翻。`).join('\n')
+  writeFileSync(join(memDir, 'project_big.md'), [
+    '---',
+    'name: project_big',
+    'description: 用于裁段的合成记忆',
+    'metadata:',
+    '  node_type: memory',
+    '  type: project',
+    '---',
+    '',
+    '# 大项目',
+    '',
+    '## 一、现行结论',
+    '',
+    para('现行', 12),
+    '',
+    '## 二、旧过程记录',
+    '',
+    para('旧过程', 20),
+    '',
+  ].join('\n'), 'utf8')
+  const sizeBefore = statSync(join(memDir, 'project_big.md')).size
+
+  const { trimMemory, readMemory } = createMemoryTools(makeCtx())
+  const out = await trimMemory.execute({ file: 'project_big.md', heading: '二、旧过程记录', reason: '这段旧过程已被实现推翻' })
+  ok(out.ok === true, '按标题裁段成功', JSON.stringify(out.code ?? out.text))
+  ok(String(out.text).startsWith('已裁剪') && String(out.text).includes('archive/'), '回执给出「已裁剪 N 字节到 archive/<file>」', String(out.text))
+  ok(String(out.text).includes('主文件'), '回执同时给主文件的体积变化', String(out.text))
+
+  const still = readFileSync(join(memDir, 'project_big.md'), 'utf8')
+  const sizeAfter = statSync(join(memDir, 'project_big.md')).size
+  ok(sizeAfter < sizeBefore, `主文件确实变小了（${sizeBefore} → ${sizeAfter} 字节）`)
+  ok(still.startsWith('---'), '主文件仍以 frontmatter 开头（裁段不动 frontmatter）')
+  ok(still.includes('archive/'), '主文件原位留下了指针行', still.slice(0, 200))
+  ok(still.includes('现行结论'), '没被裁的那一节一字不动地留着')
+  const archiveDir = join(memDir, 'archive')
+  const archived = existsSync(archiveDir) ? readdirSync(archiveDir).filter((f) => f.endsWith('.md')) : []
+  ok(archived.length === 1 && archived[0].startsWith('project_big-'), '归档件写进了 archive/，名字带原名', archived.join(','))
+
+  // 保留名一律拒绝（契约 §3 第 2 步）
+  const reserved = await trimMemory.execute({ file: 'memory.md', heading: '随便', reason: '想试着裁索引' })
+  ok(reserved.ok === false && String(reserved.text).startsWith('错误：'), '保留名被拒（回的是错误文案，不是异常）', String(reserved.text))
+
+  // read_memory：整份超过提醒线 → 回执末尾多一行提示（文案由 size-policy 出）
+  writeFileSync(join(memDir, 'project_huge.md'), [
+    '---', 'name: project_huge', 'description: 超线合成记忆', '---', '',
+    para('超线', 120),
+  ].join('\n'), 'utf8')
+  ok(statSync(join(memDir, 'project_huge.md')).size > 8 * 1024, '（前提）project_huge.md 确实超过 8 KB 提醒线')
+  const read = await readMemory.execute({ name: 'project_huge.md' })
+  ok(read.ok === true, '（前提）超大记忆照常读得到')
+  const rendered = readMemory.output.render({}, read)[0].text
+  ok(rendered.includes('ℹ 这条'), '回执追加了体积提示', rendered.slice(-160))
+  ok(rendered.includes('8 KB') || rendered.includes('16 KB'), '提示里写了对照的那条线', rendered.slice(-160))
+  const smallRead = await readMemory.execute({ name: 'reference_beta.md' })
+  ok(!readMemory.output.render({}, smallRead)[0].text.includes('ℹ 这条'), '【反向对照】小文件不出现体积提示')
 }
 
 // ── 收尾 ────────────────────────────────────────────────────

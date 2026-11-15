@@ -61,6 +61,13 @@ const SUITES = [
   'search-test.mjs',
   'intent-test.mjs',
   'reader-test.mjs',
+  // 2.10.0 体积治理（四条线 + 两条处置路径）：
+  //   size-policy 纯判据 → trim-plan 纯切分 → trim-archive 唯一写盘 → 做梦侧挂点。
+  // 顺序即依赖顺序：后面几条会 import 前面的模块，坏了能一眼定位到第一层。
+  'size-policy-test.mjs',
+  'trim-plan-test.mjs',
+  'trim-archive-test.mjs',
+  'autodream-size-test.mjs',
   // 1.6.3：检查与读取之间换文件的确定性复现 + 星图读收口（外部审查 SEC-01 / R19）。
   'safe-read-test.mjs',
   'memory-tools-test.mjs',

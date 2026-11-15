@@ -41,10 +41,14 @@
 			const sMemSet = react.useState(null); const memSet = sMemSet[0], setMemSet = sMemSet[1];
 			const sLimitsDraft = react.useState(null); const limitsDraft = sLimitsDraft[0], setLimitsDraft = sLimitsDraft[1];
 			const sSaveBusy = react.useState(false); const saveBusy = sSaveBusy[0], setSaveBusy = sSaveBusy[1];
-			const sReservedNew = react.useState(""); const reservedNew = sReservedNew[0], setReservedNew = sReservedNew[1];
 			// ── 2.7.0 界面入口三选一（客户端行为：改完立刻生效，不需要重启）──
 			const sEntryBusy = react.useState(false); const entryBusy = sEntryBusy[0], setEntryBusy = sEntryBusy[1];
 			const sEntryErr = react.useState(""); const entryErr = sEntryErr[0], setEntryErr = sEntryErr[1];
+			// ── 2.10.0「不参与整理的文件」那一块的界面状态 ──
+			// **放在宿主里**是有意的：chips 与勾选面板必须是同一份选择（见 65 分片的头注），
+			// 而且这个 hook 的位置在「运行 / 设置 / 记录」三段里恒定 —— 子面板只在设置段出现，
+			// 它自己持状态就会在两段之间错位（宿主渲染器按位置存 hook 状态）。
+			const sTidy = react.useState(null); const tidyState = sTidy[0], setTidyState = sTidy[1];
 
 			// 派生量放在 effect 之前：下面几个 effect 的依赖数组要在渲染期就能取到值。
 			const c = cfg || {};
@@ -52,13 +56,9 @@
 			const last = (st && st.lastResult) || null;
 			const route = (st && st.route) || null;
 			const rollbackScope = c.rollbackScope === "all" ? "all" : "files";
-			// 保留名名单：reserved = 生效清单（含内置两个），reservedExtra = 用户自己声明的那部分。
-			// 内置的两个 = 生效清单里不属于 reservedExtra 的那些 —— 不写死名字，host 那边改了这边跟着变。
-			const extraReserved = Array.isArray(memSet && memSet.reservedExtra) ? memSet.reservedExtra : [];
-			const extraLower = extraReserved.map(function (x) { return String(x).toLowerCase(); });
-			const fixedReserved = ((memSet && memSet.reserved) || []).filter(function (n) {
-				return extraLower.indexOf(String(n).toLowerCase()) < 0;
-			});
+			// 2.10.0：保留名名单（保护名单）整块交给 65-tidy-scope.js —— 它同时管
+			// 「chips 上立即落盘」与「勾选面板按保存落盘」，状态只有一份 draft。
+			// 这里不再派生 extraReserved / fixedReserved：**两套状态是这一块以前最脏的地方**。
 			// 2.7.1（Q04 尾巴）：宿主从 2.1.11 起就在 getSettings 里带 `limitDiagnostics`
 			// —— 坏 JSON / 逐项越界 / 环境变量写错都在这份数组里。以前它只进日志，
 			// 面板上看不见，于是「我改的值怎么没生效」只能靠猜。现在就地摊开逐条列。
@@ -83,6 +83,7 @@
 				refreshLists();
 				loadModels();
 				loadMemSettings();
+				loadTidyFiles();
 				const id = setInterval(pull, 2000);
 				return function () { alive = false; clearInterval(id); };
 			}, [remote]);
@@ -172,6 +173,30 @@
 				}, function (e) { setErr(detail(e)); });
 			}
 
+			/** 合并写入「不参与整理的文件」那份界面状态（子面板每次只patch 它关心的键）。 */
+			function patchTidy(p) {
+				setTidyState(function (cur) {
+					const base = cur && typeof cur === "object" ? cur : {};
+					return Object.assign({}, base, p);
+				});
+			}
+
+			/**
+			 * 拉一次文件名清单（勾选面板的候选行）。
+			 *
+			 * 与 getSettings 分开拉：设置读不到（旧宿主）时勾选面板仍要能列出文件并说清「只能看」；
+			 * 反过来文件列表读不到也不该让保护名单跟着变空。
+			 */
+			function loadTidyFiles() {
+				if (!memRemote || typeof memRemote.listFiles !== "function") { patchTidy({ files: [] }); return; }
+				Promise.resolve(memRemote.listFiles()).then(function (res) {
+					const d = unwrap(res);
+					patchTidy({ files: Array.isArray(d) ? d : [] });
+				}, function (e) {
+					patchTidy({ files: [], err: t("ad.tidyScope.errList", { error: String((e && e.message) || e) }) });
+				});
+			}
+
 			/** 保存 5 项上限。越界/非整数**本地先拦**（host 也是直接拒绝），别让它白跑一趟。 */
 			function saveLimits() {
 				if (!memRemote || typeof memRemote.setSettings !== "function") { setErr(t("ad.err.noSetSettings")); return; }
@@ -225,44 +250,14 @@
 			}
 
 			/**
-			 * 保存保留名名单（用户声明的那部分）。
+			 * 保存保护名单的入口**已经搬进 65-tidy-scope.js**（`TidyScopePanel` 的 `put`）。
 			 *
-			 * 两个内置名（memory.md / session-log.md）**不在**这份名单里，也不在界面上给删除入口 ——
-			 * 那是生效清单里固定的两个，删不掉。这里管的只是用户自己加的那些。
+			 * 为什么搬：2.10.0 起这份名单同时决定「注入时跳过」与「体积治理时跳过」，
+			 * 于是它需要两种编辑方式（chips 上点一下 / 勾选面板一次改多个）。两处各自
+			 * 持一份状态会打架 —— 现在只有 `tidyState` 一份（就在上面的 hook 里），
+			 * 子面板只读它、只按 props 回调改它；这一层负责把宿主回执里的 settings
+			 * 放回 memSet（注入参数等其它块靠它保持新鲜）。
 			 */
-			function saveReserved(list) {
-				if (!memRemote || typeof memRemote.setSettings !== "function") { setErr(t("ad.err.noSetSettings")); return; }
-				setSaveBusy(true); setErr(null); setNotice("");
-				Promise.resolve(memRemote.setSettings({ reserved: list })).then(function (out) {
-					setSaveBusy(false);
-					if (out && out.ok === false) { setErr(out.error || t("ad.err.reservedRejected")); return; }
-					if (out && out.settings) setMemSet(out.settings);
-					else loadMemSettings();
-					setNotice(t("ad.notice.reservedSaved"));
-				}, function (e) { setSaveBusy(false); setErr(detail(e)); });
-			}
-
-			function addReserved() {
-				const name = String(reservedNew || "").trim();
-				const extra = Array.isArray(memSet && memSet.reservedExtra) ? memSet.reservedExtra : [];
-				if (!name) { setErr(t("ad.err.reservedNeedName")); return; }
-				// 与 host 的校验同一套：单个 .md 文件名、不许带路径
-				if (!name.endsWith(".md") || name.includes("/") || name.includes("\\") || name.startsWith("..")) {
-					setErr(t("ad.err.reservedBadName", { name: name }));
-					return;
-				}
-				if (extra.some(function (x) { return String(x).toLowerCase() === name.toLowerCase(); })) {
-					setErr(t("ad.err.reservedDup", { name: name }));
-					return;
-				}
-				setReservedNew("");
-				saveReserved(extra.concat([name]));
-			}
-
-			function removeReserved(name) {
-				const extra = Array.isArray(memSet && memSet.reservedExtra) ? memSet.reservedExtra : [];
-				saveReserved(extra.filter(function (x) { return x !== name; }));
-			}
 
 			/** 报告 / 回滚点 / 整理记录三份列表一起刷。 */
 			function refreshLists() {
@@ -597,28 +592,16 @@
 						h("span", { className: "smem-status", key: "c" }, t("ad.reserved.subtitle")),
 					]),
 					h("div", { className: "smem-autodream-note", key: "n" }, t("ad.reserved.note")),
-					h("div", { className: "smem-raw-names", key: "fixed" }, fixedReserved.map(function (n) {
-						return h("span", { className: "smem-chip smem-chip--fixed", key: n, title: t("ad.reserved.fixedTitle") }, n + t("ad.reserved.fixedSuffix"));
-					})),
-					h("div", { className: "smem-raw-names", key: "extra" },
-						extraReserved.length
-							? extraReserved.map(function (n) {
-									return h("span", { className: "smem-chip", key: n, "data-on": "1" }, [
-										n,
-										h("button", { type: "button", className: "smem-chip-x", key: "x", title: t("ad.reserved.removeTitle", { name: n }), onClick: function () { removeReserved(n); } }, "✕"),
-									]);
-								})
-							: h("span", { className: "smem-status", key: "none" }, t("ad.reserved.empty"))),
-					h("div", { className: "smem-autodream-row", key: "add" }, [
-						h("input", {
-							className: "smem-input", key: "i",
-							style: { flex: "1", minWidth: "150px" },
-							value: reservedNew,
-							placeholder: t("ad.reserved.placeholder"),
-							onChange: function (e) { setReservedNew(e.target.value); },
-						}),
-						h("button", { type: "button", className: "smem-btn", key: "a", disabled: saveBusy, onClick: addReserved }, t("ad.action.addToList")),
-					]),
+					// 2.10.0（契约 §6）：整块（chips + 手输入口 + 勾选面板 + 回执）由 65 分片渲染。
+					// 这里只把宿主回执收到的 settings 接回来 —— 面板内保存完不会再各自刷新一遍。
+					h(TidyScopePanel, {
+						key: "tidy",
+						ctx: props.ctx,
+						settings: memSet,
+						state: tidyState,
+						onState: setTidyState,
+						onSettings: function (s) { if (s) setMemSet(s); else loadMemSettings(); },
+					}),
 				]),
 				h("details", { className: "smem-autodream-adv", key: "adv", open: true }, [
 					h("summary", { key: "s" }, t("ad.advanced")),

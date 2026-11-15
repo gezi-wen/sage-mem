@@ -51,6 +51,12 @@ const RULES = [
   { literal: "'memory.md'", allow: ['shared/md-name.js'], why: '索引规范名只在 shared/md-name.js（其余用 INDEX_FILE_KEY）' },
   { literal: 'MAX_FILE_BYTES =', allow: ['shared/limits.js'], why: '512 KB 上限只在 shared/limits.js 定义' },
   { literal: 'MAX_RAW_BYTES =', allow: ['shared/limits.js'], why: '4 MB 上限只在 shared/limits.js 定义' },
+  // 2.10.0 体积治理：三条软线同样只许一处。判据是「字面量 + =」，所以别处写
+  // `const X = 8 * 1024` 这种照抄数字的写法它拦不住（现有两条规则同病，已知洞）。
+  { literal: 'TRIM_WARN_BYTES =', allow: ['shared/limits.js'], why: '8 KB 提醒线只在 shared/limits.js 定义' },
+  { literal: 'TRIM_FORCE_BYTES =', allow: ['shared/limits.js'], why: '16 KB 强制线只在 shared/limits.js 定义' },
+  { literal: 'INDEX_LINE_CHARS =', allow: ['shared/limits.js'], why: '索引单行宽度只在 shared/limits.js 定义' },
+  { literal: 'INDEX_DOC_BYTES =', allow: ['shared/limits.js'], why: '索引整份上限只在 shared/limits.js 定义' },
   { literal: '${p(d.getMonth() + 1)}-${p(d.getDate())}', allow: ['shared/stamp.js'], why: '本地日期/时间戳只在 shared/stamp.js 格式化' },
   { literal: 'LIMIT_SPECS = {', allow: ['memory/config.js'], why: '注入上限的取值与边界只在 memory/config.js' },
   { literal: 'NON_ENTRY_FILES = new Set', allow: ['memory/config.js'], why: '非记忆条目集合只在 memory/config.js' },

@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.9.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.10.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -27,6 +27,7 @@ If it is useful to you, a Star is the most direct feedback.
 - [Memory File Format](#memory-file-format)
 - [Retrieval and Injection](#retrieval-and-injection)
 - [Write Safety](#write-safety)
+- [Size Governance: What to Do When a Memory Grows Too Big](#size-governance-what-to-do-when-a-memory-grows-too-big)
 - [Autodream](#autodream)
 - [Migrating from Claude Code](#migrating-from-claude-code)
 - [Configuration Reference](#configuration-reference)
@@ -71,10 +72,10 @@ Most memory schemes take the "SQLite + a long-running worker" route: once memori
 |---|---|
 | **File-based storage** | One `.md` per memory: frontmatter holds metadata, the body holds content. No database, no hidden format |
 | **Automatic injection** | Every new question rescans the memory directory and re-picks the most relevant few for that question, injecting them into context before the model speaks — no file reading needed |
-| **The model can look things up too** | Two retrieval tools are also given to the model (`search_memory` / `read_memory`), so it can go through memories on its own and read the original text by line |
+| **The model can look things up too** | Three tools are also given to the model (`search_memory` / `read_memory`, plus the disk-writing `trim_memory`), so it can go through memories on its own, read the original text by line, and cut a stale section out into the archive |
 | **Writes are not overwritten** | While you are editing and the model is changing things at the same time, the later write does not silently clobber the earlier one; the conflict is left as a pending record for you to decide which side to keep |
 | **Zero extra services** | No worker, no SQLite, no port, no long-running process, and no extra API key or cloud service (the only runtime dependency is the ordinary npm library `zod`) |
-| **Anti-bloat** | Rules guide the model in judging "is this worth storing": nothing without substance is stored, nothing derivable by reading the code / git is stored |
+| **Anti-bloat** | Rules guide the model in judging "is this worth storing": nothing without substance is stored, nothing derivable by reading the code / git is stored; the ones that did grow are flagged and dealt with along the 8 KB / 16 KB lines (see [size governance](#size-governance-what-to-do-when-a-memory-grows-too-big)) |
 | **Tidyable** | The optional "autodream" reads your memories through once: merges duplicates, fixes the index and broken links, and creates a rollback point before changing anything |
 | **Migration from Claude Code** | The persona (`CLAUDE.md` → `AGENTS.md`) is copied as-is; memories just need organizing into `.md` files under four types (see [the next section](#migrating-from-claude-code)) |
 | **Ships its own usage guide** | The package carries a skill (`skills/sage-mem/`): what a memory looks like, the four types, what not to store, the frontmatter pitfalls, how retrieval actually works, how to audit and fix a broken index. Installing the plugin is enough — the agent gets the instructions, no manual setup |
@@ -191,7 +192,7 @@ Since 1.9.0 the memory-management surface follows the harness language (**Settin
 
 ![Health: conflicts that need your call on top, machine-scanned structural problems below](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/audit.png)
 
-*Health — one screen answers "is anything wrong with this library": the **conflict queue on top** (a finite list that needs your decision: which of two contradictory statements is void) and the **audit below** (dangling index entries, missing index entries, broken links and the rest, reported in red by category). "Points to an archived memory" is only a hint — it does not count as a problem, and there is **no one-click fix**: which one to change is your call. The audit only reports and never modifies. When there is really something to deal with, the badge gets a **「复制修复提示词」(copy fix prompt)** button next to it (2.6.0): it turns what this screen needs into one prompt in your clipboard — **the audit problems and the pending conflicts are written as two separate sections** (fix these / only advise on those), so you can paste it to the agent and let it work. A receipt appears at the bottom afterwards — it closes itself in 10 seconds, closes as soon as you switch tabs, and you can dismiss it by hand.*
+*Health — one screen answers "is anything wrong with this library": the **conflict queue on top** (a finite list that needs your decision: which of two contradictory statements is void) and the **audit below** (dangling index entries, missing index entries, broken links and the rest, reported in red by category). "Points to an archived memory" is only a hint — it does not count as a problem, and there is **no one-click fix**: which one to change is your call. The audit only reports and never modifies. Since 2.10.0 it has two size categories: **over-size memories** (16 KB or more counts as a problem; 8–16 KB is only a hint) and an **over-long index** (report only, see [size governance](#size-governance-what-to-do-when-a-memory-grows-too-big)). When there is really something to deal with, the badge gets a **「复制修复提示词」(copy fix prompt)** button next to it (2.6.0): it turns what this screen needs into one prompt in your clipboard — **the audit problems and the pending conflicts are written as two separate sections** (fix these / only advise on those), so you can paste it to the agent and let it work. A receipt appears at the bottom afterwards — it closes itself in 10 seconds, closes as soon as you switch tabs, and you can dismiss it by hand.*
 
 *Lab (2.9.0, sits after Health) — only switches that change **which memories are picked**, all off by default. Today it holds one: **MMR de-duplication**. When one topic takes every injection slot, it subtracts each candidate's similarity to what is already picked before choosing. It only changes **which items are picked** (never the score, never a file, never a pinned baseline memory) and returns candidates as-is when they fit the slots. Why it is off by default: in the offline comparison it never fired (the IDF gate already keeps candidates under 10), and in a stress run with the gate disabled duplication fell only 4.5% while wrong picks rose 24% — it knows "different", not "irrelevant". Read the three notes on that page before turning it on; **if memories seem to go missing, switch it off and restart**.
 
@@ -213,7 +214,7 @@ Since 1.9.0 the memory-management surface follows the harness language (**Settin
 
 ![Autodream · settings](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/autodream-settings.png)
 
-*Autodream · settings — run / settings / history as secondary groups; the five injection parameters laid out in two columns, with both 「当前生效」(currently in effect) and 「重启后」(after restart) written out.*
+*Autodream · settings — run / settings / history as secondary groups; the five injection parameters laid out in two columns, with both 「当前生效」(currently in effect) and 「重启后」(after restart) written out. Since 2.10.0 this page ends with a **「不参与整理的文件」(files excluded from tidying)** block: you check names from the files that actually exist in the memory directory (no more typing them by hand), and a checked file is never trimmed or compressed by size governance — it is not counted as over the line either; the two built-in names (index / session log) cannot be unchecked, and **a save takes effect only after restarting DSH**.*
 
 ![Auto-archive: the second card on the Automation screen — its own run / settings segments, one switch, two modes](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/archive-settings.png)
 
@@ -283,16 +284,17 @@ The comparison on the offline evaluation set (before and after the threshold): *
 
 **Intent detection never suppresses repetition on three kinds of explicit request**: "we settled on A last time, right?" (verification), "we are not using A any more" (correction), "why did we not pick A before" (asking for the basis) must be given the original text; if it cannot be judged, it does not judge, and it does not guess.
 
-### The Model Can Browse Memories Too: Two Tools
+### The Model Can Browse Memories Too: Three Tools
 
-The trigger right for retrieval is split in two: half with the plugin (automatic injection — it guesses what you want to see), half with the model (the two tools below — it looks things up on its own).
+The trigger right for retrieval is split in two: half with the plugin (automatic injection — it guesses what you want to see), half with the model (the three tools below — it looks things up on its own, and tidies them too).
 
 | Tool | Purpose |
 |---|---|
 | `search_memory(query, scope?, limit?, cursor?)` | Compares summaries first, then searches bodies by paragraph; returns candidates, matching passages, line numbers, and **coverage information** (how many files were scanned, how many paragraphs were filtered out for insufficient relevance, whether there is a next page) |
 | `read_memory(name, startLine?, startByte?, maxBytes?, revision?)` | Reads the body by line, paginated. Pass the `revision` you last read, and if the content has been changed by someone it returns `revision_changed`, **and does not return the content** — otherwise you would read the wrong thing with stale line numbers |
+| `trim_memory(file, heading?, startLine?, endLine?, reason)` | Cuts one stale section out of a memory and archives it to `archive/`, leaving a single pointer line at the original spot. **It writes to disk**, it is **not safe to run concurrently** (two cuts at once would step on each other's revision, so the host queues them), and it **only cuts, never deletes**; `MEMORY.md` / `session-log.md` / protected names are refused, and both the cut segment and the remaining body need ≥ 1 KB |
 
-Both tools go through **the same** safe read path (file name checks → symlink and reserved-name identity checks → size gate); no separate entrance that bypasses the gate was opened for the tools. They register through the tool service the host provides — that is **not a hard dependency**: when the host does not provide that service, the plugin works as normal, only the status card switches to a "read the memory directory directly" wording.
+The first two tools go through **the same** safe read path (file name checks → symlink and reserved-name identity checks → size gate); no separate entrance that bypasses the gate was opened for the tools. `trim_memory` goes through the **single** cut-and-archive write order (lock table → name gate → snapshot → recompute → write the archived file first → revision-guarded write of the main file, see [size governance](#size-governance-what-to-do-when-a-memory-grows-too-big)) — there is no second implementation of it either. They register through the tool service the host provides — that is **not a hard dependency**: when the host does not provide that service, the plugin works as normal, only the status card switches to a "read the memory directory directly" wording.
 
 ### Relaying the Baton on Long Tasks: Task Checkpoints
 
@@ -345,6 +347,35 @@ The reason is: when a stale memory is cited as fact, the act of "citing" itself 
 **Memories with `baseline: true` are injected unconditionally on the first step of every session**, at most 8 — for memories like "who you are" and "the todo list" that ought to be present at every opening. ⚠️ **"Not subject to paragraph replacement" does not mean the whole file**: it is equally truncated by the single-item character limit (1500 characters by default), **so key content that falls at the tail will not be seen**. baseline suits short summaries; leave the full body for the tools to read. The order among several baseline memories is decided by `baselinePriority` (higher number = earlier, default 0), not by file name.
 
 If the memory directory cannot be read, or permissions are wrong → **it degrades to no injection and writes a log**; it does not fail silently. Broken frontmatter is **handled leniently**: fields that cannot be parsed fall back to defaults (`type` missing is recorded as `reference`), and the file itself is still readable — one wrong line does not make a whole memory disappear.
+
+## Size Governance: What to Do When a Memory Grows Too Big
+
+Memories are files, and files only ever grow — while injection is capped (only the first 1500 characters of a memory are read by default), so whatever is written past that cap is, for your future self, as good as absent. "Too big" therefore needs a way out, and it cannot rely on anyone remembering to take it.
+
+**Three lines** (defined in exactly one place, `lib/shared/limits.js`; the UI, the audit and the tools all read that one copy):
+
+| Quantity | Value | Who acts on it |
+|---|---|---|
+| Warning line | **8 KB** per memory | one line in the write log, one `ℹ` line in the `read_memory` receipt, listed as a hint by the audit |
+| Force line | **16 KB** per memory | counts as an audit problem; autodream has to deal with it in that run |
+| Index line | `MEMORY.md` **240 characters** per line / **24 KB** whole file | **report only**: the index should be slimmed, but which entry to drop is your decision |
+
+**Two remedies, both leaving a trail**:
+
+- **Segment archiving** (split when it splits) — move one stale section into `archive/<original>-<slice>-<date>.md` and leave **one pointer line with keywords at the original spot** in the main file ("this old content was archived to archive/…"). The archive is not part of retrieval, so those keywords are the only lead back to the details — write them so they can be searched for. The archived file's frontmatter carries `archived_at` / `archived_reason` / `archived_from` / `archived_slice`, so half a year later it still tells you why it was cut and from where. The cut segment and the remaining body each need ≥ 1 KB.
+- **Compression** (compress when it does not split) — shorten in place: conclusion first, de-duplicate, drop what has been overturned. The frontmatter gains `compressed_at` / `compressed_reason` / `compressed_from_bytes` automatically (the autodream path has the host add them; when you compress through the file tools yourself there is no interception point, so write that line by hand).
+
+**Three hard rules**:
+
+1. **The index and the session log are out of scope.** `MEMORY.md` is report-only; `session-log.md` is a reserved name served by the "raw read/write" path (4 MB cap), and no size rule nags an append-only log.
+2. **The protection list is not touched.** Files checked under 「自动整理 → 设置 → 不参与整理的文件」(Automation → Settings → files excluded from tidying) are skipped by both autodream and `trim_memory`, and **are not counted as over the line either**. The list reuses the existing `reserved` names: once a file is on it, the memory tools refuse to write it (that is what "protected" has always meant), so edit it with the file tools.
+3. **Nothing is ever deleted.** Archiving is the strongest thing this feature can do: a cut only moves, and when writing the main file fails the archived copy is renamed for safekeeping (`archive/.retired-*`) — still not deleted.
+
+**Three entry points, one set of rules**: the main agent's `trim_memory` (writes to disk, not concurrency-safe, cut-only-never-delete); autodream's "stage 3.5 — size governance" plus `archive_segment` (unattended; it checks afterwards whether the number of force-line entries actually went down and says so if it did not); and on the human side, the two new audit categories under Health plus the protection block above.
+
+**Explicitly not done**: physical compression (gz/zip — archived files stay `.md`, readable and recoverable), automatic deletion, trimming `session-log.md`, a switchable "not searchable", and making these thresholds a setting.
+
+⚠️ **Two known boundaries**: ① when the main agent compresses with the file tools, the plugin has **no interception point** — compression trails are added automatically only on the autodream path, and the audit cannot verify a hand-written one; ② **cutting the same section twice on the same day reports a name clash (`exists`)** — archive names carry the date, so pick another heading or use compression instead.
 
 ## Autodream
 
@@ -445,6 +476,8 @@ Value semantics: **out-of-range values are clamped to the boundary, illegal valu
 
 The panel can change the five caps above (written to `<state directory>/settings.json`, precedence **settings page > environment variable > built-in default**), as well as reserved names (file names that are protected and that the settings page may not write or delete, written to `<state directory>/reserved.json`). **Some items take effect only after restarting DSH**, and the panel writes out both the value in effect now and the value after restart.
 
+Since 2.10.0 the reserved names have a second role — **files excluded from tidying** (Automation → Settings): you check names from the files that actually exist in the memory directory, and a checked file is never trimmed or compressed by size governance and **is not counted as over the line either**. The two built-in names (index / session log) cannot be unchecked; **a save takes effect only after restarting DSH** (the list is read into memory when DSH starts).
+
 ### Files in the State Directory
 
 | File | Purpose |
@@ -492,7 +525,7 @@ sage-mem does three things only, all of them on your own machine:
 | What it does | Concrete scope |
 |---|---|
 | **Reading memories** | reads only the top-level `*.md` under `SAGE_MEM_DIR` (default `~/.sage-mem/memory`), 512 KB per file |
-| **Writing memories** | writes to the same directory through the model's file tools or the settings page; reserved names such as `MEMORY.md` and `session-log.md` are protected and the settings page cannot touch them |
+| **Writing memories** | writes to the same directory through the model's file tools or the settings page; reserved names such as `MEMORY.md` and `session-log.md` are protected and the settings page cannot touch them. Since 2.10.0 there is one more kind of write: segment archiving moves a stale section into `archive/` and leaves a single pointer line in the main file (**move only, never delete**) |
 | **Injection** | hands the selected memories to the model as context (at most 10 relevant + 8 `baseline`, 60 KB cumulative per session — ⚠️ this cap is **soft**, see [Retrieval and Injection](#retrieval-and-injection)) |
 
 **What it does not do**: it opens no port, starts no long-running process, and needs no API key; it **does not capture every event** (whether to store is judged by the model according to rules; it is not "everything you say gets recorded").
@@ -564,8 +597,8 @@ Module boundaries (since 1.2.0):
 - `lib/index.js` — the **composition root** plus the three gateways. The typert manifest pins `sourceLocation` to this file, so the gateway classes stay here (moving them would be a contract drift)
 - `lib/recall/` — the injection chain: selection (`select`) / rendering and budget (`compose`) / text (`text`) / session state (`state`)
 - `lib/assembly/` — the four mounts: autodream / retrieval tools / observation / write gate
-- `lib/memory/` — pure memory-layer functions and file operations; `lib/autodream/` — the autodream engine
-- `lib/shared/` — zero-dependency cross-layer rules: file-name rule / local timestamps / the two size limits (**exactly one copy each**; `test/duplication-test.mjs` turns red otherwise)
+- `lib/memory/` — pure memory-layer functions and file operations. Size governance is three separate things inside it: `memory/size-policy` (the **pure verdict**: three tiers + advice + that one sentence of plain language), `memory/trim-plan` (the **pure split**: turning a selection into "archived file + remaining body + pointer", with six invariants), and `memory/trim-archive` (the **single** place that writes a cut: exclusive write of the archived file first, then a revision-guarded write of the main file, and if that fails the archived copy is retired to `.retired-*` rather than deleted); `lib/autodream/` — the autodream engine, where `autodream/size-tools` is the thin model-facing adapter (it only forwards `archive_segment` to `trim-archive` and never re-implements the disk order)
+- `lib/shared/` — zero-dependency cross-layer rules: file-name rule / local timestamps / the size lines (the 512 KB hard ceiling plus the three governance lines: 8 KB, 16 KB, and the index's 240 characters / 24 KB. **Exactly one copy each**; `test/duplication-test.mjs` turns red otherwise)
 - UI side: `client/*.js` is split per screen (`05-shared.js` holds the cross-screen primitives and type tables); `npm run build:client` concatenates them into `lib/client.js`
 - Dependency direction: `memory` never imports `autodream`, `recall` depends only on `memory`, `assembly` never imports the composition root (`test/structure-test.mjs` turns red if that changes)
 
@@ -608,6 +641,9 @@ No. Serialized writes guarantee only **in-process** ordering; there is no file l
 
 **Can I do without autodream?**
 Yes, it is off by default. It and archiving are two different things: archiving is a deterministic rule (by idle days), calls no model and costs nothing.
+
+**What do I do when a memory file keeps growing?**
+Start with the **over-size memories** section under Health: 16 KB or more must be dealt with, 8–16 KB is only a hint. There are exactly two remedies — if it splits, **archive a segment** (the stale section moves into `archive/` and the main file keeps one pointer line with the reason at the original spot, recoverable at any time); if it does not split, **compress** it (conclusion first, de-duplicate, drop what has been overturned). The model has `trim_memory` to cut directly, and autodream handles anything over 16 KB on every run. If you do not want certain files touched, check them under 「自动整理 → 设置 → 不参与整理的文件」(Automation → Settings → files excluded from tidying). The index `MEMORY.md` is report-only and never rewritten automatically; `session-log.md` is out of scope. Details in [size governance](#size-governance-what-to-do-when-a-memory-grows-too-big).
 
 **The plugin market says "the registry's latest is older than the installed version, updating would downgrade"?**
 That is a **stale `/latest` cache on the download-region mirror**, not a mis-published package: the mirror's full metadata (the document pnpm reads) already has the new version, while the `/<pkg>/latest` shortcut still serves an old one. Retry after a minute or two; if it persists, temporarily switch the market's download region to "Global" (the origin registry, registry.npmjs.org), update, then switch back. To check what is actually published: `npm view sage-mem dist-tags`.
