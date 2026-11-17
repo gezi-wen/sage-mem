@@ -80,7 +80,10 @@ jobs:
       - name: Publish (trusted publishing)
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
-            echo "dry run: npm publish --dry-run"
+            # `--dry-run` 仍会向 registry 查重：版本已发布时直接报
+            # "You cannot publish over the previously published versions"。
+            # 预演就把版本号临时改成 <ver>-dryrun.<run number>，不提交、不发布。
+            node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=p.version+'-dryrun.'+process.env.GITHUB_RUN_NUMBER;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');console.log('dry-run version:',p.version)"
             npm publish --dry-run --access public
           else
             npm publish --provenance --access public
