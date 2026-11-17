@@ -58,8 +58,21 @@ jobs:
           echo "tag=$TAG package=$PKG"
           [ "$TAG" = "$PKG" ] || { echo "::error::tag $TAG != package.json $PKG"; exit 1; }
 
+      # 与 test.yml 同一套装法（原因写在那边的注释里，两个 workflow 必须一致）：
+      # npm 7+ 会自动补装 package.json 里声明、下面没显式列出的 peer，
+      # 而 `@deepseek-ai/dsh-skill-filesystem` 整条 peer 链还在 0.0.1-rc.x 那一代，
+      # 与这里钉的 0.2.0-rc.1 同槽冲突 → ERESOLVE。安装前临时摘掉它、装完还原。
+      # 不要用 --legacy-peer-deps：它连显式列出的 peer 也一起跳过，测试会因模块缺失成片红。
       - name: Install
-        run: npm install --no-audit --no-fund
+        run: |
+          cp package.json package.json.ci-backup
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));delete p.peerDependencies['@deepseek-ai/dsh-skill-filesystem'];fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+          npm install --no-save --no-package-lock \
+            zod@4.4.3 react@18.3.1 \
+            @deepseek-ai/cordis@4.0.4 \
+            @deepseek-ai/dsh-typert-protocol@0.2.0-rc.1 \
+            @deepseek-ai/dsh-client-locale@0.2.0-rc.1
+          mv package.json.ci-backup package.json
 
       - name: Test
         run: npm test
