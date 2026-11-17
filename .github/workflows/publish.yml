@@ -6,17 +6,16 @@
 #   Trusted Publishing 让 npm 直接信任「这个仓库 + 这个 workflow」：CI 现场领一次性凭据，
 #   并给包附上 provenance 签名（谁、哪个 commit、哪个 workflow 构建的，可追溯）。
 #
-# 前置（一次性，在 npm 网页做）：
-#   npmjs.com → 包 sage-mem → Settings → Trusted publishing → 添加
-#     Publisher: GitHub Actions
-#     Repository: gezi-wen/sage-mem
-#     Workflow file: publish.yml
-#     Environment: （留空）
+# 前置（一次性，已配好）：npmjs.com → 包 sage-mem → Settings → Trusted publishing
+#   Publisher: GitHub Actions / Repository: gezi-wen/sage-mem / Workflow: publish.yml
+#
+# 两种触发：
+#   - push `v*` tag：正式发布（tag 必须与 package.json 的 version 完全一致）；
+#   - workflow_dispatch + dry_run=true：只跑安装/测试/打包预演，**不发布**。
 #
 # 注意：
-#   - tag 必须与 package.json 的 version 完全一致（v2.11.1 ↔ 2.11.1），否则 workflow 直接失败；
-#   - provenance 要求**构建发生在 CI**，所以本地产的 tgz 只作为验证产物，不作为发布来源；
-#   - 这里不写 NPM_TOKEN：写了一个用不到的 secret，反而是将来 401 的诱因。
+#   - provenance 要求**构建发生在 CI**，本地产的 tgz 只作验证产物，不作为发布来源；
+#   - 这里不写 NPM_TOKEN：写一个用不到的 secret，反而是将来 401 的诱因。
 
 name: publish
 
@@ -24,6 +23,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '只预演（npm publish --dry-run），不真正发布'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -40,8 +45,13 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      # 版本一致性：tag 与 package.json 不一致时**先红**，不要等到 publish 那一步
+      # Trusted Publishing（OIDC）要求 npm >= 11.5.1；node 20 自带 npm 10，必须先换
+      - name: npm 11 for trusted publishing
+        run: npm install -g npm@^11 && npm --version
+
+      # 只有 tag 触发才校验版本一致性；手动触发没有 tag 可比
       - name: Check tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           TAG="${GITHUB_REF_NAME#v}"
           PKG="$(node -p "require('./package.json').version")"
@@ -54,10 +64,11 @@ jobs:
       - name: Test
         run: npm test
 
-      # Trusted Publishing（OIDC）要求 npm >= 11.5.1；node 20 自带的是 npm 10，会直接报
-      # "trusted publishing requires npm 11.5.1 or later"。装 git 版的 npm 11 再发。
-      - name: npm 11 for trusted publishing
-        run: npm install -g npm@^11
-
       - name: Publish (trusted publishing)
-        run: npm publish --provenance --access public
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "dry run: npm publish --dry-run"
+            npm publish --dry-run --access public
+          else
+            npm publish --provenance --access public
+          fi
