@@ -1,10 +1,15 @@
-		// ── 待办清单看板（2.11.0 · 实验性）──────────────────────────────────
+		// ── 待办清单看板（2.11.0 · 实验性 / 2.11.1 勾选改「搬家」）─────────────
 		//
 		// 数据源**唯一**：`memory/project_session-state.md`（跨会话代办清单，baseline 每场注入）。
-		// 面板只做**行级手术**：勾选 = 给那一行加 `[x]`，新增 / 编辑 / 清理只动那几行，
-		// 其余字节（frontmatter、引用块、空行、别的节）原样带走。
+		// 面板只做**行级手术**：勾选 = 把那一行从原组删掉、搬进「已完成，待删除」块；
+		// 新增 / 编辑 / 删除只动那几行，其余字节（frontmatter、引用块、空行、别的节）原样带走。
 		//
-		// 为什么不建自己的存储：文歌子要的是「AI 直接在 md 里调试」—— 同一个文件是唯一真相，
+		// 为什么勾选是**搬家**而不是加 `[x]`（2.11.1，用户反馈 2026-11-17）：完成项留在原组里，
+		// 原组就越读越长，而「已完成」本来只该是**待清理的队列**。搬进单独一块之后，
+		// agent 收尾时一眼就能看见该搬哪几条进 `session-log.md`、搬完从这块删掉。
+		// 这也把「谁来删」从模型自觉变成了一个显式位置 —— 见 `skills/sage-mem/SKILL.md`。
+		//
+		// 为什么不建自己的存储：用户要的是「AI 直接在 md 里调试」—— 同一个文件是唯一真相，
 		// 面板只是它的另一种视图。第二份状态一定会漂移，而漂移的代价是「看板说做完了、文件里还在」。
 		//
 		// 承载面走**官方**注册表（`sidebarRightTabs`）：
@@ -24,6 +29,15 @@
 		const TODO_DETAIL_CHARS = 150;
 		/** 没有 `##` 节时条目落进这个兜底组。 */
 		const TODO_SECTION_FALLBACK = "todo.fallbackSection";
+		/** 「已完成，待删除」块：标题匹配它就算 done 组（`kind: "done"`）。 */
+		const TODO_DONE_PATTERN = /已完成|待删除/;
+		/**
+		 * 文件里还没有这个块时，第一次勾选按这行标题建块。
+		 * **字面量写进文件，不跟界面语言走** —— 它是文件格式的一部分，不是 UI 文案。
+		 */
+		const TODO_DONE_HEADING = "## 已完成，待删除";
+		/** 撤销 / 重做各留几步（用户要两步；再多会让人误以为能回滚一整天）。 */
+		const TODO_UNDO_DEPTH = 2;
 
 		/** 开关状态（模块级：设置卡与页签共享）。 */
 		let todoBoardEnabled = false;
@@ -131,8 +145,9 @@
 				const heading = /^##\s+(.*)$/.exec(line);
 				if (heading) {
 					const title = heading[1].trim();
-					const constraint = /长期约束|不是待办|别删/.test(title);
-					current = { title: title, kind: constraint ? "constraint" : "todo", items: [], insertAt: i + 1, headingIndex: i };
+					// 三档：done（「已完成，待删除」块，勾选搬进这里）/ constraint（长期约束，别删）/ 普通待办。
+					const kind = TODO_DONE_PATTERN.test(title) ? "done" : (/长期约束|不是待办|别删/.test(title) ? "constraint" : "todo");
+					current = { title: title, kind: kind, items: [], insertAt: i + 1, headingIndex: i };
 					sections.push(current);
 					lastItem = null;
 					continue;
@@ -151,15 +166,20 @@
 					let isDone = false;
 					const box = /^\[([ xX])\]\s*(.*)$/.exec(body);
 					if (box) { isDone = box[1].toLowerCase() === "x"; body = box[2]; }
-					const item = { line: i, done: isDone, text: body, title: todoItemTitle(body), detail: todoItemDetail(body), cont: "" };
 					if (current === null) {
 						current = { title: "", kind: "todo", items: [], insertAt: i, headingIndex: -1 };
 						sections.push(current);
 					}
+					// 待删除块里的条目按语义就是「已完成」，不靠行首 `[x]` 自证（手写的也算）。
+					const inDone = current.kind === "done";
+					const item = {
+						line: i, done: isDone || inDone, inDone: inDone,
+						text: body, title: todoItemTitle(body), detail: todoItemDetail(body), cont: "",
+					};
 					current.items.push(item);
 					// 插入点 = 本条之后：节尾最后一条的下方，不会被后面的空行 / 下一节吃掉。
 					current.insertAt = i + 1;
-					if (isDone) done += 1; else open += 1;
+					if (item.done) done += 1; else open += 1;
 					lastItem = item;
 					continue;
 				}
@@ -175,18 +195,112 @@
 
 		// ── 行级手术（纯函数：输入旧全文 → 输出新全文，不改入参）────────────
 
-		/** 在第 line 行上加/去 `[x]`。返回新全文；行不认识（没有 `- `）就回 null。 */
-		function todoToggle(text, line, done) {
-			const lines = String(text).split("\n");
-			const raw = lines[line];
-			if (raw === undefined) return null;
+		/**
+		 * 把一行拆成 `- ` 条目的三段。行不认识（不是 `- ` 开头）就回 null。
+		 * ⚠️ 先把行尾 `\r` 摘掉再匹配：JS 的 `.` 与 `$` 都不吃 `\r`，
+		 * 带着它匹配 `/^(\s*)-\s+(.*)$/` 一律不中 —— CRLF 文件会一条都认不出来。
+		 * @returns {{indent: string, body: string, done: boolean}|null} body 已剥掉 `[x]`
+		 */
+		function todoBullet(line) {
+			const raw = String(line == null ? "" : line).replace(/\r+$/, "");
 			const m = /^(\s*)-\s+(.*)$/.exec(raw);
 			if (!m) return null;
 			let body = m[2];
+			let done = false;
 			const box = /^\[([ xX])\]\s*(.*)$/.exec(body);
-			if (box) body = box[2];
-			lines[line] = m[1] + "- " + (done ? "[x] " : "") + body;
-			return lines.join("\n");
+			if (box) { done = box[1].toLowerCase() === "x"; body = box[2]; }
+			return { indent: m[1], body: body.replace(/\s+$/, ""), done: done };
+		}
+
+		/** 文件用的行尾：CRLF 文件里插的新行也带 `\r`，免得一份文件两种换行。 */
+		function todoEol(text) {
+			return String(text == null ? "" : text).indexOf("\r\n") >= 0 ? "\r" : "";
+		}
+
+		/**
+		 * 找「已完成，待删除」块的行区间。
+		 * @returns {{start: number, end: number}|null} `[start, end)`：`start` 是标题行，`end` 是下一个 `##` 或文件尾
+		 */
+		function todoDoneRange(lines) {
+			const heading = /^##\s+(.*)$/;
+			for (let i = 0; i < lines.length; i++) {
+				// 先摘 `\r`：CRLF 文件里带 `\r` 的行用 `.` / `$` 匹配不到（见 todoBullet 那条注释）。
+				const m = heading.exec(String(lines[i]).replace(/\r+$/, ""));
+				if (!m || !TODO_DONE_PATTERN.test(m[1].trim())) continue;
+				let end = lines.length;
+				for (let j = i + 1; j < lines.length; j++) {
+					if (heading.exec(String(lines[j]).replace(/\r+$/, ""))) { end = j; break; }
+				}
+				return { start: i, end: end };
+			}
+			return null;
+		}
+
+		/**
+		 * 勾选 = **搬家**：从原组删掉第 line 行，在「已完成，待删除」块末尾追加 `- [x] <正文>`。
+		 *
+		 * - 文件里还没有那个块时，在**文件末尾**追加 `\n## 已完成，待删除\n` 再写条目，其余字节不动。
+		 * - 只搬**顶层**条目（缩进行是上一条的续行，跟着它自己留在原处，不在此处重构）。
+		 * - 正文只带原正文：不带原行首 `- `，也剥掉已有的 `[x]` 前缀。
+		 *
+		 * @returns {string|null} 新全文；不认识的行 / 空正文回 null（调用方据此不写盘）
+		 */
+		function todoMoveToDone(text, line) {
+			const src = String(text == null ? "" : text);
+			const lines = src.split("\n");
+			if (line < 0 || line >= lines.length) return null;
+			const bullet = todoBullet(lines[line]);
+			if (!bullet || bullet.indent !== "" || bullet.body === "") return null;
+			const eol = todoEol(src);
+			const next = lines.slice();
+			next.splice(line, 1);
+			const range = todoDoneRange(next);
+			if (!range) {
+				if (next.length > 0 && next[next.length - 1] === "") next.pop();
+				const tail = next.length > 0 ? [""] : [];
+				return next.concat(tail, [TODO_DONE_HEADING + eol, "- [x] " + bullet.body + eol, ""]).join("\n");
+			}
+			// 块末尾 = 块内**最后一条条目**的下一行；块里一条都没有就紧贴标题。
+			let at = range.start + 1;
+			for (let i = range.start + 1; i < range.end; i++) {
+				if (todoBullet(next[i])) at = i + 1;
+			}
+			next.splice(at, 0, "- [x] " + bullet.body + eol);
+			return next.join("\n");
+		}
+
+		/**
+		 * 取消完成 = **反向搬家**：从待删除块删掉第 line 行，回到它原来所在组的末尾。
+		 *
+		 * 「原来在哪一组」只存在内存里（`rememberTodoOrigin`）—— 文件里不留标记，因为
+		 * 那会把看板的私有状态写进用户的数据。记不住时（换了个页面 / 手写的条目）退而求其次：
+		 * 第一个普通待办组的末尾，再不行就文件末尾。
+		 *
+		 * @param {string} originTitle 原组标题（空 = 不知道）
+		 */
+		function todoRestore(text, line, originTitle) {
+			const src = String(text == null ? "" : text);
+			const lines = src.split("\n");
+			if (line < 0 || line >= lines.length) return null;
+			const bullet = todoBullet(lines[line]);
+			if (!bullet || bullet.indent !== "" || bullet.body === "") return null;
+			const eol = todoEol(src);
+			const next = lines.slice();
+			next.splice(line, 1);
+			const parsed = parseTodoList(next.join("\n"));
+			const want = String(originTitle == null ? "" : originTitle).trim();
+			const byTitle = want === "" ? null : parsed.sections.find(function (sec) {
+				return sec.kind !== "done" && sec.title === want;
+			});
+			const fallback = byTitle || parsed.sections.find(function (sec) {
+				return sec.kind === "todo" && sec.items.length > 0;
+			}) || parsed.sections.find(function (sec) { return sec.kind === "todo"; });
+			if (!fallback) {
+				if (next.length > 0 && next[next.length - 1] === "") next.pop();
+				return next.concat(["- " + bullet.body + eol, ""]).join("\n");
+			}
+			next.splice(fallback.insertAt, 0, "- " + bullet.body + eol);
+			return next.join("\n");
 		}
 
 		/** 在第 at 行插入一条 `- <body>`。 */
@@ -221,20 +335,60 @@
 			return lines.join("\n");
 		}
 
-		/** 清理已完成：删掉所有 `- [x]` 行。返回 { next, count }。 */
-		function todoClearDone(text) {
-			const parsed = parseTodoList(text);
-			const targets = [];
-			parsed.sections.forEach(function (sec) {
-				sec.items.forEach(function (it) { if (it.done) targets.push(it.line); });
-			});
-			if (targets.length === 0) return { next: null, count: 0 };
-			return { next: todoRemove(text, targets), count: targets.length };
+		/**
+		 * 清空「已完成，待删除」块：删掉块内**全部条目行**，`## 标题` 留着（块还要继续接下一次勾选）。
+		 * @returns {{next: string|null, count: number}} count=0 → next 为 null（不白写一次盘）
+		 */
+		function todoClearDoneBlock(text) {
+			const src = String(text == null ? "" : text);
+			const lines = src.split("\n");
+			const range = todoDoneRange(lines);
+			if (!range) return { next: null, count: 0 };
+			const hits = [];
+			for (let i = range.start + 1; i < range.end; i++) {
+				if (todoBullet(lines[i])) hits.push(i);
+			}
+			if (hits.length === 0) return { next: null, count: 0 };
+			return { next: todoRemove(src, hits), count: hits.length };
+		}
+
+		/**
+		 * 「这条原来在哪一组」的内存账本 —— 取消完成要靠它把条目送回原组。
+		 * 只活在这个页面里（不落盘）；键是正文归一化后的文本，最多留 200 条。
+		 */
+		const todoOrigins = new Map();
+
+		function rememberTodoOrigin(text, title) {
+			const key = String(text == null ? "" : text).trim();
+			if (key === "") return;
+			if (todoOrigins.size > 200) todoOrigins.clear();
+			todoOrigins.set(key, String(title == null ? "" : title));
+		}
+
+		function recallTodoOrigin(text) {
+			return todoOrigins.get(String(text == null ? "" : text).trim()) || "";
 		}
 
 		// ── 视图 ──────────────────────────────────────────────────────────
 
-		/** 一条待办的卡片：勾选 + 标题 + 折叠正文 + 行内编辑。 */
+		/**
+		 * 撤销 / 重做图标：**内联 SVG**（不引图标库、不外链、不靠字体）。
+		 * 撤销 = 一条水平基线 + 从右上绕回的弧形箭头，箭头尖在左端；重做是它的左右镜像
+		 * （x → 16-x，圆弧的 sweep 反过来）。
+		 * @param {"undo"|"redo"} dir
+		 */
+		function todoArrowIcon(dir) {
+			const paths = dir === "redo"
+				? ["M13.5 6.5h-7a4 4 0 0 0 0 8h3", "M10.5 3.5l3 3-3 3"]
+				: ["M2.5 6.5h7a4 4 0 0 1 0 8h-3", "M5.5 3.5l-3 3 3 3"];
+			return h("svg", {
+				viewBox: "0 0 16 16", width: 14, height: 14, fill: "none",
+				stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round",
+				"aria-hidden": "true",
+			}, paths.map(function (d, i) { return h("path", { key: "p" + i, d: d }); }));
+		}
+
+		/** 一条待办的卡片：勾选 + 标题 + 折叠正文 + 行内编辑（待删除块里还有「删除」）。 */
 		function TodoItemRow(props) {
 			const item = props.item;
 			const sOpen = react.useState(false);
@@ -273,41 +427,69 @@
 						: [
 							long ? h("button", { key: "m", type: "button", className: "smem-link smem-todo-mini", onClick: function () { setExpanded(!expanded); } }, expanded ? t("todo.less") : t("todo.more")) : null,
 							h("button", { key: "e", type: "button", className: "smem-link smem-todo-mini", disabled: props.busy, onClick: function () { setDraft(item.text); } }, t("todo.action.edit")),
+							// 「删除」只在待删除块里出现：别的位置删条目等于绕过「搬进流水」这一步。
+							props.onDelete
+								? h("button", { key: "d", type: "button", className: "smem-link smem-todo-mini smem-todo-del", disabled: props.busy, onClick: function () { props.onDelete(item); } }, t("todo.action.delete"))
+								: null,
 						]),
 				]),
 			]);
 		}
 
-		/** 一组（一个 `##` 节）：标题 + 计数 + 条目 + 新增框。 */
+		/** 一组（一个 `##` 节）：标题 + 计数 + 条目 + 新增框；待删除块另有「清空全部」。 */
 		function TodoSectionGroup(props) {
 			const sec = props.section;
-			const constraint = sec.kind === "constraint";
-			const sCollapsed = react.useState(constraint);
+			const isDone = sec.kind === "done";
+			// 2.11.1（用户 2026-11-17 反馈）：**所有组默认收起**，一屏先看见「有几组、各组几条」，
+			// 想看的组自己点开。原来只收「长期约束」，长清单照样一屏铺满。
+			const sCollapsed = react.useState(true);
 			const collapsed = sCollapsed[0], setCollapsed = sCollapsed[1];
+			// 上层「全部展开 / 全部收起」：allOpen 为 null 时不管（各组各管各的）。
+			react.useEffect(function () {
+				if (props.allOpen === null || props.allOpen === undefined) return;
+				setCollapsed(!props.allOpen);
+			}, [props.allOpen]);
 			const sDraft = react.useState("");
 			const draft = sDraft[0], setDraft = sDraft[1];
 			const openCount = sec.items.filter(function (it) { return !it.done; }).length;
 			const doneCount = sec.items.length - openCount;
-			return h("section", { className: "smem-todo-group" }, [
-				h("button", {
-					key: "head",
-					type: "button",
-					className: "smem-todo-group-head",
-					onClick: function () { setCollapsed(!collapsed); },
-				}, [
-					h("span", { key: "chev", className: "smem-todo-chev" }, collapsed ? "▸" : "▾"),
-					h("span", { key: "t", className: "smem-todo-group-title" }, sec.title || t(TODO_SECTION_FALLBACK)),
-					h("span", { key: "n", className: "smem-todo-count" }, String(openCount) + (doneCount > 0 ? " / " + String(doneCount) : "")),
+			// 「清空全部」清的是**整个块**（不是当前筛出来的这几条），所以按钮上的数字要取块的真实条数。
+			const blockCount = typeof props.doneCount === "number" ? props.doneCount : sec.items.length;
+			return h("section", { className: "smem-todo-group" + (isDone ? " smem-todo-group-done" : "") }, [
+				// 标题行是**行**不是按钮：右边还要放「清空全部」，按钮套按钮在浏览器里会互相吃掉。
+				h("div", { key: "head", className: "smem-todo-group-head" }, [
+					h("button", {
+						key: "toggle",
+						type: "button",
+						className: "smem-todo-group-toggle",
+						onClick: function () { setCollapsed(!collapsed); },
+					}, [
+						h("span", { key: "chev", className: "smem-todo-chev" }, collapsed ? "▸" : "▾"),
+						h("span", { key: "t", className: "smem-todo-group-title" }, sec.title || (isDone ? t("todo.doneGroup") : t(TODO_SECTION_FALLBACK))),
+						h("span", { key: "n", className: "smem-todo-count" }, String(openCount) + (doneCount > 0 ? " / " + String(doneCount) : "")),
+					]),
+					isDone && blockCount > 0
+						? h("button", {
+							key: "clear",
+							type: "button",
+							className: "smem-todo-mini smem-todo-del",
+							title: t("todo.action.clearDone", { count: blockCount }),
+							disabled: props.busy,
+							onClick: function () { props.onClearDone(sec); },
+						}, t("todo.action.clearDone", { count: blockCount }))
+						: null,
 				]),
 				collapsed ? null : h("div", { key: "list", className: "smem-todo-list" }, sec.items.length === 0
-					? [h("div", { key: "empty", className: "smem-todo-empty" }, t("todo.empty.section"))]
+					? [h("div", { key: "empty", className: "smem-todo-empty" }, isDone ? t("todo.empty.done") : t("todo.empty.section"))]
 					: sec.items.map(function (it) {
 						return h(TodoItemRow, {
 							key: "i" + it.line, item: it, busy: props.busy,
 							onToggle: props.onToggle, onEdit: props.onEdit,
+							onDelete: isDone ? props.onDelete : null,
 						});
 					})),
-				collapsed ? null : h("div", { key: "add", className: "smem-todo-add" }, [
+				// 待删除块不给「加一条」：那一块只能由勾选搬进来，手写进去等于无来源的条目。
+				collapsed || isDone ? null : h("div", { key: "add", className: "smem-todo-add" }, [
 					h("input", {
 						key: "in",
 						className: "smem-input smem-todo-add-input",
@@ -341,8 +523,15 @@
 			const sErr = react.useState(null); const err = sErr[0], setErr = sErr[1];
 			const sNotice = react.useState(""); const notice = sNotice[0], setNotice = sNotice[1];
 			const sBusy = react.useState(false); const busy = sBusy[0], setBusy = sBusy[1];
-			// 撤销只留一步：上一次写入前的 {content, revision}。够用，且不会让人误以为能回滚一整天。
-			const sUndo = react.useState(null); const undo = sUndo[0], setUndo = sUndo[1];
+			// 撤销 / 重做：两步栈，元素是写入前的 `{content, revision}`。只在内存里，不落盘。
+			// 任何**新**写入都清空 redoStack —— 从历史里分叉出去之后，原来那条「未来」就不成立了。
+			const sUndo = react.useState([]); const undoStack = sUndo[0], setUndoStack = sUndo[1];
+			const sRedo = react.useState([]); const redoStack = sRedo[0], setRedoStack = sRedo[1];
+			// 「全部展开」是**一次性动作**而不是持久状态：默认 null（各组按自己的默认走 = 收起）。
+			const sAll = react.useState(null); const allOpen = sAll[0], setAllOpen = sAll[1];
+			// 搜索：只过滤**显示**，绝不改文件；有查询时匹配的组强制展开，没匹配的组整组隐掉。
+			const sQuery = react.useState(""); const rawQuery = sQuery[0], setQuery = sQuery[1];
+			const query = String(rawQuery).trim().toLowerCase();
 
 			/** 读一次文件。`quiet` = 轮询调用（出错不弹条，避免每 4 秒闪一次）。 */
 			const load = react.useCallback(function (quiet) {
@@ -388,6 +577,8 @@
 			 */
 			function mutate(label, next) {
 				if (!next || next === doc.content) return;
+				// 写入前的快照先抓住：新写入一律清空 redoStack（历史分叉了）。
+				const snapshot = { content: doc.content, revision: doc.revision };
 				setBusy(true); setErr(null); setNotice("");
 				const revision = doc.revision;
 				const opts = revision ? { expectedRevision: revision } : undefined;
@@ -402,15 +593,59 @@
 							setErr(r.error || t("todo.err.write", { error: String(r.code || "error") }));
 							return;
 						}
-						setUndo({ content: doc.content, revision: revision });
+						setUndoStack(function (prev) { return prev.concat([snapshot]).slice(-TODO_UNDO_DEPTH); });
+						setRedoStack([]);
 						setNotice(out.degraded ? t("todo.notice.degraded") : label);
 						return load(false);
 					}, function (e) { setErr(String((e && e.message) || e)); })
 					.then(function () { setBusy(false); });
 			}
 
-			function onToggle(item, done) {
-				mutate(t(done ? "todo.notice.done" : "todo.notice.undone"), todoToggle(doc.content, item.line, done));
+			/**
+			 * 写回一份历史快照（撤销 / 重做共用）。**只有写成功才动栈** ——
+			 * 失败时界面不该显示「已经挪过一步」。
+			 * @param {{content: string, revision: string|null}} target 要写回的快照
+			 * @param {string} label 回执文案
+			 * @param {function} onDone 成功后的栈操作
+			 */
+			function writeSnapshot(target, label, onDone) {
+				if (!target || typeof target.content !== "string") return;
+				const revision = doc.revision;
+				setBusy(true); setErr(null); setNotice("");
+				writeWithFallback(remote, "writeFile", [TODO_FILE, target.content], revision ? { expectedRevision: revision } : undefined, null)
+					.then(function (out) {
+						const r = out && (out.result || out);
+						if (r && r.ok === false) {
+							if (r.code === "stale_revision") { setNotice(t("todo.notice.stale")); return load(false); }
+							setErr(r.error || t("todo.err.write", { error: String(r.code || "error") }));
+							return;
+						}
+						if (typeof onDone === "function") onDone();
+						setNotice(label);
+						return load(false);
+					}, function (e) { setErr(String((e && e.message) || e)); })
+					.then(function () { setBusy(false); });
+			}
+
+			/** 当前盘上内容的快照（撤销 / 重做要把它推到另一侧的栈里）。 */
+			function currentPoint() {
+				return { content: doc.content, revision: doc.revision };
+			}
+
+			/**
+			 * 勾选 / 取消完成：**搬家**与**反向搬家**。
+			 * 勾选 → 从原组删行、追加到「已完成，待删除」块；取消 → 删掉、送回原组末尾。
+			 */
+			function onToggle(item, done, originTitle) {
+				if (done) {
+					const next = todoMoveToDone(doc.content, item.line);
+					if (!next) return;
+					// 记住它原来在哪一组，取消完成时靠这条回到原位（只在内存里）。
+					rememberTodoOrigin(item.text, originTitle);
+					mutate(t("todo.notice.movedToDone", { group: t("todo.doneGroup") }), next);
+					return;
+				}
+				mutate(t("todo.notice.restored"), todoRestore(doc.content, item.line, recallTodoOrigin(item.text)));
 			}
 
 			function onAdd(section, body) {
@@ -421,25 +656,36 @@
 				mutate(t("todo.notice.edited"), todoReplace(doc.content, item.line, body));
 			}
 
+			/** 删掉待删除块里的一条（只删那一行）。 */
+			function onDelete(item) {
+				mutate(t("todo.notice.deleted"), todoRemove(doc.content, [item.line]));
+			}
+
+			/** 清空待删除块的**全部条目行**，`## 标题` 留着。 */
 			function onClearDone() {
-				const out = todoClearDone(doc.content);
+				const out = todoClearDoneBlock(doc.content);
 				if (out.count === 0) return;
 				mutate(t("todo.notice.cleared", { count: out.count }), out.next);
 			}
 
 			function onUndo() {
-				if (!undo) return;
-				const revision = doc.revision;
-				setBusy(true); setErr(null); setNotice("");
-				writeWithFallback(remote, "writeFile", [TODO_FILE, undo.content], revision ? { expectedRevision: revision } : undefined, null)
-					.then(function (out) {
-						const r = out.result;
-						if (r && r.ok === false) { setErr(r.error || t("todo.err.write", { error: String(r.code || "error") })); return; }
-						setUndo(null);
-						setNotice(t("todo.notice.undo"));
-						return load(false);
-					}, function (e) { setErr(String((e && e.message) || e)); })
-					.then(function () { setBusy(false); });
+				if (undoStack.length === 0) return;
+				const target = undoStack[undoStack.length - 1];
+				const point = currentPoint();
+				writeSnapshot(target, t("todo.notice.undo"), function () {
+					setUndoStack(function (prev) { return prev.slice(0, -1); });
+					setRedoStack(function (prev) { return prev.concat([point]).slice(-TODO_UNDO_DEPTH); });
+				});
+			}
+
+			function onRedo() {
+				if (redoStack.length === 0) return;
+				const target = redoStack[redoStack.length - 1];
+				const point = currentPoint();
+				writeSnapshot(target, t("todo.notice.redone"), function () {
+					setRedoStack(function (prev) { return prev.slice(0, -1); });
+					setUndoStack(function (prev) { return prev.concat([point]).slice(-TODO_UNDO_DEPTH); });
+				});
 			}
 
 			if (!enabled) {
@@ -451,26 +697,68 @@
 
 			const parsed = doc && doc.parsed ? doc.parsed : parseTodoList("");
 			const missing = doc && doc.missing;
+			// 匹配口径：标题 + 正文 + 续行里任一处包含子串（大小写不敏感；不解释正则，免得用户被自己的输入坑）。
+			const sections = query === "" ? parsed.sections : parsed.sections
+				.map(function (sec) {
+					const hit = sec.items.filter(function (it) {
+						const hay = ((it.title || "") + " " + it.text + " " + (it.cont || "")).toLowerCase();
+						return hay.indexOf(query) >= 0;
+					});
+					return { sec: sec, hit: hit };
+				})
+				.filter(function (row) { return row.hit.length > 0; })
+				.map(function (row) { return Object.assign({}, row.sec, { items: row.hit }); });
+			const matchCount = sections.reduce(function (n, sec) { return n + sec.items.length; }, 0);
 			const stats = t("todo.stat", { open: parsed.open, done: parsed.done, sections: parsed.sections.length });
+			// 「清空全部」清的是整个待删除块，数字取块的真实条数（搜索过滤后也一样）。
+			const doneBlock = parsed.sections.find(function (sec) { return sec.kind === "done"; });
+			const doneBlockCount = doneBlock ? doneBlock.items.length : 0;
 
 			return h("div", { className: "smem-todo" }, [
 				h("div", { key: "head", className: "smem-todo-head" }, [
-					h("span", { key: "s", className: "smem-todo-stat" }, stats),
+					h("span", { key: "s", className: "smem-todo-stat" }, query === "" ? stats : t("todo.search.count", { count: matchCount })),
 					h("span", { key: "sp", "data-spring": "" }),
-					undo ? h("button", { key: "u", type: "button", className: "smem-link smem-todo-mini", disabled: busy, onClick: onUndo }, t("todo.action.undo")) : null,
-					parsed.done > 0 ? h("button", { key: "c", type: "button", className: "smem-link smem-todo-mini", disabled: busy, onClick: onClearDone }, t("todo.action.clearDone", { count: parsed.done })) : null,
+					h("button", {
+						key: "u", type: "button", className: "smem-todo-icon-btn",
+						title: t("todo.action.undo"), "aria-label": t("todo.action.undo"),
+						disabled: busy || undoStack.length === 0,
+						onClick: onUndo,
+					}, todoArrowIcon("undo")),
+					h("button", {
+						key: "d", type: "button", className: "smem-todo-icon-btn",
+						title: t("todo.action.redo"), "aria-label": t("todo.action.redo"),
+						disabled: busy || redoStack.length === 0,
+						onClick: onRedo,
+					}, todoArrowIcon("redo")),
+					h("button", { key: "a", type: "button", className: "smem-link smem-todo-mini", onClick: function () { setAllOpen(allOpen === true ? false : true); } }, allOpen === true ? t("todo.collapseAll") : t("todo.expandAll")),
 					h("button", { key: "r", type: "button", className: "smem-link smem-todo-mini", disabled: busy, onClick: function () { load(false); } }, t("todo.refresh")),
+				]),
+				// 搜索框放统计条下面一行：右栏很窄，塞进同一行会把按钮挤没。
+				h("div", { key: "search", className: "smem-todo-search-row" }, [
+					h("input", {
+						key: "q",
+						className: "smem-input smem-todo-search",
+						type: "search",
+						placeholder: t("todo.search.placeholder"),
+						value: rawQuery,
+						onChange: function (e) { setQuery(e.target.value); },
+					}),
+					rawQuery === "" ? null : h("button", { key: "x", type: "button", className: "smem-link smem-todo-mini", onClick: function () { setQuery(""); } }, t("todo.action.cancel")),
 				]),
 				err ? h("div", { key: "err", className: "smem-err" }, "⚠ " + err) : null,
 				notice ? h("div", { key: "ok", className: "smem-ok" }, "✓ " + notice) : null,
 				missing
 					? h("div", { key: "miss", className: "smem-todo-empty" }, t("todo.empty.file", { file: TODO_FILE }))
-					: h("div", { key: "groups", className: "smem-todo-groups" }, parsed.sections.map(function (sec, i) {
-						return h(TodoSectionGroup, {
-							key: "s" + i, section: sec, busy: busy,
-							onToggle: onToggle, onAdd: onAdd, onEdit: onEdit,
-						});
-					})),
+					: (query !== "" && sections.length === 0
+						? h("div", { key: "nomatch", className: "smem-todo-empty" }, t("todo.search.none"))
+						: h("div", { key: "groups", className: "smem-todo-groups" }, sections.map(function (sec, i) {
+							return h(TodoSectionGroup, {
+								key: "s" + i, section: sec, busy: busy, allOpen: query === "" ? allOpen : true,
+								doneCount: doneBlockCount,
+								onToggle: function (it, d) { onToggle(it, d, sec.title); },
+								onAdd: onAdd, onEdit: onEdit, onDelete: onDelete, onClearDone: onClearDone,
+							});
+						}))),
 			]);
 		}
 
@@ -639,13 +927,21 @@
 		exports.todoBoardInternals = {
 			FILE: TODO_FILE,
 			TAB_KIND: TODO_TAB_KIND,
+			DONE_HEADING: TODO_DONE_HEADING,
+			UNDO_DEPTH: TODO_UNDO_DEPTH,
 			parse: parseTodoList,
 			titleOf: todoItemTitle,
-			toggle: todoToggle,
+			bullet: todoBullet,
+			doneRange: todoDoneRange,
+			moveToDone: todoMoveToDone,
+			restore: todoRestore,
 			insert: todoInsert,
 			replace: todoReplace,
 			remove: todoRemove,
-			clearDone: todoClearDone,
+			clearDoneBlock: todoClearDoneBlock,
+			rememberOrigin: rememberTodoOrigin,
+			recallOrigin: recallTodoOrigin,
+			arrowIcon: todoArrowIcon,
 			isEnabled: function () { return todoBoardEnabled; },
 			notify: todoBoardNotify,
 		};

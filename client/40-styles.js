@@ -348,20 +348,34 @@
 			".smem-conf-warn{font-size:11.5px;color:var(--dsw-alias-state-warn-primary,#d97706);}",
 
 			// ── 2.11.0 待办清单看板（右侧栏页签）──────────────────────────
-			// 主场景是**右栏**（约 400px）：默认单列分组；容器宽到 680px 才分栏
-			// （用容器查询而不是媒体查询 —— 窄不窄由承载它的面板决定，跟窗口无关）。
-			".smem-todo{display:flex;flex-direction:column;gap:10px;padding:12px 10px;font-size:12.5px;line-height:1.55;color:var(--dsw-alias-label-primary);container-type:inline-size;}",
-			".smem-todo-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--dsw-alias-label-secondary);}",
+			// 宿主把页签正文放进一个 `overflow:hidden` 的固定高度盒子里（实测 797px），
+			// 正文自己不设高度就会长到内容高（1924px）然后被裁掉 —— 手指够不到下面。
+			// 所以根节点必须**自己吃满高度并滚**，不能指望宿主代滚。
+			".smem-todo{height:100%;max-height:100%;min-height:0;flex:1 1 auto;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:8px;padding:0 10px 12px;font-size:12.5px;line-height:1.55;color:var(--dsw-alias-label-primary);}",
+			// 顶部统计条吸顶：滚到第 20 条时仍然知道总数。
+			".smem-todo-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-l1);backdrop-filter:blur(8px);padding:10px 0 8px;border-bottom:1px solid var(--dsw-alias-border-l1);}",
 			".smem-todo-stat{font-variant-numeric:tabular-nums;}",
 			".smem-todo-head > span[data-spring]{flex:1;}",
 			".smem-todo-mini{font-size:11.5px;background:none;border:0;padding:0;cursor:pointer;color:var(--dsw-alias-brand-primary,#3b82f6);}",
 			".smem-todo-mini:disabled{opacity:.45;cursor:default;}",
 			".smem-todo-groups{display:flex;flex-direction:column;gap:10px;}",
-			".smem-todo-group{border:1px solid var(--dsw-alias-border-l1);border-radius:10px;padding:8px 9px;display:flex;flex-direction:column;gap:6px;}",
-			".smem-todo-group-head{display:flex;align-items:center;gap:6px;background:none;border:0;padding:0;cursor:pointer;color:inherit;text-align:left;width:100%;}",
+			".smem-todo-search-row{display:flex;align-items:center;gap:8px;padding:0 0 2px;}",
+			".smem-todo-search{flex:1;min-width:0;font-size:12px;}",
+			".smem-todo-group{border:1px solid var(--dsw-alias-border-l1);border-radius:10px;padding:8px 9px;display:flex;flex-direction:column;gap:6px;flex:0 0 auto;}",
+			// 待删除块整块走红色系：它是**队列**不是结论，看得见的红提醒「这些该搬走了」。
+			".smem-todo-group-done{border-color:var(--dsw-alias-state-danger-primary,#ef4444);}",
+			".smem-todo-group-done .smem-todo-group-title{color:var(--dsw-alias-state-danger-primary,#ef4444);}",
+			// 2.11.1：标题行改成「行」—— 右侧要放「清空全部」，按钮不能套按钮。
+			".smem-todo-group-head{display:flex;align-items:center;gap:6px;width:100%;min-width:0;}",
+			".smem-todo-group-toggle{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:0;padding:0;cursor:pointer;color:inherit;text-align:left;}",
+			".smem-todo-del{color:var(--dsw-alias-state-danger-primary,#ef4444);}",
 			".smem-todo-chev{color:var(--dsw-alias-label-secondary);font-size:10px;width:10px;}",
 			".smem-todo-group-title{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
 			".smem-todo-count{font-size:11px;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-secondary);}",
+			// 顶部统计条右侧的图标按钮（撤销 / 重做）：无边框、跟文字同色、栈空时半透明。
+			".smem-todo-icon-btn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:20px;padding:0;border:0;border-radius:6px;background:none;color:currentColor;cursor:pointer;}",
+			".smem-todo-icon-btn:hover:not(:disabled){background:var(--dsw-alias-bg-l2);}",
+			".smem-todo-icon-btn:disabled{opacity:.35;cursor:default;}",
 			".smem-todo-list{display:flex;flex-direction:column;gap:6px;}",
 			".smem-todo-item{display:flex;gap:8px;align-items:flex-start;border-radius:8px;padding:4px 2px;}",
 			".smem-todo-item:hover{background:var(--dsw-alias-bg-l2);}",
@@ -381,6 +395,5 @@
 			".smem-todo-empty{font-size:11.5px;color:var(--dsw-alias-label-secondary);padding:4px 0;}",
 			".smem-todo-done-state{display:flex;flex-direction:column;gap:6px;padding:16px 12px;}",
 			".smem-todo-done-title{font-weight:600;}",
-			"@container (min-width:680px){.smem-todo-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));align-items:start;}}",
 		].join("\n");
 
