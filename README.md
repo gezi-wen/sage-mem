@@ -14,7 +14,7 @@
 
 > File-based cross-session memory for DeepSeek Harness — every memory is a plain markdown file you can open, edit and delete. No database, no worker, no port.
 
-**当前发布版本：`2.12.0`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
+**当前发布版本：`2.12.1`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
 [契约冻结](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)。
 
 如果它对你有用，给个 Star 是最直接的反馈。
@@ -474,11 +474,11 @@ sage-mem 给记忆目录的写入加了**版本守卫**：写入前记下当前�
 - **热的**：拨开关立刻生效，不用重启（与 MMR 不同）。
 - **默认关闭**；不做拖拽排序、不代写 `session-log` 留档 —— 把「待删除」搬进流水是 agent 收尾时的活。细节见 `docs/todo-board.md`。
 
-## 初始记忆：让 agent 建个骨架（2.12.0）
+## 初始记忆：让 agent 建个骨架（2.12.0，2.12.1 挪到「实验性」）
 
 新装的库是空的，而 agent 并不知道你的记忆该怎么起 —— 它要么把记忆写成日记，要么一条都不写。
 
-设置 → 记忆管理 → 文件列表顶部那张**初始记忆**卡片里，是一段可以直接执行的提示词：**复制**（或**下载 .md**），粘到会话里发给 agent。它会先看库里已经有什么，再建 `MEMORY.md` 索引、`session-log.md` 流水和三条起步记忆（记忆纪律 / 库结构 / 收尾动作）。
+设置 → 记忆管理 → **实验性** 页签最上面那张**初始记忆**卡片里，是一段可以直接执行的提示词：**复制**（或**下载 .md**），粘到会话里发给 agent。它会先看库里已经有什么，再建 `MEMORY.md` 索引、`session-log.md` 流水和三条起步记忆（记忆纪律 / 库结构 / 收尾动作）。
 
 ![初始记忆：复制这段提示词粘给 agent，它会先看你已有的记忆再动手](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/initial-guide.png)
 

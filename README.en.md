@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.12.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.12.1`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -474,11 +474,11 @@ The two things are moved **differently**, spelled out:
 - **Hot**: flipping the switch takes effect immediately, no restart (unlike MMR).
 - **Off by default**; no drag-and-drop ordering, no automatic `session-log` archiving — moving those pending-deletion rows into the log is the agent's job at wrap-up. Details in `docs/todo-board.md`.
 
-## Initial memory: scaffold the library with an agent (2.12.0)
+## Initial memory: scaffold the library with an agent (2.12.0; moved to Lab in 2.12.1)
 
 A freshly installed library is empty, and the agent has no idea how your memories should start — it either writes a diary or writes nothing at all.
 
-The **Initial memory** card at the top of Settings → Memory management → Files holds a prompt you can execute directly: **copy** it (or **download the .md**), paste it to the agent in the conversation. It first looks at what your library already contains, then creates the `MEMORY.md` index, the `session-log.md` log and three starter memories (memory discipline / library layout / wrap-up routine).
+The **Initial memory** card at the top of Settings → Memory management → **Lab** holds a prompt you can execute directly: **copy** it (or **download the .md**), paste it to the agent in the conversation. It first looks at what your library already contains, then creates the `MEMORY.md` index, the `session-log.md` log and three starter memories (memory discipline / library layout / wrap-up routine).
 
 ![Initial memory: copy this prompt to the agent and it scaffolds the library around what you already have](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/initial-guide.png)
 

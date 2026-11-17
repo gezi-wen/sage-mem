@@ -56,10 +56,16 @@ const REQUIRED = [
   ['wrap-up', '收尾自检四问', (t) => t.includes('第 4 步')],
 ]
 
+/**
+ * 内部称呼与真名：**用转义写**，不把字面量留在这份公开文件里 ——
+ * 这跟它自己的断言是同一个道理（测试文件也不该成为泄漏点）。
+ */
+const PERSONAL = ['\u6587\u6b4c\u5b50', '\u663c\u6bbf', '\u5723\u6bbf', '\u7070\u4e91']
+
 /** 提示词里**不许**出现的东西：个人信息、版本号、host 机制细节。 */
 const FORBIDDEN = [
-  ['no-personal-name', '不含真名', (t) => !t.includes('文歌子')],
-  ['no-sage-name', '不含三殿内部称呼', (t) => !t.includes('昼殿') && !t.includes('圣殿')],
+  ['no-personal-name', '不含真名', (t) => !t.includes(PERSONAL[0])],
+  ['no-sage-name', '不含三殿内部称呼', (t) => !PERSONAL.slice(1).some((w) => t.includes(w))],
   ['no-local-path', '不含本机路径', (t) => !/E:\\\\?shengdian|E:\/shengdian/.test(t)],
   ['no-version', '不含版本号字面量', (t) => !/\b\d+\.\d+\.\d+\b/.test(t)],
   ['no-env-vars', '不写 SAGE_MEM_* 环境变量', (t) => !t.includes('SAGE_MEM_')],
@@ -113,7 +119,7 @@ console.log('\n== 3. 反向对照：改坏一句必须被抓住 ==')
   const withCaps = built.text + '\r\n随便加一行\r\n'
   ok(guideProblems(withCaps).some((p) => p.id === 'no-crlf'), '【反向对照】混进 CRLF 会被抓到')
 
-  const withName = built.text + '\n文歌子的记忆\n'
+  const withName = built.text + '\n' + PERSONAL[0] + '的记忆\n'
   ok(guideProblems(withName).some((p) => p.id === 'no-personal-name'), '【反向对照】混进真名会被抓到')
 
   const withVersion = built.text + '\nsage-mem 2.12.0\n'

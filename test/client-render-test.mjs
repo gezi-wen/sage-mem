@@ -3832,18 +3832,25 @@ async function main() {
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  group('28. 2.12.0 初始记忆：空库展开 / 老库收起 / 复制的是全文 / 失败不谎报 / 不写盘')
+  group('28. 2.12.0/2.12.1 初始记忆（在「实验性」屏）：空库展开 / 老库收起 / 复制的是全文 / 失败不谎报 / 不写盘')
   {
     const wrote = (mem) => mem.st.calls.filter((c) => /^(write|delete|archive|restore|save|remove|edit|create)/i.test(String(c[0])))
+    // 2.12.1：卡片在「实验性」那一屏 —— 进那一屏要先点页签（页签是 role=tab，不是 button）。
+    const tabTo = async (r, Comp, tree0, label) => {
+      click(all(tree0, (n) => n.type === 'button' && textOf(n) === label)[0])
+      return r.settle(Comp, {})
+    }
 
     // ① 空库：卡片默认展开（这就是他们要做的事），正文是真文本而不是占位
     const mem1 = makeMemoryRemote([], [], [])
     const rt = makeReact()
     const C = (await loadClient(rt, { memory: mem1 })).comp
     const tree = await rt.settle(C, {})
-    const card = all(tree, byClass('smem-guide'))[0]
-    ok(!!card, '空库时出现「初始记忆」卡片')
-    const pre = all(tree, byClass('smem-guide-preview'))[0]
+    ok(all(tree, byClass('smem-guide')).length === 0, '【反向对照】文件列表那一屏没有这张卡')
+    const treeLab = await tabTo(rt, C, tree, '实验性')
+    const card = all(treeLab, byClass('smem-guide'))[0]
+    ok(!!card, '实验性那一屏出现「初始记忆」卡片')
+    const pre = all(treeLab, byClass('smem-guide-preview'))[0]
     ok(!!pre, '空库时正文默认展开')
     ok(textOf(pre).indexOf('MEMORY.md') >= 0, '正文里真的写着 MEMORY.md（不是占位文案）')
     ok(textOf(pre).indexOf('已有文件一律只做增量') >= 0, '正文里带着防覆盖条款')
@@ -3851,7 +3858,7 @@ async function main() {
 
     // ② 复制：写进剪贴板的是提示词**全文**，随后弹出提醒（提醒挂在根层）
     fakeClip.calls.length = 0
-    click(btn(tree, '复制提示词')[0])
+    click(btn(treeLab, '复制提示词')[0])
     let t2 = await rt.settle(C, {})
     ok(fakeClip.calls.length === 1, '复制按钮只写一次剪贴板')
     ok(String(fakeClip.calls[0]).indexOf('第 4 步') >= 0, '写进剪贴板的是全文（含收尾自检那一步）')
@@ -3867,7 +3874,9 @@ async function main() {
     const rt3 = makeReact()
     const C3 = (await loadClient(rt3, { memory: mem3 })).comp
     let t3 = await rt3.settle(C3, {})
-    ok(all(t3, byClass('smem-guide')).length === 1, '老库也看得到卡片（留一个入口）')
+    ok(all(t3, byClass('smem-guide')).length === 0, '【反向对照】老库的文件列表同样没有卡片')
+    t3 = await tabTo(rt3, C3, t3, '实验性')
+    ok(all(t3, byClass('smem-guide')).length === 1, '老库在实验性屏也看得到卡片（留一个入口）')
     ok(all(t3, byClass('smem-guide-preview')).length === 0, '老库默认收起：正文不渲染')
     click(btn(t3, '展开')[0])
     t3 = await rt3.settle(C3, {})
@@ -3878,6 +3887,7 @@ async function main() {
     const rt4 = makeReact()
     const C4 = (await loadClient(rt4, { memory: mem4 })).comp
     let t4 = await rt4.settle(C4, {})
+    t4 = await tabTo(rt4, C4, t4, '实验性')
     fakeClip.mode = 'reject'
     click(btn(t4, '复制提示词')[0])
     t4 = await rt4.settle(C4, {})
@@ -3892,6 +3902,7 @@ async function main() {
     const rt5 = makeReact()
     const C5 = (await loadClient(rt5, { memory: mem5 })).comp
     let t5 = await rt5.settle(C5, {})
+    t5 = await tabTo(rt5, C5, t5, '实验性')
     fakeClip.mode = 'ok'
     click(btn(t5, '下载 .md')[0])
     t5 = await rt5.settle(C5, {})

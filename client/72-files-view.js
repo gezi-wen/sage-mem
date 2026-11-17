@@ -84,12 +84,6 @@
 					: list;
 			}
 
-			// 2.12.0：初始记忆卡片由**装配层**（Section）造好传进来（`guideCard`）。
-			// 这一屏保持「只吃 props 的纯渲染」：不 import 卡片、也不判断库空不空 ——
-			// 于是它单独被渲染（比如 Q16 那套只拼 05+55+50+72 的量具）时照样成立。
-			// 没有卡片时**原样返回**（不包数组）：旧调用点拿到的形状必须与 2.11.1 一致。
-			if (!props.guideCard) return filesView;
-			const body = Array.isArray(filesView) ? filesView : [filesView];
-			return [props.guideCard].concat(body);
+			return filesView;
 		}
 

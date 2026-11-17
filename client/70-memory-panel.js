@@ -1182,7 +1182,10 @@
 			const healthWork = (audit && typeof audit.problems === "number" && audit.problems > 0 ? audit.problems : 0)
 				+ (conflictOpen > 0 ? conflictOpen : 0);
 
-			// 2.12.0：初始记忆卡片（放在文件列表顶部，由装配层决定，FilesView 只负责摆）。
+			// 2.12.0（2.12.1 改位置）：初始记忆卡片 —— 挂在**实验性**那一屏最上面。
+			// 放这里的理由（2026-11-17 定）：它不是日常动作，是「第一次上手」用的一段材料，
+			// 和 MMR / 待办看板一样属于「你可能不会天天用、但需要时找得到」的那一栏；
+			// 文件列表留给「今天要读哪条记忆」。卡片由装配层造好传给实验性屏，FilesView 不再认识它。
 			// 骨架加载期间不渲染：`totalCount` 此刻还是 0，卡片会误判成空库并展开一次再收起。
 			const guideCard = (loading && totalCount === 0) ? null : h(InitialGuideCard, {
 				key: "guide",
@@ -1194,7 +1197,6 @@
 			// 「文件列表」这一屏：状态筛选决定看哪一批，灰色卡片与留痕块自带「退役」语义。
 			// banner 只在**专门看归档**时出现，切到全部时不重复说一遍。
 			const filesView = h(FilesView, {
-				guideCard: guideCard,
 				loading: loading, totalCount: totalCount, openAdd: openAdd, createIndexSkeleton: createIndexSkeleton,
 				statusFilter: statusFilter, setStatusFilter: setStatusFilter,
 				items: items, archiveItems: archiveItems, filtered: filtered,
@@ -1501,7 +1503,7 @@
 							h(AuditPanel, { key: "audit", report: audit, busy: auditBusy, onRun: runAudit, standalone: true }),
 						])
 					: tab === "lab"
-					? h("div", { className: "smem-stack smem-view", key: "lab" }, [h(LabSettingsPanel, { key: "lab-card", ctx: props.ctx })])
+					? h("div", { className: "smem-stack smem-view", key: "lab" }, [guideCard, h(LabSettingsPanel, { key: "lab-card", ctx: props.ctx })])
 					: h("div", { className: "smem-view", key: "files" }, filesView),
 				// 2.8.0：第三方注入的视图（`settings.memory.starmap` 子槽）。没有占用者时是 null，
 				// 一个 div 都不出 —— 所以默认安装下界面与 2.7.0 逐像素相同。
