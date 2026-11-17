@@ -39,6 +39,24 @@
 			}
 			applyEntryMode(initialMode);
 
+			// ── 2.11.0 实验性「待办清单」看板 ────────────────────────────────
+			// 开关住在设置页「实验性」，但**消费方是 client**（右侧栏注册）→ 启动读一次，
+			// 之后由设置卡调 applyTodoBoard 热切换，不参与 restartRequired
+			// （宿主 `EXPERIMENTAL_SPECS.todoBoard` 标了 `live: true`）。
+			todoBoardCtx = ctx;
+			try {
+				const memBoard = typeof ctx.get === "function" ? ctx.get("remote.memory") : null;
+				let boardOn = false;
+				if (memBoard && typeof memBoard.getSettings === "function") {
+					const loadedBoard = unwrap(await memBoard.getSettings()) || {};
+					const lab = loadedBoard.pendingExperimental || loadedBoard.experimental || {};
+					boardOn = typeof lab.todoBoard === "number" && lab.todoBoard > 0;
+				}
+				applyTodoBoard(boardOn);
+			} catch (e) {
+				applyTodoBoard(false);
+			}
+
 			// ── 1.8.2 / 2.7.0 插件详情页的「界面入口」折叠行 ────────────────────
 			// `plugins.bundle.config` 是 keyed 槽，key = 本 bundle 的 **package name**（sage-mem）。
 			// 宿主在插件页的 description 与「包含的组件」行之间渲染它；ownerProps 形如

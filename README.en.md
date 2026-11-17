@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.10.2`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.11.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -463,6 +463,15 @@ The two things are moved **differently**, spelled out:
 
 ⚠️ **The premise is that the shape matches.** The four-type division and the frontmatter are sage-mem's own conventions: if your memories in CC were already "one Markdown file per memory + frontmatter" (which is what ours were at the time), just copy them over; **if they were not** (if they were all piled into a single `CLAUDE.md`, say), you need to organize them first — and that job can perfectly well be handed to an agent: have it read the old material and lay it out as files under the four types.
 
+## To-do Board (experimental · 2.11.0)
+
+`project_session-state.md` in the memory directory has always been a to-do list you keep for yourself: injected into every session, but you still have to open the file to see what is left. 2.11.0 puts it in the **right sidebar**: Settings → Memory management → Lab → enable "To-do board", and the sidebar's Start page gains a card that opens a tab.
+
+- **Tick it**: checking a row adds `[x]` (the line stays, and can be unchecked); "Clear done" is what actually removes rows.
+- **Edit it**: add an item at the end of a group, edit one in place, undo the last write.
+- **The file is still the only truth**: the board does line-level surgery only; edit the file with any tool and the board follows within 4 seconds.
+- **Hot**: flipping the switch takes effect immediately, no restart (unlike MMR).
+- **Off by default**; no drag-and-drop ordering, no automatic `session-log` archiving. Details in `docs/todo-board.md`.
 ## Configuration Reference
 
 ### Environment Variables

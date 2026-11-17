@@ -356,6 +356,57 @@ group('8. experimental.mmr：默认关、写盘、待生效与已生效分离、
   ok(stripped.success === true && stripped.data.experimental.nope === undefined, 'patch schema 把未知键剥掉（不让它进 host），不是拒')
 }
 
-rmSync(sandbox, { recursive: true, force: true })
+// ── 9. 2.11.0 实验性 todoBoard：默认关 / 写盘 / 不参与 restartRequired / 严格校验 ──
+// 与第 8 组的分工：那组钉 mmr（选材开关，要重启）；这组钉 todoBoard（界面开关，client 半当场应用）。
+// 最关键的一条断言是「restartRequired 必须为 false」：说「要重启」而实际已经生效，比不说更糟。
+group('9. experimental.todoBoard：默认关、写盘、不触发重启、严格校验')
+{
+  delete process.env.SAGE_MEM_TODO_BOARD
+  // 前置：把前面几组留下的漂移归零（mmr 被第 8 组写成 35；limits.maxResults 被前一组改成 11）。
+  // 不归零的话 `restartRequired` 会因为**别的**字段差异为真，这组就测不到自己想要的那一条。
+  const zero = await gw.setSettings({ experimental: { mmr: 0 }, limits: { maxResults: 10 } })
+  ok(zero.ok === true, '前置：mmr 与 limits.maxResults 归零成功', JSON.stringify(zero))
+
+  const t0 = await gw.getSettings()
+  ok(t0.experimental && t0.experimental.todoBoard === 0, '默认 todoBoard=0（实验性功能默认关）', JSON.stringify(t0.experimental))
+
+  const set = await gw.setSettings({ experimental: { todoBoard: 1 } })
+  ok(set.ok === true, '写入 todoBoard=1 成功', JSON.stringify(set))
+  if (process.env.SMEM_DEBUG) console.log('DEBUG settings:', JSON.stringify(await gw.getSettings(), null, 1))
+  ok(set.restartRequired === false, 'todoBoard 带 live 标记 → 不提示重启（client 半当场应用）', JSON.stringify({ rr: set.restartRequired }))
+  const disk = JSON.parse(readFileSync(SETTINGS_FILE, 'utf8'))
+  ok(disk.experimental && disk.experimental.todoBoard === 1, '落到 settings.json.experimental.todoBoard', JSON.stringify(disk.experimental))
+
+  const t1 = await gw.getSettings()
+  ok(t1.pendingExperimental.todoBoard === 1, 'pendingExperimental 看到 1（面板据此显示「已开启」）', JSON.stringify(t1.pendingExperimental))
+  ok(t1.restartRequired === false, 'getSettings 回读时 restartRequired 仍为 false', JSON.stringify({ rr: t1.restartRequired }))
+
+  const before = readFileSync(SETTINGS_FILE, 'utf8')
+  const bads = [
+    ['越界', { experimental: { todoBoard: 2 } }, 'must be an integer in [0, 1]'],
+    ['负值', { experimental: { todoBoard: -1 } }, 'must be an integer in [0, 1]'],
+    ['类型不对', { experimental: { todoBoard: '开' } }, 'must be a number'],
+  ]
+  for (const [label, patch, expect] of bads) {
+    const r = await gw.setSettings(patch)
+    ok(r.ok === false && String(r.error).includes(expect), `拒绝：${label}（含 "${expect}"）`, JSON.stringify(r))
+  }
+  ok(readFileSync(SETTINGS_FILE, 'utf8') === before, '被拒的这批一次都没写盘（settings.json 逐字节未变）')
+
+  // typert 两侧：只加一侧会被 strict 静默剥掉 —— 这条是 2.9.0 踩过的原文坑。
+  const { TYPERT } = await import(new URL('typert.host.js', LIB).href)
+  const inv = new Map(TYPERT.invocations.map((i) => [i.method, i]))
+  const rs = inv.get('getSettings').result.schema.safeParse(await gw.getSettings())
+  ok(rs.success, 'getSettings 返回值过 strict schema（todoBoard 已在 result 侧声明）', rs.success ? '' : JSON.stringify(rs.error.issues.slice(0, 4)))
+  const parsed = inv.get('getSettings').result.schema.safeParse(await gw.getSettings())
+  ok(parsed.success && typeof parsed.data.experimental.todoBoard === 'number',
+    'result 侧真的保留了 todoBoard（被剥掉时这个键会整个消失，不是回 undefined 的同名键）',
+    parsed.success ? JSON.stringify(parsed.data.experimental) : '')
+  const patchCodec = inv.get('setSettings').parameters[0].codec.schema
+  ok(patchCodec.safeParse({ experimental: { todoBoard: 1 } }).success, 'patch schema 认得 experimental.todoBoard')
+  ok(patchCodec.safeParse({ experimental: { todoBoard: 1 } }).data.experimental.todoBoard === 1, 'patch 侧不剥 todoBoard')
+}
+
+
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

@@ -140,6 +140,9 @@
 					h("div", { key: "c" }, t("lab.declare.default")),
 				]),
 
+				// ── 2.11.0 新增：待办清单看板（界面入口类开关，改完立刻生效）──
+				h(TodoBoardLabCard, { key: "todos", ctx: props.ctx }),
+
 				// 错误与回执留在最后：不管在哪按的，结果都得看得见。
 				err ? h("div", { className: "smem-err", key: "err" }, "⚠ " + err) : null,
 				notice ? h("div", { className: "smem-ok", key: "ok" }, "✓ " + notice) : null,
