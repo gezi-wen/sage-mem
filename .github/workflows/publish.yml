@@ -54,5 +54,10 @@ jobs:
       - name: Test
         run: npm test
 
+      # Trusted Publishing（OIDC）要求 npm >= 11.5.1；node 20 自带的是 npm 10，会直接报
+      # "trusted publishing requires npm 11.5.1 or later"。装 git 版的 npm 11 再发。
+      - name: npm 11 for trusted publishing
+        run: npm install -g npm@^11
+
       - name: Publish (trusted publishing)
         run: npm publish --provenance --access public
