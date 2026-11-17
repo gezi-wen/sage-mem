@@ -59,6 +59,12 @@ function makeReact(nodeFactory = makeFakeNode) {
   let n = 0
   let dirty = false
   let pending = []
+  // hook 的键 = 「当前组件路径 + 该组件内第几个 hook」。原先只有全局序号（`n++`）：
+  // 任何一个组件**多一个 useState**，它后面所有组件的状态就整体错位，上一屏的 state
+  // 会被下一屏读到。2.12.0 实测过：Section 加了一个 useState 之后，星图那头把别的
+  // 状态当成 `data`，报 `Cannot read properties of undefined (reading 'filter')`。
+  let hookCtx = 'root'
+  const hookKey = () => hookCtx + '#' + (n++)
 
   const api = {
     // `props.children` 是 React 的语义，宿主的 `h()` 也一样：组件里想拿到「调用方塞进来的
@@ -72,7 +78,7 @@ function makeReact(nodeFactory = makeFakeNode) {
       return { type, props: p, children }
     },
     useState(init) {
-      const i = n++
+      const i = hookKey()
       if (!stateStore.has(i)) stateStore.set(i, typeof init === 'function' ? init() : init)
       const set = (v) => {
         const cur = stateStore.get(i)
@@ -81,12 +87,12 @@ function makeReact(nodeFactory = makeFakeNode) {
       }
       return [stateStore.get(i), set]
     },
-    useEffect(fn, deps) { pending.push({ i: n++, fn, deps }) },
+    useEffect(fn, deps) { pending.push({ i: hookKey(), fn, deps }) },
     useMemo: (fn) => fn(),
     useCallback: (fn) => fn,
     // ref 必须跨渲染保持同一个对象（真实 react 语义）：星图的 visBox/drawBox 靠它传状态
     useRef(init) {
-      const i = n++
+      const i = hookKey()
       if (!refStore.has(i)) refStore.set(i, { current: init })
       return refStore.get(i)
     },
@@ -106,7 +112,17 @@ function makeReact(nodeFactory = makeFakeNode) {
     if (el === null || el === undefined || el === false || el === true) return el
     if (typeof el !== 'object') return el
     if (Array.isArray(el)) return el.map((x, i) => expand(x, path + '.' + i))
-    if (typeof el.type === 'function') return expand(el.type(el.props || {}), path)
+    if (typeof el.type === 'function') {
+      // 进组件前把「当前路径」交给 hook 存储：同一个组件实例跨渲染拿到同一批状态槽，
+      // 不同实例（列表里的每张卡）各自独立 —— 与真实 React 的语义一致。
+      const prev = hookCtx
+      hookCtx = path
+      try {
+        return expand(el.type(el.props || {}), path)
+      } finally {
+        hookCtx = prev
+      }
+    }
     const props = el.props || {}
     // 宿主元素：有 ref 就给一个稳定的假节点（canvas 需要 getContext / getBoundingClientRect）
     if (typeof props.ref === 'function') {
@@ -3813,6 +3829,78 @@ async function main() {
     const boom = await mk({ renderSlot: () => { throw new Error('third-party boom') } })
     ok(all(boom, byClass('smem-extra-slot')).length === 0, '【反向对照】第三方 renderSlot 抛错 → 静默跳过，不拖垮设置页')
     ok(treeText(boom).indexOf('记忆') >= 0, '第三方抛错后设置页仍然完整')
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  group('28. 2.12.0 初始记忆：空库展开 / 老库收起 / 复制的是全文 / 失败不谎报 / 不写盘')
+  {
+    const wrote = (mem) => mem.st.calls.filter((c) => /^(write|delete|archive|restore|save|remove|edit|create)/i.test(String(c[0])))
+
+    // ① 空库：卡片默认展开（这就是他们要做的事），正文是真文本而不是占位
+    const mem1 = makeMemoryRemote([], [], [])
+    const rt = makeReact()
+    const C = (await loadClient(rt, { memory: mem1 })).comp
+    const tree = await rt.settle(C, {})
+    const card = all(tree, byClass('smem-guide'))[0]
+    ok(!!card, '空库时出现「初始记忆」卡片')
+    const pre = all(tree, byClass('smem-guide-preview'))[0]
+    ok(!!pre, '空库时正文默认展开')
+    ok(textOf(pre).indexOf('MEMORY.md') >= 0, '正文里真的写着 MEMORY.md（不是占位文案）')
+    ok(textOf(pre).indexOf('已有文件一律只做增量') >= 0, '正文里带着防覆盖条款')
+    ok(textOf(card).indexOf('初始记忆') >= 0, '卡片标题可见')
+
+    // ② 复制：写进剪贴板的是提示词**全文**，随后弹出提醒（提醒挂在根层）
+    fakeClip.calls.length = 0
+    click(btn(tree, '复制提示词')[0])
+    let t2 = await rt.settle(C, {})
+    ok(fakeClip.calls.length === 1, '复制按钮只写一次剪贴板')
+    ok(String(fakeClip.calls[0]).indexOf('第 4 步') >= 0, '写进剪贴板的是全文（含收尾自检那一步）')
+    ok(String(fakeClip.calls[0]) === textOf(pre), '剪贴板内容与界面上摊开的那份逐字节相同')
+    ok(all(t2, byClass('smem-modal-host')).length === 1, '复制成功后弹提醒')
+    ok(modalTitleOf(t2).indexOf('下一步在你手里') >= 0, '提醒说清「下一步在你手里」')
+    click(btn(modalOf(t2), '知道了')[0])
+    t2 = await rt.settle(C, {})
+    ok(all(t2, byClass('smem-modal-host')).length === 0, '点「知道了」关掉提醒')
+
+    // ③ 老库：卡片在，但默认收起 —— 已经有内容的人不该每次进来都看见一大段说明
+    const mem3 = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const rt3 = makeReact()
+    const C3 = (await loadClient(rt3, { memory: mem3 })).comp
+    let t3 = await rt3.settle(C3, {})
+    ok(all(t3, byClass('smem-guide')).length === 1, '老库也看得到卡片（留一个入口）')
+    ok(all(t3, byClass('smem-guide-preview')).length === 0, '老库默认收起：正文不渲染')
+    click(btn(t3, '展开')[0])
+    t3 = await rt3.settle(C3, {})
+    ok(all(t3, byClass('smem-guide-preview')).length === 1, '点「展开」后正文出现')
+
+    // ④ 剪贴板被拒：把正文摊出来手抄，**不许**弹「已复制」的谎报
+    const mem4 = makeMemoryRemote([], [], [])
+    const rt4 = makeReact()
+    const C4 = (await loadClient(rt4, { memory: mem4 })).comp
+    let t4 = await rt4.settle(C4, {})
+    fakeClip.mode = 'reject'
+    click(btn(t4, '复制提示词')[0])
+    t4 = await rt4.settle(C4, {})
+    ok(modalTitleOf(t4).indexOf('复制没成功') >= 0, '剪贴板被拒 → 走「手动复制」兜底')
+    ok(modalTitleOf(t4).indexOf('下一步在你手里') < 0, '兜底时没有谎报「已复制」')
+    // 兜底模态里是只读 textarea：正文在 `value` 上（不是 children），所以按属性取。
+    const ta4 = all(modalOf(t4), (n) => n.type === 'textarea')[0]
+    ok(!!ta4 && String(ta4.props.value || '').indexOf('MEMORY.md') >= 0, '兜底模态里摊的是完整正文')
+
+    // ⑤ 「下载 .md」在沙箱里没有 Blob/URL → 同样退回摊开，不静默
+    const mem5 = makeMemoryRemote([], [], [])
+    const rt5 = makeReact()
+    const C5 = (await loadClient(rt5, { memory: mem5 })).comp
+    let t5 = await rt5.settle(C5, {})
+    fakeClip.mode = 'ok'
+    click(btn(t5, '下载 .md')[0])
+    t5 = await rt5.settle(C5, {})
+    ok(all(t5, byClass('smem-modal-host')).length === 1, '下载不可用（沙箱没有 Blob）→ 摊出正文，不静默')
+
+    // ⑥ 五条路径走完，一个写入口都没碰过 —— 「不会覆盖已有记忆」的机器证明
+    const allWrites = [mem1, mem3, mem4, mem5].map(wrote).reduce((a, b) => a.concat(b), [])
+    ok(allWrites.length === 0, '整个过程没有任何写 / 删 / 归档调用（插件从不碰记忆文件）', JSON.stringify(allWrites.slice(0, 3)))
+    fakeClip.mode = 'ok'
   }
 
   console.log(`\n结果：${pass} passed, ${fail} failed`)

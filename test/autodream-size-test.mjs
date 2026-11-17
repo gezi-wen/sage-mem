@@ -371,7 +371,7 @@ group('4. 压缩留痕（落盘前自动补 compressed_*）')
   const beforeBytes = readFileSync(F('project_huge.md')).length
   const out = await runner.run('write_memory', {
     file: 'project_huge.md',
-    content: entryText('project_huge', 'project', '## 部署\n\n- 只在灰云跑，入口 deploy.sh\n', '部署记录（已压缩）'),
+    content: entryText('project_huge', 'project', '## 部署\n\n- 只在服务器上跑，入口 deploy.sh\n', '部署记录（已压缩）'),
     reason: '压缩掉重复的部署步骤',
   })
   ok(String(out).startsWith('已写入'), '缩水写入成功', String(out))

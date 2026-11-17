@@ -201,6 +201,13 @@
 			".smem-modcard-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}",
 			".smem-modcard-title{font-weight:600;font-size:13px;}",
 			".smem-modcard-head .smem-modcard-status{margin-left:auto;color:var(--dsw-alias-label-tertiary);font-size:12px;}",
+			// 2.12.0 初始记忆卡片：卡头之后是一段可滚动的提示词正文（等宽、只读、可选中）。
+			// 高度取 24vh 而不是撑满：面板是设置弹窗里的一屏，正文有五十来行，摊开会把
+			// 文件列表挤到看不见 —— 需要看全文的人点「展开」或直接滚这一块。
+			".smem-guide{margin:0 0 12px;}",
+			".smem-guide-body{display:flex;flex-direction:column;gap:8px;}",
+			".smem-guide-preview{margin:0;padding:8px 10px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;overflow-y:auto;overflow-x:hidden;height:24vh;min-height:150px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);}",
+			".smem-guide-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}",
 			// 关掉时的说明条：只解释「运行被停了」，不暗示设置被锁。
 			".smem-modcard-off{margin:6px 0 10px;padding:7px 10px;border-radius:8px;font-size:12px;line-height:1.6;color:var(--dsw-alias-state-warn-primary,#d97706);background:var(--dsw-alias-bg-layer-2);}",
 			".smem-err{border:1px solid var(--dsw-alias-state-error-primary,#ef4444);color:var(--dsw-alias-state-error-primary,#ef4444);border-radius:8px;padding:6px 10px;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;}",

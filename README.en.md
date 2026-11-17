@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.11.1`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.12.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -29,6 +29,7 @@ If it is useful to you, a Star is the most direct feedback.
 - [Write Safety](#write-safety)
 - [Size Governance: What to Do When a Memory Grows Too Big](#size-governance-what-to-do-when-a-memory-grows-too-big)
 - [Autodream](#autodream)
+- [Initial memory](#initial-memory-scaffold-the-library-with-an-agent-2120)
 - [Migrating from Claude Code](#migrating-from-claude-code)
 - [Configuration Reference](#configuration-reference)
 - [Stability and Versioning Policy](#stability-and-versioning-policy)
@@ -472,6 +473,20 @@ The two things are moved **differently**, spelled out:
 - **The file is still the only truth**: the board does line-level surgery only; edit the file with any tool and the board follows within 4 seconds.
 - **Hot**: flipping the switch takes effect immediately, no restart (unlike MMR).
 - **Off by default**; no drag-and-drop ordering, no automatic `session-log` archiving — moving those pending-deletion rows into the log is the agent's job at wrap-up. Details in `docs/todo-board.md`.
+
+## Initial memory: scaffold the library with an agent (2.12.0)
+
+A freshly installed library is empty, and the agent has no idea how your memories should start — it either writes a diary or writes nothing at all.
+
+The **Initial memory** card at the top of Settings → Memory management → Files holds a prompt you can execute directly: **copy** it (or **download the .md**), paste it to the agent in the conversation. It first looks at what your library already contains, then creates the `MEMORY.md` index, the `session-log.md` log and three starter memories (memory discipline / library layout / wrap-up routine).
+
+![Initial memory: copy this prompt to the agent and it scaffolds the library around what you already have](https://raw.githubusercontent.com/gezi-wen/sage-mem/main/docs/images/initial-guide.png)
+
+- **The plugin writes no file at all**: the card only hands over text, and the agent does the writing — so "will this overwrite the memories I already have" simply cannot happen, and the prompt itself tells the agent to only add to existing files and to ask when unsure.
+- The prompt only says what to do this time; the mechanics (frontmatter, the four prefixes, retrieval and injection) live in the bundled skill `skills/sage-mem/SKILL.md` and are not repeated.
+- It starts expanded on an empty library and collapsed on a full one; copying pops a reminder — the next step is yours.
+- Why this is not an install-time generator: see `docs/decisions.md` D46.
+
 ## Configuration Reference
 
 ### Environment Variables

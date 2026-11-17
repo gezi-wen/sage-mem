@@ -41,6 +41,8 @@ export const CLIENT_PARTS = [
   'client/62-archive-settings.js', // 「自动归档」面板（三档策略 + 三个阈值；v0.9.9 独立成页）
   'client/64-lab-settings.js', // 2.9.0：「实验性设置」面板（MMR 去重开关；只放会改变选材的开关）
   'client/65-tidy-scope.js', // 2.10.1：体积治理的「不参与整理的文件」（保护名单 chips + 勾选面板）
+  'client/66-initial-guide.js', // 2.12.0：初始记忆提示词的正文（唯一真相源，纯字符串组装）
+  'client/67-initial-guide-card.js', // 2.12.0：上面那段提示词的卡片（展开 / 复制 / 下载 / 复制提醒）
   'client/72-files-view.js', // 1.5.3：文件列表这一屏（纯渲染，状态在上层）
   'client/74-filter-bar.js', // 1.5.2：筛选条（只吃 props，语义在 Section）
   'client/70-memory-panel.js', // 记忆管理 Section：文件列表 / 筛选 / 归档 / 工具面板 / tab

@@ -560,6 +560,27 @@
 			"prompt.copyFailedHint": "点一下文本框全选，再按 Ctrl+C 复制",
 			"prompt.close": "关闭",
 
+			// ── 2.12.0 初始记忆（提示词 + 复制提醒）──
+			// 只有界面文案走 i18n；提示词**正文**是中文（与随包技能同一口径，见 66 分片头注）。
+			"guide.title": "初始记忆：让 agent 建个骨架",
+			"guide.status.empty": "库还是空的",
+			"guide.status.filled": "库已有内容",
+			"guide.status.copied": "已复制到剪贴板",
+			"guide.expand": "展开",
+			"guide.collapse": "收起",
+			"guide.why1": "这段提示词只说明「这次要做什么」：索引怎么写、流水怎么记、起步建哪三条。机制（frontmatter、四类前缀、检索与注入）在随包技能里，不重复第二遍。",
+			"guide.why2": "sage-mem 不会替你写任何记忆。复制它、粘到会话里发给 agent，由 agent 先看你库里已有什么，再决定新建还是只补一行 —— 已有文件不会被覆盖。",
+			"guide.copy": "复制提示词",
+			"guide.copy.again": "再复制一次",
+			"guide.download": "下载 .md",
+			"guide.hint": "复制后粘到会话里发给 agent 即可。",
+			"guide.closedNote": "记忆库已经有内容了 —— 需要时展开，把这段提示词交给 agent，让它按现状补骨架。",
+			"guide.notice.title": "已复制 —— 下一步在你手里",
+			"guide.notice.step1": "1. 回到会话，把提示词整段粘进去发给 agent。",
+			"guide.notice.step2": "2. agent 会先列出你已有的记忆，再只补缺的部分：索引、流水、三条起步记忆。",
+			"guide.notice.hint": "它不会覆盖任何已有文件；拿不准时会先问你。",
+			"guide.notice.ok": "知道了",
+
 			// ── 2.11.0 待办清单看板（右侧栏页签 + 实验性页那张卡）──
 			"todo.tabTitle": "待办清单",
 			"todo.guide.title": "待办清单",
@@ -1165,6 +1186,26 @@
 			"prompt.copyFailedTitle": "Copy failed — copy this prompt by hand",
 			"prompt.copyFailedHint": "Click the box to select it all, then press Ctrl+C",
 			"prompt.close": "Close",
+
+			// ── 2.12.0 initial memory (the prompt + the copy reminder) ──
+			"guide.title": "Initial memory: let the agent scaffold the library",
+			"guide.status.empty": "the library is still empty",
+			"guide.status.filled": "the library already has content",
+			"guide.status.copied": "copied to the clipboard",
+			"guide.expand": "Expand",
+			"guide.collapse": "Collapse",
+			"guide.why1": "This prompt only says what to do this time: how to write the index, how to keep the log, which three starter memories to create. The mechanics (frontmatter, the four prefixes, retrieval and injection) live in the bundled skill and are not repeated here.",
+			"guide.why2": "sage-mem never writes a memory for you. Copy this, paste it to the agent in the conversation, and let the agent look at what you already have before it decides to create a file or only add a line — existing files are never overwritten.",
+			"guide.copy": "Copy prompt",
+			"guide.copy.again": "Copy again",
+			"guide.download": "Download .md",
+			"guide.hint": "Paste it to the agent in the conversation after copying.",
+			"guide.closedNote": "Your library already has content — expand this when you want the agent to fill in the gaps.",
+			"guide.notice.title": "Copied — the next step is yours",
+			"guide.notice.step1": "1. Go back to the conversation and paste the whole prompt to the agent.",
+			"guide.notice.step2": "2. The agent first lists the memories you already have, then only fills in what is missing: index, log, three starter memories.",
+			"guide.notice.hint": "It never overwrites an existing file, and it asks you when unsure.",
+			"guide.notice.ok": "Got it",
 
 			// ── 2.11.0 to-do board (right-sidebar tab + its lab card) ──
 			"todo.tabTitle": "To-dos",

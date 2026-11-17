@@ -141,6 +141,10 @@
 			const toast = sToast[0], setToast = sToast[1];
 			const sPromptFallback = react.useState(null);
 			const promptFallback = sPromptFallback[0], setPromptFallback = sPromptFallback[1];
+			// 2.12.0：初始记忆提示词「复制成功」后的提醒弹窗。状态放在 Section（根层），
+			// 卡片只上报 —— `.smem-view` 的进场 transform 会让 `position:fixed` 失效。
+			const sGuideNotice = react.useState(false);
+			const guideNotice = sGuideNotice[0], setGuideNotice = sGuideNotice[1];
 			// 更新提示：只在**确实有新版本**时才被赋值（查不到/限流/网络错都不赋值）
 			const sUpdate = react.useState(null);
 			const updateInfo = sUpdate[0], setUpdateInfo = sUpdate[1];
@@ -1178,9 +1182,19 @@
 			const healthWork = (audit && typeof audit.problems === "number" && audit.problems > 0 ? audit.problems : 0)
 				+ (conflictOpen > 0 ? conflictOpen : 0);
 
+			// 2.12.0：初始记忆卡片（放在文件列表顶部，由装配层决定，FilesView 只负责摆）。
+			// 骨架加载期间不渲染：`totalCount` 此刻还是 0，卡片会误判成空库并展开一次再收起。
+			const guideCard = (loading && totalCount === 0) ? null : h(InitialGuideCard, {
+				key: "guide",
+				empty: totalCount === 0,
+				onCopied: function () { setGuideNotice(true); },
+				onCopyFailed: function (text) { setPromptFallback(text); },
+			});
+
 			// 「文件列表」这一屏：状态筛选决定看哪一批，灰色卡片与留痕块自带「退役」语义。
 			// banner 只在**专门看归档**时出现，切到全部时不重复说一遍。
 			const filesView = h(FilesView, {
+				guideCard: guideCard,
 				loading: loading, totalCount: totalCount, openAdd: openAdd, createIndexSkeleton: createIndexSkeleton,
 				statusFilter: statusFilter, setStatusFilter: setStatusFilter,
 				items: items, archiveItems: archiveItems, filtered: filtered,
@@ -1498,6 +1512,8 @@
 				toast ? h(Toast, { key: "toast", text: toast, closeTitle: t("prompt.close"), onClose: function () { setToast(null); } }) : null,
 				// 复制失败时把提示词摊出来手抄；用户手动关（× / 关闭 / 点遮罩）。
 				promptFallback ? h(PromptFallbackModal, { key: "prompt-fallback", text: promptFallback, onClose: function () { setPromptFallback(null); } }) : null,
+				// 2.12.0：初始记忆提示词复制成功的提醒（下一棒在用户手里：粘进会话发给 agent）。
+				guideNotice ? h(InitialGuideNotice, { key: "guide-notice", onClose: function () { setGuideNotice(false); } }) : null,
 				// 底部一行仓库链接（四个 tab 都在，不抢视线）
 				h(StarLine, { key: "star-line" }),
 			]);
