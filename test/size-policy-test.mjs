@@ -82,7 +82,11 @@ group('2. kindOfName 四类')
   ok(kindOfName('MEMORY.MD') === 'index', 'MEMORY.MD（扩展名大写）→ index')
   ok(kindOfName('session-log.md') === 'sessionLog', 'session-log.md → sessionLog')
   ok(kindOfName('Session-Log.MD') === 'sessionLog', '大小写混写 → sessionLog')
-  ok(kindOfName('..\\..\\MEMORY.md') === 'index', '带目录成分的名字先取 basename → index')
+  // 分隔符用 `/`，别写成 `..\\..\\MEMORY.md`：`kindOfName` 走 `node:path` 的 `basename`，
+  // 而 POSIX 上反斜杠不是分隔符 —— 那种写法只在 Windows 拆得开，CI 的 ubuntu runner 会
+  // 原样返回整个串、这条断言直接假。它从 2.10.0 起让三个 node 版本连着红了三版
+  // （2026-11-17 修；`basename('../../MEMORY.md')` 在 win32 与 posix 上都回 `MEMORY.md`）。
+  ok(kindOfName('../../MEMORY.md') === 'index', '带目录成分的名字先取 basename → index')
   ok(kindOfName(RESERVED_NAME) === 'reserved', `reserved.json 里声明的名字 → reserved（${RESERVED_NAME}）`)
   ok(kindOfName(RESERVED_NAME.toUpperCase()) === 'reserved', '保护名单同样大小写不敏感')
   ok(kindOfName(undefined) === 'entry' && kindOfName('') === 'entry', '非字符串 / 空值 → entry（分类器不抛）')
