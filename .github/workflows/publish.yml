@@ -1,0 +1,58 @@
+# Trusted Publishing（OIDC）—— push 一个 v* tag 就发布，不需要 NPM_TOKEN、不需要 OTP。
+#
+# 为什么这样做（2026-11-17 决定）：
+#   npm 正在收紧「绕过 2FA 的 automation token」（账户变更 2026-08 起、直接发布 2027-01 起），
+#   网页创建带 bypass 的 token 已被策略拦；而交互式 `npm publish` 每次都要人按安全密钥。
+#   Trusted Publishing 让 npm 直接信任「这个仓库 + 这个 workflow」：CI 现场领一次性凭据，
+#   并给包附上 provenance 签名（谁、哪个 commit、哪个 workflow 构建的，可追溯）。
+#
+# 前置（一次性，在 npm 网页做）：
+#   npmjs.com → 包 sage-mem → Settings → Trusted publishing → 添加
+#     Publisher: GitHub Actions
+#     Repository: gezi-wen/sage-mem
+#     Workflow file: publish.yml
+#     Environment: （留空）
+#
+# 注意：
+#   - tag 必须与 package.json 的 version 完全一致（v2.11.1 ↔ 2.11.1），否则 workflow 直接失败；
+#   - provenance 要求**构建发生在 CI**，所以本地产的 tgz 只作为验证产物，不作为发布来源；
+#   - 这里不写 NPM_TOKEN：写了一个用不到的 secret，反而是将来 401 的诱因。
+
+name: publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write # OIDC：向 npm 领取一次性发布凭据
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      # 版本一致性：tag 与 package.json 不一致时**先红**，不要等到 publish 那一步
+      - name: Check tag matches package.json
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          echo "tag=$TAG package=$PKG"
+          [ "$TAG" = "$PKG" ] || { echo "::error::tag $TAG != package.json $PKG"; exit 1; }
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Test
+        run: npm test
+
+      - name: Publish (trusted publishing)
+        run: npm publish --provenance --access public
