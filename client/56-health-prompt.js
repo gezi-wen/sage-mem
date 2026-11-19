@@ -40,6 +40,13 @@
 				item: function (x) { return String(x.file == null ? "" : x.file); },
 			},
 			{
+				// 2.14.0：这一类**已经算进 problems** 却一直没有渲染位置 —— 于是「问题 N」
+				// 徽标亮着、清单里一行都没有（只有大小写敏感的卷上才会出现，但一旦出现就是哑的）。
+				field: "indexConflicts", title: "索引有多份变体", sub: "同一目录里同时存在多个大小写变体",
+				fix: "只保留一份索引（通常是 MEMORY.md），把多余的变体改名或删掉 —— 它们的内容可能不一样，先各自看一眼",
+				item: function (x) { return String(x.file == null ? "" : x.file); },
+			},
+			{
 				field: "typeMismatch", title: "type 与前缀对不上", sub: "",
 				fix: "本库以前缀为准，改 frontmatter 的 type（确实该换类型的再改文件名）",
 				item: function (x) {
@@ -84,23 +91,65 @@
 				fix: "归档中途崩溃留下的私有名，内容可能还在 —— 先问我，再决定改回 .md 还是删除",
 				item: function (x) { return String(x.file == null ? "" : x.file); },
 			},
+			{
+				// 2.14.0：体积这一项原先也不在分节表里 —— force 档计数进了 problems，
+				// 面板却没有位置显示是哪几条（与上面 indexConflicts 同一个缺口）。
+				// warn / force 都列（面板要看见「该处置了」），但只有 force 进 problems。
+				field: "oversize", title: "超线体积", sub: "≥40 KB 必须处置，16 KB 起只提醒",
+				fix: "能拆一节就 archive_segment，拆不开就 write_memory 压缩（正文别为了省行删事实）",
+				item: function (x) {
+					const lv = String(x.level == null ? "" : x.level) === "force" ? "必须处置" : "提醒";
+					return String(x.file == null ? "" : x.file) + " · " + fmtSize(typeof x.bytes === "number" ? x.bytes : 0) + " · " + lv;
+				},
+			},
 		];
 
-		/** 「指向已归档」是提示、不计入 problems —— 面板与提示词各用一句自己的标题，条目格式共用。 */
-		const AUDIT_ARCHIVED_LINKS = {
-			field: "archivedLinks",
-			item: function (x) {
-				return String(x.file == null ? "" : x.file) + " → [[" + String(x.target == null ? "" : x.target) + "]]";
+		/**
+		 * 体检的**提示类**（不计入 problems）—— 面板与提示词共用同一份（2.6.0 的教训：
+		 * 两处各写一份标题，久了就会出现「面板说 8 条、复制出去只有 6 条」）。
+		 *
+		 *   · `note` 给面板的一句「为什么不用管 / 该怎么处置」；
+		 *   · `fix`  给提示词的行动口径（纪律必须写死：归档不是删除、索引只报不改）。
+		 *
+		 * 2.14.0 新增两类：孤儿归档件（治理发现的死件）、索引瘦身提案（只报不改）。
+		 */
+		const AUDIT_HINTS = [
+			{
+				field: "archivedLinks",
+				title: "指向已归档（提示，不计入问题）",
+				note: "归档不是删除：这些链接的目标还在档案馆里躺着，恢复它链接就活了 —— 不用改。",
+				fix: "归档不是删除，目标还在档案馆里 —— 能改成指向现有活动记忆就改；改不了就保持原样，不要为此恢复归档，也不要删掉链接所在的记忆",
+				item: function (x) {
+					return String(x.file == null ? "" : x.file) + " → [[" + String(x.target == null ? "" : x.target) + "]]";
+				},
 			},
-		};
-
-		/** 提示词里那一节的标题与口径（面板上写的是「不计入问题」，提示词里写「不是错误」）。 */
-		const AUDIT_PROMPT_HINT = {
-			field: AUDIT_ARCHIVED_LINKS.field,
-			title: "指向已归档（提示，不是错误）",
-			fix: "归档不是删除，目标还在档案馆里 —— 能改成指向现有活动记忆就改；改不了就保持原样，不要为此恢复归档，也不要删掉链接所在的记忆",
-			item: AUDIT_ARCHIVED_LINKS.item,
-		};
+			{
+				field: "orphans",
+				title: "孤儿归档件（提示，不计入问题）",
+				note: "「原件已不在」= 这段旧内容所属的那条记忆没了；「内容相同」= 整理时留了两份 —— 恢复还是删，你定。",
+				fix: "这两类都**先别动手**：no_source 的先确认原件该不该恢复（可能是有意删掉的）；duplicate 的两份都要读一遍，可能是「新版 + 旧版」而不是重复。拿不准就原样留着，归档件不影响检索",
+				item: function (x) {
+					const f = String(x.file == null ? "" : x.file);
+					if (String(x.kind == null ? "" : x.kind) === "duplicate") {
+						return f + " 与 " + String(x.with == null ? "?" : x.with) + " 内容完全相同";
+					}
+					return f + " ← 原件 " + String(x.from == null ? "?" : x.from) + " 已不在";
+				},
+			},
+			{
+				field: "indexProposals",
+				title: "索引瘦身提案（只报不改）",
+				note: "MEMORY.md 是每轮注入的入口，插件不自动改它 —— 要动就复制修复提示词，按行号改，改前先落一份 .bak。",
+				// dangling 与上面「索引悬空」是**同一批条目**（这里只是补上行号），不重复算两件事；
+				// 真正只有这里才有的是 long_line（超长行）。
+				fix: "只改**下面点到行号**的地方：dangling 那几行与上面「索引悬空」是同一批，这里多给行号，别当成两件事；long_line 那行压成「一句描述 + 指针」。动 MEMORY.md 之前先把它备份成 MEMORY.md.bak-<时间戳>，改完把改动的行贴给我",
+				item: function (x) {
+					const line = "第 " + String(x.line == null ? "?" : x.line) + " 行";
+					if (String(x.kind == null ? "" : x.kind) === "dangling") return line + " 指向不存在的 " + String(x.target == null ? "?" : x.target);
+					return line + " " + String(x.chars == null ? "?" : x.chars) + " 字：" + String(x.head == null ? "" : x.head);
+				},
+			},
+		];
 
 		/** 冲突类型 → 中文标签（提示词正文只出中文，所以不走界面那份 i18n 键）。 */
 		const CONFLICT_KIND_ZH = {
@@ -151,14 +200,26 @@
 			const r = report && typeof report === "object" ? report : null;
 			if (!r) return null;
 			const problems = typeof r.problems === "number" && isFinite(r.problems) ? r.problems : 0;
-			if (problems <= 0) return null;
+			/**
+			 * 提示类（孤儿归档件 / 索引瘦身提案）里有几条。
+			 *
+			 * 2.14.0 起这段的门槛从「problems > 0」放宽成「problems > 0 **或** 有提案」——
+			 * 否则治理发现的死件与索引超长永远走不到这颗按钮上（它们按设计不进 problems）。
+			 */
+			const hintCount = AUDIT_HINTS.reduce(function (n, g) {
+				const list = Array.isArray(r[g.field]) ? r[g.field] : [];
+				return n + list.filter(function (x) { return x && typeof x === "object"; }).length;
+			}, 0);
+			if (problems <= 0 && hintCount === 0) return null;
 
 			const lines = [];
 			// 不在这里写「记忆目录」—— 那是整段提示词的开头（`buildHealthFixPrompt` 统一写一次），
 			// 两段各写一遍会在合成后的文本里出现两次同样的路径。
 			lines.push(
 				"扫描 " + auditPromptNum(r.fileCount) + " 个记忆 · 索引 " + auditPromptNum(r.indexEntries) +
-				" 条 · 档案馆 " + auditPromptNum(r.archivedCount) + " 条 · 问题合计 " + problems,
+				" 条 · 档案馆 " + auditPromptNum(r.archivedCount) +
+				(typeof r.archiveReferenced === "number" ? " 条（被活动记忆引用 " + auditPromptNum(r.archiveReferenced) + " 条）" : " 条") +
+				" · 问题合计 " + problems,
 			);
 			lines.push("");
 			lines.push("修复口径：");
@@ -168,12 +229,15 @@
 			lines.push("2. 只改清单里指出的那一点：正文与其它 frontmatter 字段不要顺手动，行尾保持 LF。");
 			lines.push("3. 不删记忆：要下线用归档，不要删文件；「归档残留」这一类先问我再动。");
 			lines.push("4. 拿不准的（读不出来、type 该怎么统一）先说不确定，不要猜着改。");
+			if (problems <= 0) {
+				lines.push("5. 本屏**没有硬问题**：下面全是提示与提案（只报不改）。没有我点头之前，一个文件都不要动。");
+			}
 
-			const listed = appendPromptGroups(lines, AUDIT_SECTIONS, r);
-			const hinted = appendPromptGroups(lines, [AUDIT_PROMPT_HINT], r);
+			const listed = problems > 0 ? appendPromptGroups(lines, AUDIT_SECTIONS, r) : 0;
+			const hinted = appendPromptGroups(lines, AUDIT_HINTS, r);
 			lines.push("");
 			lines.push("改完请自己再核对一遍（能跑 audit_memory 就跑），然后告诉我每条改了什么。");
-			return { lines: lines, count: listed, hints: hinted };
+			return { lines: lines, count: listed + hinted, hard: problems > 0, hints: hinted };
 		}
 
 		/**
@@ -226,7 +290,11 @@
 			if (a && b) {
 				lines.push("这次两部分都有：A 是体检发现的结构问题（**要修**），B 是待裁决的矛盾（**只做判断，不要改盘上的文件**）。");
 			} else if (a) {
-				lines.push("这次只有 A：体检发现的结构问题（**要修**）；当前没有待裁决的矛盾。");
+				// 2.14.0：A 段现在也可能是「只有提示与提案」—— 措辞必须跟着分叉，
+				// 不然智能体会把一段只报告的内容当成「按清单修」去改盘。
+				lines.push(a.hard
+					? "这次只有 A：体检发现的结构问题（**要修**）；当前没有待裁决的矛盾。"
+					: "这次只有 A 的提示类：体检**没有硬问题**，下面是治理提案（**只报不改**）；当前没有待裁决的矛盾。");
 			} else {
 				lines.push("这次只有 B：待裁决的矛盾（**只做判断，不要改盘上的文件**）；体检没有发现问题。");
 			}
@@ -234,7 +302,7 @@
 
 			if (a) {
 				lines.push("");
-				lines.push("════ A · 体检问题：按下面的清单修 ════");
+				lines.push(a.hard ? "════ A · 体检问题：按下面的清单修 ════" : "════ A · 体检提示与提案：只报不改 ════");
 				Array.prototype.push.apply(lines, a.lines);
 			}
 			if (b) {

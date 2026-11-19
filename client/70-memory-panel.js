@@ -810,8 +810,10 @@
 			function conflictErrText(err) {
 				const code = err && typeof err.code === "string" ? err.code : "";
 				const key = CONFLICT_CODE_KEY[code] || "conflict.code.unknown";
-				const detail = err && typeof err.error === "string" ? err.error : "";
-				return t(key) + (detail ? t("conflict.code.detail", { detail: detail }) : "");
+				// 2.14.0：局部量改叫 hostDetail —— 工厂作用域现在有一份共享的 detail()
+				// （错误详情展开），同名会遮蔽它，也让 client-scope-test 的「只此一份」判据读不清。
+				const hostDetail = err && typeof err.error === "string" ? err.error : "";
+				return t(key) + (hostDetail ? t("conflict.code.detail", { detail: hostDetail }) : "");
 			}
 
 			/** 打开「冲突」这一屏。数据没取过才取（挂载时已经取过一次，通常直接有内容）。 */
@@ -1177,10 +1179,15 @@
 			// 冲突徽标数的是**待裁决**（open）条数 —— 与冲突页签里的「N 条待裁决」同源。
 			// -1 = 还没取到队列（显示「未载」，不假装 0 条）。
 			const conflictOpen = conf && conf.counts && typeof conf.counts.open === "number" ? conf.counts.open : -1;
-			// 「复制修复提示词」那颗按钮的分母：体检问题 + 待裁决冲突。两边都没有（=0）时按钮不渲染；
+			// 「复制修复提示词」那颗按钮的分母：体检问题 + 待裁决冲突 + **治理提案**。全都没有（=0）时按钮不渲染；
 			// 冲突队列还没载入（-1）不算进分母 —— 免得按钮先冒出来又消失。
+			// 2.14.0：孤儿归档件与索引瘦身提案按设计不进 problems，只数 problems 会让它们
+			// 永远走不到这颗按钮上（治理看得到、复制不出去）。
+			const proposalCount = (audit && Array.isArray(audit.orphans) ? audit.orphans.length : 0)
+				+ (audit && Array.isArray(audit.indexProposals) ? audit.indexProposals.length : 0);
 			const healthWork = (audit && typeof audit.problems === "number" && audit.problems > 0 ? audit.problems : 0)
-				+ (conflictOpen > 0 ? conflictOpen : 0);
+				+ (conflictOpen > 0 ? conflictOpen : 0)
+				+ proposalCount;
 
 			// 2.12.0（2.12.1 改位置）：初始记忆卡片 —— 挂在**实验性**那一屏最上面。
 			// 放这里的理由（2026-11-17 定）：它不是日常动作，是「第一次上手」用的一段材料，

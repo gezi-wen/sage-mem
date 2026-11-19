@@ -1,6 +1,7 @@
 # 体积治理 · 模块契约（2.10.1 实现基准）
 
 > 2.10.2 起两条软线为提醒 16 KB / 强制 40 KB（2.10.1 落地时是 8 KB / 16 KB）；其余契约不变。
+> 2.14.0 ①：归档名收短 —— slug 上限 40 → 16，尾部加 4 位内容 hash（`<原名>-<slug>-<YYYYMMDD>-<hash4>.md`，见 §2 第 5 条）。
 
 > 本文件是实现的**唯一接口真相**。四个实现片各自只碰自己的文件，跨片调用只按这里的签名。
 > 设计与取舍（含被驳回的方案与代价）记在 `docs/decisions.md` 的 **D45**。
@@ -76,7 +77,13 @@ export function planTrim({ content, name, selector, reason, at })
 2. 行号选择器**不许**触到 frontmatter 区（`code:'selector_invalid'`）。
 3. 被裁段 ≥ `TRIM_MIN_SEGMENT_BYTES`（`segment_too_small`）；剩余正文 ≥ `TRIM_MIN_REMAIN_BYTES`（`remain_too_small`）。
 4. 标题找不到 → `heading_not_found`；标题重复 → `heading_ambiguous`。
-5. `archiveName` = `<原名去掉 .md>-<slug>-<YYYYMMDD>.md`；slug 取标题/首行的实义词，去空白与 `\\/:*?"<>|`，长度 ≤ 40，空则 `section`。`archiveName` 必须能通过 `shared/md-name.js` 的 `isPlainMdName`。
+5. `archiveName` = `<原名去掉 .md>-<slug>-<YYYYMMDD>-<hash4>.md`（四段，2.14.0 起）：
+   - **段序是硬约束**：原名必须在最前 —— 归档件被「恢复」搬回根目录后就是一条活记忆，体检按 `f.split('_')[0]` 判类型前缀（`lib/autodream/audit.js` 的 `typeMismatch`），把日期/类型/hash 挪到前面会让它常亮。
+   - `slug` 取标题/首行的实义词，去空白与 `\\/:*?"<>|`，长度 **≤ 16**（code point；40 → 16 于 2.14.0 收短），空则 `section`。
+   - `hash4` = **被归档那段正文**（`segment`，也就是归档件的正文）的 FNV-1a 32 位指纹，取 4 位小写十六进制，实现在 `lib/shared/hash.js`（零 import）。**取低 4 位**（不是高 4 位）：FNV-1a 的乘法把影响从低位向高位传播，近似文本（同一份记忆的不同切片只差末尾几行）的差异先落在低位 —— 实测 200 条近似文本取高 4 位只有 162 个不同、取低 4 位 200 个全不同。不能用 `node:crypto`：`trim-plan.js` 是纯逻辑层，`test/structure-test.mjs` 第 5 组钉住它零 node 内建 import。
+   - 为什么要有 `hash4`：撞名是**硬拒绝**（§3 第 5 步，不覆盖、不改名、不加序号），slug 一收短，「同一天 + 同一前缀 + 同一截断标题」就会假撞，治理直接跑不动。加了内容指纹后只有**正文真重复**才撞 —— 那本来就该拒。
+   - `archiveName` 必须能通过 `shared/md-name.js` 的 `isPlainMdName`。
+   - **旧归档件不迁移、不重命名**：库里同时存在三种归档命名（本形状 / `name-YYYYMMDD` / `name.YYYYMMDD-before-split`），所以任何逻辑（孤儿检测、去重、排序）都**不许按名字形状判**，只按 `archived_from` / 指针行 / frontmatter 判。
 6. `pointer` 一行：`> 这段旧内容已归档到 archive/<archiveName>（<YYYY-MM-DD>，缘由：<reason>）`；`remaining` 在原位置留 `pointer` + 前后各一空行，**其余正文一字不动**（用严格相等断言：把 pointer 换回 segment 应还原原文件）。
 7. `segment` 是 Markdown 正文（不含 frontmatter）。
 

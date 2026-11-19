@@ -101,6 +101,9 @@ const SUITES = [
   'recall-context-literal-test.mjs',
   'host-facts-test.mjs',
   'archive-test.mjs',
+  // 2.14.0 记忆治理：孤儿归档件（②）与索引瘦身提案（③）—— 两项都**不进 problems**，
+  // 所以它们坏掉的方式是「悄悄什么都不报」，只有专门的套件盯得住。
+  'governance-test.mjs',
   // 2.1.5（外部审查 Q06）：恢复归档改成「接管源 → 核对 → 排他落位 → 退役私有副本」的事务移动，
   // 读源后 / 接管前后 / 目标落位后插入源改写都不许丢新版本；EEXIST / EIO / 崩溃残留各留一份可捞回的原文。
   'review-211-q06-test.mjs',

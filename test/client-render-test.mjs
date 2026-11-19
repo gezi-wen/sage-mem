@@ -942,6 +942,36 @@ const AUDIT_CLEAN = {
   hashHazards: [], noFrontmatter: [], unreadable: [],
 }
 
+/**
+ * 2.14.0 治理夹具：**没有硬问题**，只有孤儿归档件（②）与索引瘦身提案（③）。
+ * 这两项按设计都不进 problems —— 所以「有提案、没问题」是常态，界面必须照样把它们露出来。
+ */
+const AUDIT_GOVERNANCE = {
+  dir: '/tmp/memory', fileCount: 12, skipped: [], archivedCount: 6, archiveReferenced: 2,
+  indexEntries: 40, problems: 0,
+  dangling: [], unlisted: [], typeMismatch: [], crlf: [], brokenLinks: [], archivedLinks: [],
+  hashHazards: [], noFrontmatter: [], unreadable: [],
+  orphans: [
+    { file: 'project_dead-旧段-20261001-cd34.md', kind: 'no_source', from: 'project_dead.md' },
+    { file: 'reference_dup.20261102.md', kind: 'duplicate', with: 'reference_dup.md' },
+  ],
+  indexProposals: [
+    { kind: 'dangling', line: 4, target: 'gone.md' },
+    { kind: 'long_line', line: 42, chars: 254, head: '- [某某记忆](project_x.md) — 一句话' },
+  ],
+}
+
+/**
+ * 2.14.0 补的两个哑巴分类：`indexConflicts` 与 `oversize` 原先**进了 problems 却没有渲染位置** ——
+ * 结果是「问题 N」徽标亮着、下面一行都没有。
+ */
+const AUDIT_UNMAPPED = {
+  ...AUDIT_CLEAN,
+  problems: 2,
+  indexConflicts: [{ file: 'memory.md' }],
+  oversize: [{ file: 'project_big.md', bytes: 44100, level: 'force' }],
+}
+
 const CANDIDATES = {
   count: 2,
   autoArchive: 'report',
@@ -2008,6 +2038,59 @@ async function main() {
       '新标签页打开、带 noreferrer')
   }
 
+  // ── 8i. 2.14.0 记忆治理：孤儿归档件 + 索引瘦身提案（两项都不进 problems）──────────
+  // 这一组盯的坏法是「悄悄不显示」：problems 是 0，界面看起来一片健康，而治理发现的东西
+  // 一条都看不见 —— 那正是这两项在 2.13 之前的处境（`indexOversize` 就是这么哑了好几版）。
+  group('8i. 治理提案：没问题也要露出来（孤儿归档件 / 索引瘦身提案）')
+  {
+    const goTo = async (fixture, conflicts) => {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      mem.st.audit = fixture
+      const { comp: C } = await loadClient(rt, { memory: mem, ...(conflicts ? { conflict: conflicts } : {}) })
+      let tree = await rt.settle(C, {})
+      click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '库健康')[0])
+      tree = await rt.settle(C, {})
+      return { tree, panel: all(tree, byClass('smem-tool-panel'))[0] }
+    }
+
+    const { tree: gt, panel: gp } = await goTo(AUDIT_GOVERNANCE)
+    ok(!!gp, '治理夹具下体检面板出现')
+    ok(!!gp && textOf(gp).indexOf('没有问题') >= 0, `硬问题 0 → 徽标是「没有问题」（${gp ? textOf(gp).slice(0, 40) : ''}…）`)
+    const hintBlocks = all(gp, byClass('smem-audit-hint')).map(textOf)
+    ok(hintBlocks.length === 2, `两块提示（孤儿归档件 + 索引提案）都渲染了（实际 ${hintBlocks.length} 块）`)
+    ok(hintBlocks.some((t) => t.indexOf('孤儿归档件（提示，不计入问题）') >= 0 && t.indexOf('2 条') >= 0),
+      '孤儿归档件成块、并写明条数')
+    ok(hintBlocks.some((t) => t.indexOf('原件 project_dead.md 已不在') >= 0), 'no_source 的条目写出原件名')
+    ok(hintBlocks.some((t) => t.indexOf('与 reference_dup.md 内容完全相同') >= 0), 'duplicate 的条目写出对手件')
+    ok(hintBlocks.some((t) => t.indexOf('索引瘦身提案（只报不改）') >= 0), '索引提案成块、标题写明只报不改')
+    ok(hintBlocks.some((t) => t.indexOf('第 4 行') >= 0 && t.indexOf('gone.md') >= 0), '悬空条目指到行号与目标')
+    ok(hintBlocks.some((t) => t.indexOf('第 42 行') >= 0 && t.indexOf('254 字') >= 0), '超长行给出行号与字数')
+    // 「复制修复提示词」原先只在 problems>0 或冲突>0 时出现 —— 治理提案永远够不到它。
+    ok(all(gt, (n) => n.type === 'button' && textOf(n) === '复制修复提示词').length === 1,
+      '只有提案、没有硬问题时，「复制修复提示词」也要出现（否则治理没有出口）')
+  }
+
+  // ── 8j. 2.14.0：两个「进了 problems 却没渲染位置」的分类补上 ─────────────────
+  group('8j. 索引变体 / 超线体积：进了 problems 就必须有地方显示')
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    mem.st.audit = AUDIT_UNMAPPED
+    const { comp: C } = await loadClient(rt, { memory: mem })
+    let tree = await rt.settle(C, {})
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '库健康')[0])
+    tree = await rt.settle(C, {})
+    const panel = all(tree, byClass('smem-tool-panel'))[0]
+    const hardH = all(panel, byClass('smem-audit-h--hard')).map(textOf)
+    ok(hardH.some((t) => t.indexOf('索引有多份变体') >= 0), `索引变体有独立分节（硬标题：${hardH.join(' | ')}）`)
+    ok(hardH.some((t) => t.indexOf('超线体积') >= 0), '超线体积有独立分节')
+    ok(!!panel && textOf(panel).indexOf('memory.md') >= 0, '索引变体列出具体文件名')
+    ok(!!panel && textOf(panel).indexOf('project_big.md') >= 0 && textOf(panel).indexOf('必须处置') >= 0,
+      '超线体积列出文件名 + 档位')
+    ok(!!panel && textOf(panel).indexOf('本屏分类表还没有对应这一类') < 0, '不再落到「分类表没有这一类」的兜底行')
+  }
+
   // ── 8c. 库健康「复制修复提示词」（2.6.0）──────────────────────────────────
   // 三条是需求原话：按钮收在两组徽标之后（**只有一颗**）、**只在有问题时出现**、
   // 复制成功弹一条不挡操作的提示条（10 秒自收 / 换页签即收 / 能手动关）。
@@ -2356,6 +2439,26 @@ async function main() {
     for (let i = 0; i < 3; i++) tree = await rt.settle(C, {})
     ok(pulls() === first, `后续渲染不再新增拉取（${first} → ${pulls()}）`)
     ok(treeText(tree).indexOf('记忆注入参数') >= 0 || treeText(tree).indexOf('自动做梦') >= 0, '面板照常渲染（没被循环卡死）')
+  }
+
+  // ── 8h. 错误分支必须能取到「错误详情」（2.14.0 修的 detail ReferenceError）──────
+  // `detail()` 原在 `StarmapRuntime` IIFE 里，60-autodream-panel 的错误分支也在调它，
+  // 于是 remote 一失败就抛 `ReferenceError: detail is not defined` —— 只有失败分支
+  // 才触发，所以既有的 600+ 条渲染断言全绿。这里让 getSettings 直接 reject，走真分支。
+  group('8h. 宿主报错 → 错误详情照样进界面（detail 作用域探测）')
+  {
+    const rt = makeReact()
+    const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+    const ad = makeAutodreamRemote()
+    mem.getSettings = () => Promise.reject(new Error('probe-detail-not-defined'))
+    const { comp: C } = await loadClient(rt, { memory: mem, autodream: ad })
+    let tree = await rt.settle(C, {})
+    click(all(tree, (n) => n.type === 'button' && byClass('smem-tab')(n) && textOf(n) === '自动整理')[0])
+    tree = await rt.settle(C, {})
+    for (let i = 0; i < 3; i++) tree = await rt.settle(C, {})
+    const txt = treeText(tree)
+    ok(txt.indexOf('probe-detail-not-defined') >= 0,
+      '失败分支把宿主给的错误详情显示出来了（ReferenceError 时这里是空的）', txt.slice(0, 400))
   }
 
   group('9. 归档候选：理由 + 逐条 / 批量执行')

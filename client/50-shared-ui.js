@@ -788,7 +788,15 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 						rows(list, render),
 					])
 				: null);
-			const hints = r.archivedLinks || [];
+			const hints = AUDIT_HINTS.map(function (g) {
+				const list = (Array.isArray(r[g.field]) ? r[g.field] : []).filter(function (x) { return x && typeof x === "object"; });
+				if (!list.length) return null;
+				return h("div", { className: "smem-audit-hint", key: "hint-" + g.field }, [
+					h("div", { className: "smem-audit-h", key: "h" }, g.title + " · " + list.length + " 条"),
+					g.note ? h("div", { className: "smem-ar-hint", key: "n" }, g.note) : null,
+					rows(list, g.item),
+				]);
+			}).filter(Boolean);
 			// 分节表（字段 / 标题 / 条目格式）与「复制修复提示词」共用同一份，定义在
 			// `client/56-health-prompt.js` 的 `AUDIT_SECTIONS` —— 面板上看到的每一行，
 			// 就是提示词里读到的那一行。这里只负责把它渲染成「标题（说明）」。
@@ -806,18 +814,21 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 					standalone ? null : toolClose(props),
 				]),
 				r.problems
-					? h("div", { key: "secs" }, AUDIT_SECTIONS.map(function (s) {
-							return section(sectionTitle(s), r[s.field], s.item);
-						}))
+					? h("div", { key: "secs" }, (function () {
+							const secs = AUDIT_SECTIONS.map(function (s) {
+								return section(sectionTitle(s), r[s.field], s.item);
+							}).filter(Boolean);
+							if (secs.length) return secs;
+							// 2.14.0：`problems` 有数、分类行却一条都渲染不出来 —— 旧版就是在这种状态下
+							// 只亮一颗红徽标、下面留白（`indexConflicts` / `oversize` 都没进分类表）。
+							// 分类表补齐之后这条只是兜底：宁可多一行解释，也不要「有问题但看不见」。
+							return [h("div", { className: "smem-audit-row", key: "unmapped" },
+								"问题 " + r.problems + " 条：本屏分类表还没有对应这一类，先看下面的提示。")];
+						})())
 					: h("div", { className: "smem-empty smem-empty--ok", key: "ok" },
 							"没有发现问题 —— 索引、双链、frontmatter 与行尾都对得上。"),
 				hints.length
-					? h("div", { className: "smem-audit-hint", key: "hint" }, [
-							h("div", { className: "smem-audit-h", key: "h" }, "指向已归档（提示，不计入问题）"),
-							h("div", { className: "smem-ar-hint", key: "n" },
-								"归档不是删除：这些链接的目标还在档案馆里躺着，恢复它链接就活了 —— 不用改。"),
-							rows(hints, AUDIT_ARCHIVED_LINKS.item),
-						])
+					? h("div", { key: "hints" }, hints)
 					: null,
 				h("div", { className: "smem-ar-hint", key: "ro" }, "这里只报告、不修改 —— 要改哪条，用那条记忆自己的编辑入口。"),
 			]);

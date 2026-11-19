@@ -45,7 +45,7 @@ function loadShard(extra = {}) {
     [prelude + SOURCE],
     sandbox,
     `globalThis.__hp = { buildHealthFixPrompt, auditFixLines, conflictFixLines, copyPromptText,
-       legacyCopyPrompt, PromptFallbackModal, AUDIT_SECTIONS, AUDIT_ARCHIVED_LINKS, AUDIT_PROMPT_MAX_ITEMS };`,
+       legacyCopyPrompt, PromptFallbackModal, AUDIT_SECTIONS, AUDIT_HINTS, AUDIT_PROMPT_MAX_ITEMS };`,
   ).__hp
 }
 
@@ -69,8 +69,28 @@ const CLEAN = {
   dir: '/tmp/memory',
   fileCount: 12, skipped: 0, archivedCount: 2, indexEntries: 12, problems: 0,
   dangling: [], unlisted: [], typeMismatch: [], crlf: [], brokenLinks: [],
-  archivedLinks: [{ file: 'reference_gamma.md', target: 'feedback_old' }],
+  // 2.14.0：干净夹具连提示类也清空 —— 否则「指向已归档」会让 A 段重新出现，
+  // 「只有 B」「两边都没事 → null」这两组就不再测它们本来要测的东西。
+  archivedLinks: [],
   hashHazards: [], noFrontmatter: [], unreadable: [], strays: [],
+  orphans: [], indexProposals: [],
+}
+
+/** 2.14.0 治理夹具：**没有硬问题**，只有提示类（孤儿归档件 + 索引瘦身提案）。 */
+const GOVERNANCE = {
+  dir: '/tmp/memory',
+  fileCount: 12, skipped: 0, archivedCount: 6, archiveReferenced: 2, indexEntries: 40, problems: 0,
+  dangling: [], unlisted: [], typeMismatch: [], crlf: [], brokenLinks: [],
+  archivedLinks: [],
+  hashHazards: [], noFrontmatter: [], unreadable: [], strays: [],
+  orphans: [
+    { file: 'project_a-旧段-20261115.md', kind: 'no_source', from: 'project_a.md' },
+    { file: 'reference_b.20261117.md', kind: 'duplicate', with: 'reference_b.md' },
+  ],
+  indexProposals: [
+    { kind: 'dangling', line: 7, target: 'gone.md' },
+    { kind: 'long_line', line: 42, chars: 254, head: '- [某某记忆](project_x.md) — 一句话…' },
+  ],
 }
 
 const CONFLICTS = {
@@ -114,7 +134,7 @@ group('1. 两段都有：开场白说清有两段，A / B 各自成段')
     '冲突条目落在 B 段之内')
   ok(text.indexOf('记忆目录：/tmp/memory') >= 0, '带上记忆目录')
   ok((text.match(/记忆目录：/g) || []).length === 1, `记忆目录只出现一次（实际 ${(text.match(/记忆目录：/g) || []).length} 次）`)
-  ok(r.count === 6, `count = 体检 4 + 冲突 2（实际 ${r ? r.count : 'null'}）`)
+  ok(r.count === 7, `count = 体检 4 + 提示类 1 + 冲突 2（实际 ${r ? r.count : 'null'}）`)
 }
 
 group('2. 只有体检：不出现 B 段，开场白说「没有待裁决」')
@@ -125,7 +145,7 @@ group('2. 只有体检：不出现 B 段，开场白说「没有待裁决」')
   ok(text.indexOf('这次只有 A') >= 0 && text.indexOf('没有待裁决的矛盾') >= 0, '开场白说清只有体检')
   ok(text.indexOf('B · 待裁决的矛盾') < 0, 'B 段整段不出现')
   ok(text.indexOf('【双链断链】') >= 0 && text.indexOf('- dangling_one.md') >= 0, 'A 段内容照旧')
-  ok(r.count === 4, `count = 4（实际 ${r ? r.count : 'null'}）`)
+  ok(r.count === 5, `count = 体检 4 + 提示类 1（实际 ${r ? r.count : 'null'}）`)
 }
 
 group('3. 只有冲突：不出现 A 段，开场白说「体检没有问题」')
@@ -146,6 +166,25 @@ group('4. 两边都没事 → null（那颗按钮因此不渲染）')
   ok(hp.buildHealthFixPrompt({ report: null, conflicts: null }) === null, '数据没到 → null')
   ok(hp.buildHealthFixPrompt({}) === null && hp.buildHealthFixPrompt(null) === null, '空对象 / null 入参 → null')
   ok(hp.buildHealthFixPrompt({ report: { problems: 4 } }) !== null, '只有 problems 没有分类数组也不炸')
+}
+
+group('4b. 治理提案：没有硬问题也要出提示词，且明写「只报不改」')
+{
+  const r = hp.buildHealthFixPrompt({ report: GOVERNANCE, conflicts: { items: [] } })
+  const text = r ? r.text : ''
+  ok(!!r && r.hasAudit === true, '体检硬问题为 0、只有提案 → 仍然生成提示词（否则治理永远走不到这颗按钮）')
+  ok(text.indexOf('只有 A 的提示类') >= 0 && text.indexOf('没有硬问题') >= 0, '开场白说清「只有提示类、没有硬问题」')
+  ok(text.indexOf('A · 体检提示与提案：只报不改') >= 0, '分隔标题写的是「只报不改」，不是「按清单修」')
+  ok(text.indexOf('本屏**没有硬问题**') >= 0 && text.indexOf('一个文件都不要动') >= 0, '口径第 5 条：没有授权不许写盘')
+  ok(text.indexOf('【孤儿归档件（提示，不计入问题）】') >= 0, '孤儿归档件成节')
+  ok(text.indexOf('原件 project_a.md 已不在') >= 0, 'no_source 的行写出原件名')
+  ok(text.indexOf('与 reference_b.md 内容完全相同') >= 0, 'duplicate 的行写出对手件')
+  ok(text.indexOf('【索引瘦身提案（只报不改）】') >= 0, '索引提案成节')
+  ok(text.indexOf('第 7 行 指向不存在的 gone.md') >= 0, '悬空条目指到行号与目标')
+  ok(text.indexOf('第 42 行 254 字') >= 0, '超长行给出行号与字数')
+  ok(text.indexOf('MEMORY.md.bak-') >= 0, '明写「改索引前先备份」')
+  ok(text.indexOf('档案馆 6 条（被活动记忆引用 2 条）') >= 0, '统计行带上「被引用几条」（这才是「无入链」的可见形式）')
+  ok(r.count === 4, `count = 提案 4 条（实际 ${r ? r.count : 'null'}）`)
 }
 
 group('5. 上限：每类 50 条 + 明写还剩几条')

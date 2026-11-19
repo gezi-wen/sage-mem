@@ -13,6 +13,7 @@
  * 写法照 `test/archive-index-test.mjs`：自研 `ok()` + 每个断言打 `  PASS <名>` + 结尾结果行。
  */
 import { isPlainMdName } from '../lib/shared/md-name.js'
+import { fnv1a32, fnv1aHex } from '../lib/shared/hash.js'
 import { planTrim } from '../lib/memory/trim-plan.js'
 
 let pass = 0
@@ -152,11 +153,32 @@ console.log('== 4. 不变量 4：标题找不到 / 重名不猜 ==')
   ok(three.ok && !three.segment.includes('## 新段'), '段在下一个同级或更高级标题前收住（不吃掉后一节）')
 }
 
-console.log('== 5. 不变量 5：archiveName = <原名去 .md>-<slug>-<YYYYMMDD>.md，且过 isPlainMdName ==')
+console.log('== 5. 不变量 5：archiveName = <原名去 .md>-<slug ≤16>-<YYYYMMDD>-<hash4>.md，且过 isPlainMdName ==')
 {
-  const r = planOf(docOf(), { heading: '旧段' })
-  ok(r.ok && r.archiveName === 'note-旧段-20261115.md', '默认形状：原名-标题-日期.md', r.ok ? r.archiveName : '')
+  const src = docOf()
+  const r = planOf(src, { heading: '旧段' })
+  const hashOf = (res) => (res.ok ? fnv1aHex(res.segment) : '')
+  // 期望名字自己拼一遍：hash 段必须等于「被归档那段正文」的指纹（不是标题、不是整份原文）。
+  const expect = (name, slug, seg) => `${name}-${slug}-20261115-${fnv1aHex(seg)}.md`
+  ok(r.ok && r.archiveName === expect('note', '旧段', r.segment), '四段逐字：原名-slug-日期-hash4.md', r.ok ? `${r.archiveName} ≠ ${expect('note', '旧段', r.segment)}` : '')
+
+  // 段序 —— 这一段是**硬约束**：归档件被「恢复」搬回根目录后是一条活记忆，
+  // 体检按 `f.split('_')[0]` 认类型前缀（`audit.js`），所以原名必须仍在最前面。
+  ok(r.ok && r.archiveName.split('-')[0] === 'note', '原名在最前（第一段就是原名 note）', r.ok ? r.archiveName : '')
+  const shape = r.ok ? r.archiveName.match(/^(.+)-(.+)-(\d{8})-([0-9a-f]{4})\.md$/) : null
+  ok(!!shape, '形状可解析成 原名 / slug / 8 位日期 / 4 位 hash 四段', r.ok ? r.archiveName : '')
+  ok(!!shape && shape[1] === 'note' && shape[3] === '20261115', '第 1 段是原名、第 3 段是日期（YYYYMMDD）', shape ? shape.slice(1).join(' | ') : '')
+  ok(!!shape && /^[0-9a-f]{4}$/.test(shape[4]), `hash 段是 4 位小写十六进制（实际 ${shape ? shape[4] : '无'}）`, shape ? shape[4] : '')
   ok(r.ok && isPlainMdName(r.archiveName), 'archiveName 过 isPlainMdName', r.ok ? r.archiveName : '')
+
+  // hash 打在**被归档的正文**上：改正文一个字，hash 就得变（否则它只是个随机尾巴）。
+  const edited = planOf(src.replace('旧段第 3 行', '旧段第 三 行'), { heading: '旧段' })
+  ok(edited.ok && hashOf(edited) !== hashOf(r), '改正文一个字 → hash 段变（指纹打在被归档的正文上）', edited.ok ? `${hashOf(r)} vs ${hashOf(edited)}` : '')
+  ok(edited.ok && edited.archiveName !== r.archiveName, '同标题 + 同日 + 不同正文 → 归档名不同（slug 收短不会假撞）', edited.ok ? `${r.archiveName} vs ${edited.archiveName}` : '')
+
+  // 反向对照：正文一字不差 → 名字必须完全一样（撞名只该发生在「真的同一段」上）。
+  const again = planOf(src, { heading: '旧段' })
+  ok(again.ok && again.archiveName === r.archiveName, '【反向对照】同标题 + 同日 + 同正文 → 归档名相同（真重复才撞）', again.ok ? `${again.archiveName} vs ${r.archiveName}` : '')
 
   const sluggy = planOf(docOf({ title: '## 路径 a/b:c 段落' }), { heading: '路径 a/b:c 段落' })
   ok(sluggy.ok === true, '（前提）带非法字符的标题能选中', sluggy.ok ? '' : `${sluggy.code} ${sluggy.error}`)
@@ -164,16 +186,18 @@ console.log('== 5. 不变量 5：archiveName = <原名去 .md>-<slug>-<YYYYMMDD>
   ok(sluggy.ok && !/[/\\:*?"<>|]/.test(sluggy.archiveName), 'archiveName 里没有任何文件名保留字符', sluggy.ok ? sluggy.archiveName : '')
 
   const symbolsOnly = planOf(docOf({ title: '## ///' }), { heading: '///' })
-  ok(symbolsOnly.ok === true && symbolsOnly.archiveName === 'note-section-20261115.md', '标题去掉后为空 → slug 用 section', symbolsOnly.ok ? symbolsOnly.archiveName : `${symbolsOnly.code} ${symbolsOnly.error}`)
+  ok(symbolsOnly.ok === true && symbolsOnly.archiveName === expect('note', 'section', symbolsOnly.ok ? symbolsOnly.segment : ''),
+    '标题去掉后为空 → slug 用 section', symbolsOnly.ok ? symbolsOnly.archiveName : `${symbolsOnly.code} ${symbolsOnly.error}`)
 
   const longTitle = '很长的标题'.repeat(30)
   const longName = planOf(docOf({ title: `## ${longTitle}` }), { heading: longTitle })
-  const slugPart = longName.ok ? longName.archiveName.replace(/^note-/, '').replace(/-\d{8}\.md$/, '') : ''
-  ok(longName.ok && Array.from(slugPart).length <= 40, `slug 长度 ≤ 40（实际 ${Array.from(slugPart).length}）`, slugPart)
+  const slugPart = longName.ok ? longName.archiveName.replace(/^note-/, '').replace(/-\d{8}-[0-9a-f]{4}\.md$/, '') : ''
+  ok(longName.ok && Array.from(slugPart).length <= 16, `slug 长度 ≤ 16 code point（实际 ${Array.from(slugPart).length}）`, slugPart)
+  ok(longName.ok && longName.archiveName.endsWith(`-20261115-${fnv1aHex(longName.segment)}.md`), 'slug 被截断也不影响尾部日期 + hash', longName.ok ? longName.archiveName : '')
 
   // slug 会**去掉**空白（契约 §2 第 5 条「去空白」），所以 `旧段第 0 行` 变成 `旧段第0行`。
-  const byLines = planOf(docOf(), { startLine: 11, endLine: 30 })
-  ok(byLines.ok && byLines.archiveName.startsWith('note-旧段第0行') && byLines.archiveName.endsWith('-20261115.md'), '行号选择器的 slug 取首行实义词（去掉空白）', byLines.ok ? byLines.archiveName : `${byLines.code} ${byLines.error}`)
+  const byLines = planOf(src, { startLine: 11, endLine: 30 })
+  ok(byLines.ok && byLines.archiveName.startsWith('note-旧段第0行') && byLines.archiveName.endsWith(`-20261115-${fnv1aHex(byLines.segment)}.md`), '行号选择器的 slug 取首行实义词（去掉空白），尾部仍是日期 + hash', byLines.ok ? byLines.archiveName : `${byLines.code} ${byLines.error}`)
   ok(byLines.ok && isPlainMdName(byLines.archiveName), '行号选择器算出的 name 也过 isPlainMdName')
   ok(planOf('x', { heading: 'a' }, { name: 'notes' }).code === 'invalid_name', '名字不是 .md → invalid_name')
   ok(planOf(docOf(), { heading: '旧段' }, { name: 'dir/note.md' }).code === 'invalid_name', '名字带路径成分 → invalid_name（防穿越）')
@@ -185,7 +209,7 @@ console.log('== 6. 不变量 6：pointer 一行、前后各一空行、其余一
   const r = planOf(src, { heading: '旧段' })
   ok(r.ok === true, '（前提）基准裁段成功', r.ok ? '' : `${r.code} ${r.error}`)
   ok(!r.pointer.includes('\n'), 'pointer 只有一行')
-  ok(r.pointer === `> 这段旧内容已归档到 archive/${r.archiveName}（2026-11-15，缘由：${REASON}）`, 'pointer 文案与契约逐字一致', r.pointer)
+  ok(r.pointer === `> 这段旧内容已归档到 archive/note-旧段-20261115-${fnv1aHex(r.segment)}.md（2026-11-15，缘由：${REASON}）`, 'pointer 文案与契约逐字一致，且带**完整**新名字（含 hash 段）', r.pointer)
   ok(r.remaining.split(r.pointer).length - 1 === 1, '指针在 remaining 里只出现一次（往返断言的前提）')
   ok(roundTrip(r) === src, '**往返**：把 pointer 换回 segment，逐字节还原原文')
   const at = r.remaining.indexOf(r.pointer)
@@ -256,6 +280,53 @@ console.log('== 10. 段首尾空行：空行留给「周围」，不写进归档
   const byLines = planOf(src, { startLine: 10, endLine: 31 }) // 用户把两边的空行也框进来
   ok(byLines.ok && byLines.range.start === 11 && byLines.range.end === 30, '行号选择器把首尾空行剔掉（range 回显真实范围）', byLines.ok ? JSON.stringify(byLines.range) : `${byLines.code} ${byLines.error}`)
   ok(byLines.ok && roundTrip(byLines) === src, '剔空行后往返仍成立（空行留在前后缀里）')
+}
+
+console.log('== 11. shared/hash.js 指纹本身：参考向量 + 近似文本属性（「4 位十六进制」拦不住算法被改坏）==')
+{
+  /**
+   * 为什么单独钉参考向量：不变量 5 只验「hash 段是 4 位十六进制」，把 FNV 的质数写成
+   * 1677762、或者忘了 `>>> 0`，那条断言照样绿 —— 而撞名概率会悄悄从「几乎不可能」
+   * 变成「经常」。前三条是 FNV-1a 32 的**公开参考值**（UTF-8 字节序），
+   * 中文 / 表情那两条是回归常量（实现与「按 `Buffer.from(s,'utf8')` 逐字节跑 FNV-1a」
+   * 对拍过：非 ASCII 走的是 3/4 字节编码，这条最容易写错）。
+   */
+  const FNV_VECTORS = [
+    ['', '811c9dc5', '空串 = offset basis'],
+    ['a', 'e40c292c', 'FNV-1a 公开参考值'],
+    ['hello', '4f9f2cab', 'FNV-1a 公开参考值'],
+    ['中文', 'c488f045', '回归常量：3 字节 UTF-8'],
+    ['😀', '33a29608', '回归常量：4 字节 UTF-8（代理对必须合成一个 code point）'],
+  ]
+  const hex8 = (s) => fnv1a32(s).toString(16).padStart(8, '0')
+  for (const [input, expected, why] of FNV_VECTORS) {
+    ok(hex8(input) === expected, `fnv1a32(${JSON.stringify(input)}) = ${expected}（${why}）`, `实际 ${hex8(input)}`)
+  }
+  ok(fnv1aHex('hello') === '2cab', 'fnv1aHex 默认取 4 位、取的是**低位**（乘法把影响从低位推向高位）', fnv1aHex('hello'))
+  ok(/^[0-9a-f]{4}$/.test(fnv1aHex('hello')), 'fnv1aHex 输出小写十六进制、定长 4')
+  ok(fnv1aHex('hello', 6) === '9f2cab' && fnv1aHex('hello', 8) === '4f9f2cab', '位数可调（1-8），末端始终是低位的最后一位', `${fnv1aHex('hello', 6)} ${fnv1aHex('hello', 8)}`)
+  ok(fnv1aHex('hello', 99) === '2cab' && fnv1aHex('hello', 0) === '2cab', '越界位数按 4 处理（命名助手不抛错）', fnv1aHex('hello', 99))
+  // 定长不靠运气：指纹小到不足 8 位时也得给满 4 位（`0x0000abcd` → `abcd` 而不是 `abc`）。
+  const tiny = Array.from({ length: 4000 }, (_, i) => i).map((i) => fnv1aHex(`x${i}`)).filter((h) => h.length !== 4)
+  ok(tiny.length === 0, '4 位定长（连指纹高位全零的那些也是 4 位）', tiny.slice(0, 3).join(','))
+
+  /**
+   * **属性断言**（本条是这一段的核心）：`planTrim` 的指纹输入是**同一份记忆的不同切片**，
+   * 往往只差标题和末尾几行 —— 近似文本才是真实分布，随机串不是。
+   *
+   * FNV-1a 的一步是 `h = (h ^ b) * prime`：乘法让进位从低位向高位传播，末字节的改动
+   * 先落在低位。所以对近似文本，**低位强、高位弱**。取值取错端时这条必红：
+   *   - 取低 4 位：200 / 200 distinct
+   *   - 取高 4 位：162 / 200 distinct（38 次碰撞 → 38 次 `exists` 硬拒 → 治理跑不动）
+   */
+  const base = '很长的正文内容'.repeat(20)
+  const near = Array.from({ length: 200 }, (_, i) => base + String.fromCharCode(0x4e00 + i))
+  const low4 = new Set(near.map((s) => fnv1aHex(s)))
+  const high4 = new Set(near.map((s) => hex8(s).slice(0, 4)))
+  ok(low4.size === near.length, `200 条只差末字的近似文本 → 200 个不同指纹（实际 ${low4.size}）`, `${low4.size}/${near.length}`)
+  // 【反向对照】同一条判据在「取高位」的实现下必须红 —— 否则它证明不了自己有区分力。
+  ok(high4.size < near.length, '【反向对照】取高 4 位时这条判据会红（所以它真能区分两种实现）', `high4 distinct=${high4.size}/${near.length}`)
+  ok(hex8('旧段第 3 行') !== hex8('旧段第 三 行'), '改一个字 → 指纹就变')
 }
 
 console.log(`\n结果：${pass} passed, ${fail} failed`)

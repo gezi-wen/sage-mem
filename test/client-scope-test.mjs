@@ -33,7 +33,7 @@ function declaredIn(name, sources = SOURCES) {
   return out
 }
 const SHARED = [
-  'isStr', 'isBool', 'isNum', 'parseSchema', 'strSchema', 'unwrap', 'fmtSize', 'hexA',
+  'isStr', 'isBool', 'isNum', 'parseSchema', 'strSchema', 'unwrap', 'fmtSize', 'hexA', 'detail',
   'TYPE_ORDER', 'TYPE_SORT', 'TYPE_LABEL', 'TYPE_META', 'TYPE_COLOR_DARK', 'TYPE_COLOR_LIGHT',
 ]
 
@@ -137,8 +137,8 @@ group('6. 体检分类表只许一处（2.6.0：面板分节与「复制修复�
     'AUDIT_SECTIONS 只在 56-health-prompt.js 声明一次', where.join(','))
   ok((SOURCES.get('50-shared-ui.js') || '').includes('AUDIT_SECTIONS'),
     '面板（50-shared-ui.js）确实复用了这张表，而不是自己再写一份')
-  ok((SOURCES.get('50-shared-ui.js') || '').includes('AUDIT_ARCHIVED_LINKS'),
-    '「指向已归档」的条目格式也共用（两处只各写自己的标题）')
+  ok((SOURCES.get('50-shared-ui.js') || '').includes('AUDIT_HINTS'),
+    '「指向已归档 / 孤儿归档件 / 索引提案」这三类提示的标题与条目格式也共用（2.14.0 起合并成 AUDIT_HINTS）')
   // 判据本身要有反证：把同一张表的两份声明塞进去，必须报出来
   const fake = declaredIn('AUDIT_SECTIONS', new Map([
     ['56-health-prompt.js', '\t\tconst AUDIT_SECTIONS = []'],
@@ -146,6 +146,77 @@ group('6. 体检分类表只许一处（2.6.0：面板分节与「复制修复�
   ]))
   ok(fake.length === 2, '【反向对照】两处各自声明一份 → 判据报 2 处', fake.join(','))
 }
+
+group('7. 工厂作用域的分片不许引用 IIFE 内独有的名字（2.14.0：60 的错误分支栽在这）')
+{
+  // 结构事实（与第 5 组同源）：10/11/12/13 整个在 `StarmapRuntime` 那个 IIFE 内，
+  // 00/05/20..80 在工厂主体。**裸标识符从工厂里解析不到 IIFE 内的绑定** —— 拼接后
+  // 闭包方向是反的，运行到就 `ReferenceError`。
+  //
+  // 为什么这条值得单独守：`detail` 在 `10-starmap-head.js` 里、`60-autodream-panel.js`
+  // 的错误分支也在调它，而错误分支**只有 remote 失败时才走** —— 688 + 条渲染断言、
+  // 界面都不白屏，只是「本该显示错误详情的地方换成了另一条 ReferenceError」。
+  // 2026-11-18 定位、11-19 修（搬到 05）；这条判据覆盖的是**同一类**，不是这一个名字。
+  //
+  // 判据：去掉注释与字符串字面量（`"smem-guide-preview"`、i18n 的 `"{detail}"`
+  // 不是引用）后，再找工厂分片对 IIFE 独有名字的引用。两类例外都不是错：
+  //   ① 该分片自己更深缩进地声明了同名（内层函数遮蔽，例如 70 的 `const detail`
+  //      是「冲突详情」局部量）；
+  //   ② 对象字面量的键名（`detail: todoItemDetail(body)`）。
+  const scope2 = (rel) => (/^(10|11|12|13)-/.test(rel) ? 'iife' : 'factory')
+  const DECL2 = /^\t\t(?:const|let|var|function|class|async function)\s+([A-Za-z0-9_$]+)/gm
+  const esc = (n) => n.replace(/\$/g, '\\$')
+  const topDecls = (rel) => [...(SOURCES.get(rel) || '').matchAll(DECL2)].map((m) => m[1])
+  const iifeOnly = new Set(PARTS.filter((p) => scope2(p) === 'iife').flatMap(topDecls))
+  for (const rel of PARTS.filter((p) => scope2(p) === 'factory')) for (const n of topDecls(rel)) iifeOnly.delete(n)
+
+  /** 注释与字符串之外的部分（引号先剥：注释里出现 URL 也不会把后面的代码吃掉）。 */
+  const codeOnly = (src) => src
+    .replace(/"(?:\\[\s\S]|[^"\\])*"/g, '""')
+    .replace(/'(?:\\[\s\S]|[^'\\])*'/g, '""')
+    .replace(/`(?:\\[\s\S]|[^`\\])*`/g, '""')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:\w$])\/\/[^\n]*/gm, '$1 ')
+
+  /** 某分片内层（缩进 ≥3 tab）是否声明了同名 —— 声明了就是遮蔽，不是引用外层的。 */
+  const shadowed = (rel, name) =>
+    new RegExp(`^\\t{3,}(?:const|let|var|function|class|async function)\\s+${esc(name)}\\b`, 'm').test(SOURCES.get(rel) || '')
+
+  const leaksIn = (rel, src, names = iifeOnly) => {
+    const code = codeOnly(src)
+    const out = []
+    for (const name of names) {
+      if (shadowed(rel, name)) continue
+      const re = new RegExp(`(?<![\\w$.])${esc(name)}(?![\\w$])`, 'g')
+      for (const m of code.matchAll(re)) {
+        const tail = code.slice(m.index + name.length, m.index + name.length + 4)
+        if (/^\s*:/.test(tail)) continue // 对象字面量的键名
+        out.push(`${name}@${rel}`)
+        break
+      }
+    }
+    return out
+  }
+
+  ok(iifeOnly.size > 20, `IIFE 独有名字扫出来了（${iifeOnly.size} 个）`)
+  ok(!iifeOnly.has('detail'), 'detail 在工厂作用域可解析（声明已搬到 05-shared.js）')
+  const leaks = PARTS.filter((p) => scope2(p) === 'factory')
+    .flatMap((rel) => leaksIn(rel, SOURCES.get(rel)))
+  ok(leaks.length === 0, '工厂分片没有引用 IIFE 独有名字', leaks.join(' | '))
+
+  // 反向对照：把 `detail` 按**修之前的构型**放回 IIFE 名单，这段合成源码必须被报出来
+  // （否则判据只是「什么都没查」）。修之前 `detail` 就是 IIFE 独有的名字。
+  const prefixNames = new Set([...iifeOnly, 'detail'])
+  const fakeLeak = leaksIn('60-autodream-panel.js', '\t\t\t\tcatch (e) { setErr(detail(e)); }', prefixNames)
+  ok(fakeLeak.length === 1 && fakeLeak[0] === 'detail@60-autodream-panel.js',
+    '【反向对照】工厂分片裸调 IIFE 内的 detail(e)（修之前的构型）→ 判据报 1 处', fakeLeak.join(','))
+  // 反向对照 2：字符串里的名字、内层遮蔽、对象键名都不许报
+  const benign = new Map([['67-initial-guide-card.js',
+    '\t\tconst k = { detail: "x", preview: "smem-guide-preview" };\n\t\t\tfunction f() {\n\t\t\t\tconst detail = 1;\n\t\t\t\treturn detail;\n\t\t\t}\n']])
+  ok(leaksIn('67-initial-guide-card.js', benign.get('67-initial-guide-card.js')).length === 0,
+    '【反向对照】字符串 / 内层遮蔽 / 键名都不报')
+}
+
 
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

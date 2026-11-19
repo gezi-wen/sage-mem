@@ -41,6 +41,27 @@
 			return "rgba(" + ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a.toFixed(3) + ")";
 		}
 
+		/**
+		 * 错误详情尽量展开，避免 "[object Object]" 式黑洞。
+		 *
+		 * 2.14.0 从 `10-starmap-head.js` 搬到这里：它原本声明在 `StarmapRuntime` 那个
+		 * IIFE **里面**，而 `60-autodream-panel.js` 的错误分支也在调它 —— 拼接顺序是
+		 * 先 IIFE 后工厂主体，闭包方向是反的，于是 remote 一失败就抛
+		 * `ReferenceError: detail is not defined`。危险之处在于**只有失败分支才炸**：
+		 * 正常路径全绿、界面也不白屏，只是「错误提示变成另一条错误」。
+		 * `client-scope-test` 第 7 组现在按作用域盯着这一类（不只看这一个名字）。
+		 */
+		function detail(e) {
+			if (!e) return "未知错误";
+			if (e instanceof Error) return (e.message || String(e)) + (e.stack ? " · " + e.stack.slice(0, 180) : "");
+			try {
+				const s = JSON.stringify(e);
+				return s && s !== "{}" ? s.slice(0, 200) : String(e);
+			} catch (_) {
+				return String(e);
+			}
+		}
+
 		// ── 陈旧宿主（2.1.22 / issue #10）────────────────────────────────
 		//
 		// `@deepseek-ai/dsh-typert-loader` 把每个包的 TYPERT manifest **按包名缓存、

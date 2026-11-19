@@ -2,17 +2,8 @@ const StarmapRuntime = (function (require, _react) {
 	let react = _react;
 	const h = react.createElement;
 
-		/** 错误详情尽量展开，避免 "[object Object]" 式黑洞。 */
-		function detail(e) {
-			if (!e) return "未知错误";
-			if (e instanceof Error) return (e.message || String(e)) + (e.stack ? " · " + e.stack.slice(0, 180) : "");
-			try {
-				const s = JSON.stringify(e);
-				return s && s !== "{}" ? s.slice(0, 200) : String(e);
-			} catch (_) {
-				return String(e);
-			}
-		}
+		// detail() 2.14.0 已搬到 05-shared.js（工厂作用域）：本 IIFE 与 IIFE 外的
+		// 60-autodream-panel.js 都要用它，放在 IIFE 里就只对内可见。
 
 		function preview(v) {
 			try {

@@ -27,6 +27,7 @@ const LIB = new URL('../lib/', import.meta.url)
 const { trimArchive } = await import(new URL('memory/trim-archive.js', LIB).href)
 const { planTrim } = await import(new URL('memory/trim-plan.js', LIB).href)
 const { readArchivedMeta } = await import(new URL('memory/scan.js', LIB).href)
+const { fnv1aHex } = await import(new URL('shared/hash.js', LIB).href)
 
 let pass = 0
 let fail = 0
@@ -38,7 +39,16 @@ const group = (t) => console.log(`== ${t} ==`)
 /** 固定时间戳（本地时间构造）：归档名里的日期与 `archived_at` 都由它决定。 */
 const AT = new Date(2026, 10, 15, 9, 30, 0).getTime()
 const REASON = '体积治理'
-const ARCHIVED_NAME = 'note-旧段-20261115.md'
+
+/**
+ * 归档名的期望值：`<原名>-<slug>-<YYYYMMDD>-<hash4>.md`，hash 吃**被归档的正文**，
+ * 所以它只能由纯函数算出来 —— 手抄一份字面量，实现一改（或 hash 输入一换）两边会一起旧。
+ */
+const nameOf = (src) => {
+  const plan = planTrim({ content: src, name: 'note.md', selector: { heading: '旧段' }, reason: REASON, at: AT })
+  return plan.ok ? plan.archiveName : ''
+}
+const ARCHIVED_NAME = nameOf(docOf())
 
 const exists = async (p) => Boolean(await stat(p).then(() => true, () => false))
 
@@ -90,8 +100,12 @@ console.log('== 1. 成功路径：归档件 + 主文件指针 + 字节数，索�
 
   const r = await trimArchive({ memoryDir, name: 'note.md', selector: { heading: '旧段' }, reason: REASON, at: AT })
   ok(r.ok === true, '裁段归档成功', JSON.stringify(r))
-  ok(r.ok && r.archivedFile === ARCHIVED_NAME, `归档名 = 原名-slug-日期（${ARCHIVED_NAME}）`, r.ok ? r.archivedFile : '')
+  ok(r.ok && r.archivedFile === ARCHIVED_NAME, `归档名 = 原名-slug-日期-hash4（${ARCHIVED_NAME}）`, r.ok ? r.archivedFile : '')
+  ok(r.ok && /^note-旧段-20261115-[0-9a-f]{4}\.md$/.test(r.archivedFile), `落盘名是 4 段骨架，hash 段 4 位十六进制（实际 ${r.ok ? r.archivedFile : ''}）`, r.ok ? r.archivedFile : '')
+  ok(r.ok && r.archivedFile === `note-旧段-20261115-${fnv1aHex(planTrim({ content: src, name: 'note.md', selector: { heading: '旧段' }, reason: REASON, at: AT }).segment)}.md`,
+    'hash 段 = 被归档那段正文的指纹（IO 侧原样落盘，不重算）', r.ok ? r.archivedFile : '')
   ok(r.ok && r.archivedPath === `archive/${ARCHIVED_NAME}`, 'archivedPath 带 archive/ 前缀（回执用）', r.ok ? r.archivedPath : '')
+  ok(r.ok && r.pointer.includes(`archive/${r.archivedFile}`), '指针行里带**完整**新名字（含 hash 段，人能照着找回来）', r.ok ? r.pointer : '')
 
   const archivePath = join(memoryDir, 'archive', ARCHIVED_NAME)
   ok(await exists(archivePath), '归档件落在 archive/ 里')
@@ -142,6 +156,19 @@ console.log('== 2. 撞名：exists，不覆盖、不改名、主文件不动 =='
   ok((await readFile(archivePath, 'utf8')) === 'SENTINEL — 上一次的归档\n', '已有归档件一个字节没被覆盖')
   ok((await readFile(join(memoryDir, 'note.md'), 'utf8')) === src, '撞名时主文件一个字节没动')
   ok((await readdir(join(memoryDir, 'archive'))).length === 1, '撞名时没有改名 / 没有多出副本')
+
+  /**
+   * 【反向对照】slug 从 40 收到 16 之后，「假撞名」由尾部的内容 hash 兜住：
+   * 同一天、同一个标题、**不同正文** → 名字不同 → 照常落盘；而正文真重复才撞（上一组）。
+   */
+  const otherSrc = docOf().replace('旧段第 3 行', '旧段第 三 行')
+  const { memoryDir: dir2 } = await makeDir({ 'note.md': otherSrc }, { archive: true })
+  const otherSentinel = 'SENTINEL — 另一段正文的归档\n'
+  await writeFile(join(dir2, 'archive', ARCHIVED_NAME), otherSentinel, 'utf8')
+  const other = await trimArchive({ memoryDir: dir2, name: 'note.md', selector: { heading: '旧段' }, reason: REASON, at: AT })
+  ok(other.ok === true, '同标题 + 同日 + 不同正文 → 不撞名（hash 把它们区分开）', JSON.stringify(other))
+  ok(other.ok && other.archivedFile !== ARCHIVED_NAME && /-[0-9a-f]{4}\.md$/.test(other.archivedFile), '新件的 hash 段与另一段不同', other.ok ? other.archivedFile : '')
+  ok((await readFile(join(dir2, 'archive', ARCHIVED_NAME), 'utf8')) === otherSentinel, '另一段正文的归档件一个字节没被碰')
 }
 
 console.log('== 3. 读完之后主文件被改：stale_revision + 归档件退役（不删）==')
