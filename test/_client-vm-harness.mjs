@@ -25,10 +25,26 @@ export function makeMiniReact(nodeFactory = makePlainNode) {
   const stateStore = new Map()
   const effectStore = new Map()
   const refStore = new Map()
+  // 2.15.0：useMemo / useCallback 必须**真的记住**（按 hook 序号 + 依赖比对）。
+  // 原先写成「直接返回入参」，于是每次渲染 `useCallback` 都给出新函数 → 依赖它的
+  // effect 每次都重跑 → load() 每次都 setState → `settle` 永远不收敛。
+  // 真实 React 是记住的，这里是量具向真实语义看齐，不是给被测代码开后门。
+  const memoStore = new Map()
   const nodeCache = new Map()
   let n = 0
   let dirty = false
   let pending = []
+  // 2.15.0：hook 状态按**组件路径 + 序号**存，不按全局序号。
+  // 原先按全局序号，一旦某次渲染多出/少掉一个组件（异步数据到位后插进来一块，比如
+  // 「检查点」那块），后面所有组件的 state 就会整体错位 —— 测出来的界面不是真实界面的样子。
+  // React 按「组件在树里的位置」定位 state，这里用路径模拟同一条语义。
+  let curPath = 'root'
+  const hookKey = () => curPath + '#' + (n++)
+
+  const depsEqual = (a, b) => {
+    if (!a || !b || a.length !== b.length) return false
+    return a.every((v, k) => v === b[k])
+  }
 
   const api = {
     // 与 React / 宿主的 `h()` 一致：子节点同时进 `props.children`（组件里只有这个入口能拿到
@@ -40,7 +56,7 @@ export function makeMiniReact(nodeFactory = makePlainNode) {
       return { type, props: p, children }
     },
     useState(init) {
-      const i = n++
+      const i = hookKey()
       if (!stateStore.has(i)) stateStore.set(i, typeof init === 'function' ? init() : init)
       const set = (v) => {
         const cur = stateStore.get(i)
@@ -49,11 +65,26 @@ export function makeMiniReact(nodeFactory = makePlainNode) {
       }
       return [stateStore.get(i), set]
     },
-    useEffect(fn, deps) { pending.push({ i: n++, fn, deps }) },
-    useMemo: (fn) => fn(),
-    useCallback: (fn) => fn,
+    useEffect(fn, deps) { pending.push({ i: hookKey(), fn, deps }) },
+    useMemo: (fn, deps) => {
+      const i = hookKey()
+      const prev = memoStore.get(i)
+      if (prev && !deps && !prev.deps) return prev.value
+      if (prev && depsEqual(prev.deps, deps)) return prev.value
+      const value = fn()
+      memoStore.set(i, { deps: deps || null, value })
+      return value
+    },
+    useCallback: (fn, deps) => {
+      const i = hookKey()
+      const prev = memoStore.get(i)
+      if (prev && !deps && !prev.deps) return prev.value
+      if (prev && depsEqual(prev.deps, deps)) return prev.value
+      memoStore.set(i, { deps: deps || null, value: fn })
+      return fn
+    },
     useRef(init) {
-      const i = n++
+      const i = hookKey()
       if (!refStore.has(i)) refStore.set(i, { current: init })
       return refStore.get(i)
     },
@@ -73,7 +104,23 @@ export function makeMiniReact(nodeFactory = makePlainNode) {
     if (el === null || el === undefined || el === false || el === true) return el
     if (typeof el !== 'object') return el
     if (Array.isArray(el)) return el.map((x, i) => expand(x, path + '.' + i))
-    if (typeof el.type === 'function') return expand(el.type(el.props || {}), path)
+    if (typeof el.type === 'function') {
+      // 组件体内的 hook 调用以它的树路径 + **组件内局部序号**定位（见 hookKey）。
+      // ⚠️ 局部序号要在这里归零：否则某个兄弟组件多渲染几行（比如一组展开后多出两条条目），
+      // 后面所有组件的 hook 键都会整体平移 —— 状态被当成「新组件」重置，测出来的不是真界面。
+      const prevPath = curPath
+      const prevN = n
+      curPath = path + '<' + (el.type.name || 'anon') + '>'
+      n = 0
+      let rendered
+      try {
+        rendered = el.type(el.props || {})
+      } finally {
+        curPath = prevPath
+        n = prevN
+      }
+      return expand(rendered, path)
+    }
     const props = el.props || {}
     // 宿主元素：有 ref 就给一个稳定的假节点（canvas 需要 getContext / getBoundingClientRect）
     if (typeof props.ref === 'function') {

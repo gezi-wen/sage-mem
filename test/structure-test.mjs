@@ -60,7 +60,7 @@ group('1. 组合根体积（1.2.0 验收线；2.0.0 按 D21 的契约位置调�
   // `oversize` / `indexOversize` / `orphans` / `indexProposals` 等字段，都是**传输契约**，
   // 必须与它镜像的 payload 放在同一个 manifest 文件里（typert 的 strict 会把没声明的字段
   // 剥掉，搬走就是面板与模型面口径分叉）。这条护栏防的是「往 lib 里塞逻辑」，不是防
-  // schema 行数（39 条 invocation 的字段声明本来就会长）。
+  // schema 行数（40 条 invocation 的字段声明本来就会长）。
   // 2.14.0 抬 40 行：两个新数组各自带 3–5 个字段（孤儿件 file/kind/with/from、
   // 提案 kind/line/target/chars/head），加上「为什么不能搬走」的注释共 20 行。
   // ⚠️ 下一次再撞线，先想「这个字段是不是可以客户端派生」，别再习惯性抬。
@@ -118,19 +118,19 @@ group('3. 组合根接线：barrel + 直调 mountWriteGate')
 }
 
 // ── 4. typert 契约位置没动 ──────────────────────────────────────
-group('4. typert 契约：39 条 invocation 仍指 lib/index.js')
+group('4. typert 契约：40 条 invocation 仍指 lib/index.js')
 {
   const { TYPERT } = await import(new URL('../lib/typert.host.js', import.meta.url).href)
-  // 39 = 1.9.2 的 33 + 2.0.0 的 6 条 conflict.*（list/read/invalidate/dismiss/undo/remove）。
+  // 40 = 1.9.2 的 33 + 2.0.0 的 6 条 conflict.* + 2.15.0 的 checkpoints（待办看板只读聚合）。
   // 数字变了要**同时**改 client-exec-test 里的对表计数 —— 两处一起红才是「漏了一边」的正确定位信号。
-  ok(TYPERT.invocations.length === 39, `39 条 invocation（实际 ${TYPERT.invocations.length}）`)
+  ok(TYPERT.invocations.length === 40, `40 条 invocation（实际 ${TYPERT.invocations.length}）`)
   const bad = TYPERT.invocations.filter((i) => !(i.sourceLocation?.file === 'lib/index.js' && i.sourceLocation?.line === 1 && i.sourceLocation?.column === 1))
   ok(bad.length === 0, '每条 sourceLocation 仍是 lib/index.js:1:1（搬 Gateway 类就必须同步改这里）', bad.slice(0, 3).map((i) => i.id).join(','))
   const src = read('index.js')
   for (const cls of ['MemoryGateway', 'StarmapGateway', 'AutodreamGateway', 'ConflictGateway']) {
     ok(new RegExp(`export class ${cls} extends TypertRemoteService`).test(src), `${cls} 仍定义在 lib/index.js（契约位置）`)
   }
-  ok((src.match(/^markRemote\(/gm) || []).length === 39, '39 条 markRemote 仍在组合根里')
+  ok((src.match(/^markRemote\(/gm) || []).length === 40, '40 条 markRemote 仍在组合根里')
   // 1.7.0：调试账必须是**只读**（无入参）—— 面板只许看，不许改账。
   const dbg = TYPERT.invocations.find((i) => i.id === 'sage-mem#memory/recallDebug')
   ok(!!dbg && dbg.parameters.length === 0, 'memory/recallDebug 存在且无入参（只读）')

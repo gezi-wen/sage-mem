@@ -417,13 +417,12 @@ if (clientInv) {
   }).map((i) => i.method)
   ok(failProbe.length === 0, '每条 conflict 结果 codec 接受 {ok:false, code} 失败形态', failProbe.join(', '))
 
-  // 契约总数：memory 20（原 9 + audit / archiveCandidates / checkUpdate / getSettings /
+  // 契约总数：memory 21（原 9 + audit / archiveCandidates / checkUpdate / getSettings /
   // setLocked / setSettings / readRaw / writeRaw + deleteArchived + openMemoryDir
-  // + 1.7.0 的 recallDebug）+ starmap 2 + autodream 11 = 33；2.0.0 再加 conflict 6 = 39。
+  // + 1.7.0 的 recallDebug）+ starmap 2 + autodream 11 = 33；2.0.0 再加 conflict 6 = 39；2.15.0 加 checkpoints = 40。
   // 数字变了要**同时**改 test/structure-test.mjs（那份由 Lead 维护）——
-  // 两处一起红才是「漏了一边」的正确定位信号。
-  ok(clientInv.length === 39, `客户端声明了 39 条描述符（实际 ${clientInv.length}）`)
-  ok(hostInv.length === 39, `宿主 manifest 也是 39 条 invocation（实际 ${hostInv.length}）`)
+  ok(clientInv.length === 40, `客户端声明了 40 条描述符（实际 ${clientInv.length}）`)
+  ok(hostInv.length === 40, `宿主 manifest 也是 40 条 invocation（实际 ${hostInv.length}）`)
 
   const missing = [...hostMap.keys()].filter((k) => !clientMap.has(k))
   const extra = [...clientMap.keys()].filter((k) => !hostMap.has(k))

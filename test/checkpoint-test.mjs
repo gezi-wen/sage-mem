@@ -37,6 +37,7 @@ import {
   renderCheckpoint,
   writeCheckpoint,
 } from '../lib/memory/checkpoint.js'
+import { scanCheckpointOpen } from '../lib/memory/scan.js'
 
 let pass = 0
 let fail = 0
@@ -484,6 +485,57 @@ console.log('== 11. checkpointHandleText：一行、≤160 字节、说清怎么
   ok(checkpointHandleText({ taskId: '../x', revision: 1 }) === '', '非法 id → 空串（没有身份就不给句柄）')
   ok(checkpointHandleText({}) === '' && checkpointHandleText() === '', '缺 taskId 也不抛，返回空串')
   ok(checkpointHandleText({ taskId: 't1', revision: -5 }).includes('revision 0'), '非法 revision 按 0，不把负数写进句柄')
+}
+
+// ────────────────────────── 12. scanCheckpointOpen（2.15.0 看板聚合） ──────────────────────────
+
+console.log('== 12. scanCheckpointOpen：只读收集「未完成」 ==')
+{
+  const root = join(world, 'agg')
+  const tasksDir = join(root, TASKS_DIR_NAME)
+  const mk = async (id, text) => {
+    await mkdir(join(tasksDir, id), { recursive: true })
+    await writeFile(join(tasksDir, id, CHECKPOINT_FILE_NAME), text, 'utf8')
+  }
+  const body = (todo) => [
+    '# 任务检查点 甲',
+    '',
+    '- 任务：task-a',
+    '- 项目：合成项目',
+    '- revision：2',
+    '',
+    '## 目标与约束', '- 只做这一件',
+    '## 已完成与证据', '- 开了目录  验证：`ls`',
+    '## 未完成', todo,
+    '## 关键决定', '- 无',
+    '## 记忆引用', '- 无',
+    '## 待核实', '- 无',
+    '',
+  ].join('\n')
+
+  await mk('task-a', body('- 把看板接上\n- 补一条断言'))
+  await mk('task-b', body('- （待补）'))
+  await mk('task-c', '这里根本不是检查点')
+  await mkdir(join(tasksDir, 'task-d'), { recursive: true })  // 有目录没 WORKING.md
+  await mkdir(join(tasksDir, '..bad'), { recursive: true })   // 非法 id（不是单段）
+  await writeFile(join(tasksDir, 'stray.md'), 'x', 'utf8')     // 文件不是任务目录
+
+  const res = await scanCheckpointOpen(root)
+  ok(res.ok === true, '扫描成功')
+  ok(res.tasks.length === 1, `只有一条任务有真正的「未完成」（实际 ${res.tasks.length}）`)
+  const t0 = res.tasks[0] || {}
+  ok(t0.taskId === 'task-a', `任务 id 取目录名（实际 ${t0.taskId}）`)
+  ok(t0.project === '合成项目' && t0.revision === 2, '带上项目名与 revision（面板要显示是哪一版）')
+  ok(Array.isArray(t0.items) && t0.items.length === 2 && t0.items[0] === '把看板接上', '条目按原顺序逐条给出', JSON.stringify(t0.items))
+  ok(!res.tasks.some((x) => x.taskId === 'task-b'), '全是占位符的「未完成」不算条目')
+  ok(!res.tasks.some((x) => x.taskId === 'task-c'), '读不出骨架的检查点不显示（坏文件比读不到更危险）')
+  ok(!res.tasks.some((x) => x.taskId === 'task-d'), '目录里没有 WORKING.md 时跳过，不报错')
+  ok(!res.tasks.some((x) => x.taskId === '..bad'), '非法 id 的目录不进列表')
+  ok(res.truncated === false, '没到上限时 truncated 为 false')
+
+  const missing = await scanCheckpointOpen(join(world, 'no-such-root'))
+  ok(missing.ok === true && missing.tasks.length === 0, '状态根下没有 tasks 目录 → 空列表，不是错误')
+  ok((await scanCheckpointOpen(undefined)).ok === true, '不传 stateRoot 也不抛')
 }
 
 // ────────────────────────── 收尾 ──────────────────────────

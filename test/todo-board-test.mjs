@@ -64,7 +64,7 @@ const T = mod && mod.todoBoardInternals
 ok(T && typeof T.parse === 'function', '导出了 todoBoardInternals（解析 + 行级手术）')
 ok(T && T.FILE === 'project_session-state.md', `认的文件是 project_session-state.md（实际 ${T && T.FILE}）`)
 ok(mod && typeof mod.apply === 'function', '插件本体仍然只导出 apply（测试缝是额外字段，不影响装载）')
-ok(T && T.UNDO_DEPTH === 2, `撤销栈深是两步（实际 ${T && T.UNDO_DEPTH}）`)
+ok(T && T.UNDO_DEFAULT === 5, `撤销栈默认 5 步（实际 ${T && T.UNDO_DEFAULT}）`)
 ok(T && T.DONE_HEADING === '## 已完成，待删除', '待删除块的标题是写进文件的字面量，不随界面语言变')
 
 // ── 2. 解析 ────────────────────────────────────────────────────────────────
@@ -284,6 +284,66 @@ ok(end.sections.length === 4, '待删除块空了之后仍在（标题留着）'
 ok(end.sections.find((s) => s.kind === 'done').items.length === 0, '清空后块内没有条目')
 ok(end.sections[2].items[0].text.includes('约束一改'), '约束节的编辑生效了')
 ok(round.startsWith('---\nname: session-state'), 'frontmatter 始终在文件最前面（逐字节没动）')
+
+// ── 9. 2.15.0：撤销深度 / 筛选 / 展开偏好 ─────────────────────────────────
+console.log('== 9. 撤销深度 / 筛选 / 展开偏好（纯逻辑） ==')
+ok(T.UNDO_DEFAULT === 5 && T.UNDO_MIN === 3 && T.UNDO_MAX === 5,
+  `撤销默认 5 步、可配范围 3–5（实际 ${T.UNDO_DEFAULT}，${T.UNDO_MIN}–${T.UNDO_MAX}）`)
+ok(T.clampDepth(2) === 3, '低于下限收到 3（老配置里那个「两步」也被收上来）')
+ok(T.clampDepth(9) === 5, '高于上限收到 5')
+ok(T.clampDepth('4') === 4, '字符串数字照收（select 的 value 是字符串）')
+ok(T.clampDepth(4.6) === 5, '小数先四舍五入再收界（4.6 → 5）')
+ok(T.clampDepth('abc') === T.UNDO_DEFAULT && T.clampDepth(null) === T.UNDO_DEFAULT, '坏值回默认 5，不是 NaN')
+
+const mixed = [
+  { done: true, inDone: false, text: '普通组里的旧 [x]' },
+  { done: false, inDone: false, text: '未完成' },
+  { done: true, inDone: true, text: '待删除块里的' },
+]
+ok(T.filterItems(mixed, T.FILTER_OPEN).length === 2, '「未完成」档藏掉普通组里遗留的 [x] 行')
+ok(T.filterItems(mixed, T.FILTER_OPEN).every((it) => !it.done || it.inDone), '待删除块里的条目照常显示（它是队列，不是历史）')
+ok(T.filterItems(mixed, T.FILTER_ALL).length === 3, '「全部」档一条不少')
+ok(T.filterItems(null, T.FILTER_ALL).length === 0, '入参为 null 时回空数组，不抛')
+
+const openMap = T.openMapParse(JSON.stringify({ '⏳ 等你一句话': true, '长期约束': false, '杂项': 'yes' }))
+ok(openMap['⏳ 等你一句话'] === true && openMap['长期约束'] === false, '展开偏好按节标题记住（true / false 都留）')
+ok(openMap['杂项'] === undefined, '非布尔值的键丢掉（坏数据不传染）')
+ok(Object.keys(T.openMapParse('{bad json')).length === 0, '坏 JSON 当作没有偏好')
+ok(Object.keys(T.openMapParse('[1,2]')).length === 0, '数组当作没有偏好')
+const openRound = T.openMapParse(T.openMapSerialize({ 甲: true, 乙: false }))
+ok(openRound['甲'] === true && openRound['乙'] === false, '序列化 → 解析往返一致')
+ok(T.groupKey(null) === '' && T.groupKey('甲') === '甲', '组键就是节标题原文（空标题共用一个兜底键）')
+ok(T.PREF_UNDO.includes('undoDepth') && T.PREF_OPEN.includes('openGroups'), '两个偏好键分开存在（改一个不会冲掉另一个）')
+
+// ── 10. 2.15.0：完成项留档（搬进流水） ────────────────────────────────────
+console.log('== 10. 完成项留档：正文照抄 + 去重 + 只在尾部追加 ==')
+ok(T.LOG_FILE === 'session-log.md', `留档落点是跨会话流水（实际 ${T.LOG_FILE}）`)
+ok(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(T.stamp(new Date(2026, 0, 2, 3, 4))), '时间戳是 YYYY-MM-DD HH:mm（本地时区）')
+
+const logStart = '# 会话日志\n\n## 2026-11-20 22:29 · 上一段\n\n**做法**：啥也没干。\n'
+const now = new Date(2026, 10, 20, 23, 40)
+const block = T.archiveBlock([{ text: '**甲** —— 一。' }, { text: '**乙** —— 二。' }, { text: '**甲** —— 一。' }], now)
+ok(block.count === 2, `同一批里正文重复的只写一次（实际 ${block.count} 条）`)
+ok(block.text.startsWith('## 2026-11-20 23:40 · 待办收尾（2 条）'), '段落带日期与条数', block.text.split('\n')[0])
+ok(block.text.includes('- **甲** —— 一。'), '条目正文**逐字照抄**（不概括、不改写）')
+ok(block.text.includes('`project_session-state.md`'), '段落写清来源文件（半年后还知道这是从哪儿搬来的）')
+ok(T.archiveBlock([], now).count === 0 && T.archiveBlock([], now).text === '', '没有条目时不造空段落')
+ok(T.archiveBlock([{ text: '   ' }], now).count === 0, '空白正文跳过')
+
+const existing = T.logKeys(logStart + '\n- **甲** —— 一。\n')
+ok(existing.has(T.logKey('**甲** —— 一。')), '流水里已有的条目认得出（连续空白归一后比对）')
+const partial = T.archiveBlock([{ text: '**甲** —— 一。' }, { text: '**乙** —— 二。' }], now, existing)
+ok(partial.count === 1 && partial.text.includes('**乙**') && !partial.text.includes('**甲**'),
+  '重试时只补没记过的那条（「写了一半」可以安全重来）')
+
+const appended = T.logAppend(logStart, block.text)
+ok(appended.startsWith(logStart.replace(/\n$/, '')), '已有内容逐字节保留（只在尾部追加）')
+ok(!/\n\n\n/.test(appended), '段落之间恰好一个空行（不叠空行）')
+ok(appended.trimEnd().endsWith('- **乙** —— 二。'), '新内容落在文件末尾')
+ok(T.logAppend('', block.text).split('\n')[0].startsWith('## '), '空文件：直接从段标题起头')
+ok(T.logAppend(logStart, '').endsWith('**做法**：啥也没干。\n'), '空段落不写盘（原样返回）')
+const crlfLog = T.logAppend('# 日志\r\n', '## 段\n- 一')
+ok(crlfLog.includes('\r\n## 段\r\n'), 'CRLF 文件里追加的行也用 CRLF（不混两种换行）')
 
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

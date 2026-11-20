@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.14.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.15.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -464,15 +464,18 @@ The two things are moved **differently**, spelled out:
 
 ⚠️ **The premise is that the shape matches.** The four-type division and the frontmatter are sage-mem's own conventions: if your memories in CC were already "one Markdown file per memory + frontmatter" (which is what ours were at the time), just copy them over; **if they were not** (if they were all piled into a single `CLAUDE.md`, say), you need to organize them first — and that job can perfectly well be handed to an agent: have it read the old material and lay it out as files under the four types.
 
-## To-do Board (experimental · since 2.11.0; ticking means moving since 2.11.1)
+## To-do Board (experimental · since 2.11.0; wrapped up in 2.15.0)
 
 `project_session-state.md` in the memory directory has always been a to-do list you keep for yourself: injected into every session, but you still have to open the file to see what is left. 2.11.0 puts it in the **right sidebar**: Settings → Memory management → Lab → enable "To-do board", and the sidebar's Start page gains a card that opens a tab.
 
 - **Ticking = moving**: a finished item is removed from its group and appended to the "Done, pending deletion" block (created at the end of the file on first use); un-ticking moves it back to the end of its original group. "Clear all" is what actually deletes rows.
-- **Edit it**: add an item at the end of a group, edit one in place, undo / redo two steps.
+- **Edit it**: add an item at the end of a group, edit one in place, undo / redo **3–5 steps** (5 by default).
+- **See only what is open**: the default filter is "Open" (legacy `- [x]` lines appear under "All"; the pending-deletion block always shows, since it is a queue). Each group remembers whether it was expanded.
+- **Wrap-up has a button**: **"Move to log"** on the pending-deletion block appends the rows to `session-log.md` and removes them from the list — log first, list second, verbatim text, already-logged rows skipped, **not undoable**.
+- **See work owed elsewhere**: the 未完成 (open-work) section of `tasks/*/WORKING.md` is aggregated into a **read-only** block (never merged back).
 - **The file is still the only truth**: the board does line-level surgery only; edit the file with any tool and the board follows within 4 seconds.
 - **Hot**: flipping the switch takes effect immediately, no restart (unlike MMR).
-- **Off by default**; no drag-and-drop ordering, no automatic `session-log` archiving — moving those pending-deletion rows into the log is the agent's job at wrap-up. Details in `docs/todo-board.md`.
+- **Off by default**; no drag-and-drop ordering. Details in `docs/todo-board.md`.
 
 ## Initial memory: scaffold the library with an agent (2.12.0; moved to Lab in 2.12.1)
 

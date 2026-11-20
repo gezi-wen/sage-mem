@@ -400,6 +400,22 @@
 			".smem-todo-add{padding-top:2px;}",
 			".smem-todo-add-input{width:100%;font-size:12px;}",
 			".smem-todo-empty{font-size:11.5px;color:var(--dsw-alias-label-secondary);padding:4px 0;}",
+			// 2.15.0：筛选 + 撤销步数那一行；步数选择器要窄，别把右栏撑开。
+			".smem-todo-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:0 0 2px;}",
+			".smem-todo-tools > span[data-spring]{flex:1;}",
+			".smem-todo-filter{border:1px solid transparent;border-radius:6px;padding:1px 6px;}",
+			".smem-todo-filter-on{border-color:var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-l2);color:var(--dsw-alias-label-primary);}",
+			".smem-todo-depth{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:var(--dsw-alias-label-secondary);}",
+			".smem-todo-depth-select{width:auto;padding:0 2px;font-size:11.5px;}",
+			// 「搬进流水」是待删除块的主动作（清空是丢弃、这条是留档），给品牌色。
+			".smem-todo-archive{font-weight:600;}",
+			// 检查点聚合块：只读、来源是别的文件 —— 用虚线边框和正文色区分开。
+			".smem-todo-group-cp{border-style:dashed;}",
+			".smem-todo-cp-task{display:flex;flex-direction:column;gap:2px;padding:2px 0;}",
+			".smem-todo-cp-head{font-size:11.5px;font-weight:600;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere;}",
+			".smem-todo-cp-items{display:flex;flex-direction:column;gap:2px;}",
+			".smem-todo-cp-item{font-size:12px;color:var(--dsw-alias-label-primary);overflow-wrap:anywhere;padding-left:8px;border-left:2px solid var(--dsw-alias-border-l2);}",
+			".smem-todo-cp-note{font-size:11px;color:var(--dsw-alias-label-secondary);}",
 			".smem-todo-done-state{display:flex;flex-direction:column;gap:6px;padding:16px 12px;}",
 			".smem-todo-done-title{font-weight:600;}",
 		].join("\n");
