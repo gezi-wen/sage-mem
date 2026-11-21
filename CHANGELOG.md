@@ -19,6 +19,10 @@
 - **撞上单次输出上限、续写或重试过的报告，界面能认出来了**：`truncated` / `continuations` / `retries` 会随 `lastResult` 到达面板。修之前这三个键被 strict 校验剥掉，2026-10-17 那次「残篇报成功」的修复在传输层没生效。
 - 正常跑完时三个值为 `0 / 0 / false`，界面无额外元素。
 
+### 顺带：契约面第一次拆模块
+
+- 补完这三个字段后 lib/typert.host.js 到了 **1162 行**，撞上 1160 行那条守卫（structure-test 第 1 组，D47 说过「下次撞线先想能不能挪走」）。按它执行：把 checkpointTaskSchema / checkpointsResultSchema 搬到 lib/shared/checkpoints-schema.js，**invocation 声明仍留在 	ypert.host.js**（那是契约的索引面）。文件回到 **1154 行**。
+
 ### 新增测试
 
 - `test/schema-surface-test.mjs` **10 条（+3）**：`lastResult` 三个键都在声明里、真实形状过 schema、三个值都没被 strip。
