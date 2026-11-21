@@ -118,5 +118,31 @@ console.log('== 2.15.9 · setLocked 的失败分支 ==')
     '失败原因与错误码都保留（界面能说清「什么都没写」）')
 }
 
+// ── 2.15.11（M5）：memory/recallDebug 的 gated / validitySuppressed ────────
+console.log('== 2.15.11 · recallDebug 的两个「为什么没进来」 ==')
+{
+  const base = {
+    at: 1763712000000, sessionId: 's1', query: '为什么这条没进来', outcome: 'empty', deduped: false,
+    baseline: 2, scanned: 120, hits: 0, scores: [{ file: 'a.md', score: 3.5 }], body: [],
+    picked: [], injected: [], chars: 0, sessionChars: 0, cardChars: 0, skippedByBudget: 0, card: '',
+  }
+  const gated = parse('sage-mem#memory/recallDebug', { enabled: true, records: [{ ...base, gated: true }] })
+  ok(gated.success, '带 gated 的记录过 schema', gated.success ? '' : JSON.stringify(gated.error?.issues?.slice(0, 3)))
+  ok(gated.success && gated.data.records[0].gated === true, 'gated 没被 strip（「同题没重算」看得见）')
+  const suppressed = parse('sage-mem#memory/recallDebug', {
+    enabled: true,
+    records: [{
+      ...base, gated: false,
+      validitySuppressed: [
+        { file: 'old.md', reason: 'expired_source', label: '已失效' },
+        { file: 'clash.md', reason: 'conflict_pending', label: '待裁决矛盾', conflictId: 'c-1' },
+      ],
+    }],
+  })
+  ok(suppressed.success, '带 validitySuppressed 的记录过 schema', suppressed.success ? '' : JSON.stringify(suppressed.error?.issues?.slice(0, 3)))
+  ok(suppressed.success && suppressed.data.records[0].validitySuppressed.length === 2,
+    'validitySuppressed 没被 strip（被挡掉的条目连同 conflictId 都在）')
+}
+
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

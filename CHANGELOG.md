@@ -8,6 +8,30 @@
 ---
 
 
+## 2.15.11
+
+**主题（审查修复 M5/6）：`recallDebug` 的 `gated` 与 `validitySuppressed` 没进 schema —— 排查「为什么这条没进来」的两个主要线索永远为空。**
+
+版本判定：2.15.11（PATCH）｜理由：补两条既有字段的声明；另把这一族 schema 挪出 `typert.host.js`（行数守卫）｜运行时源文件 2（`lib/typert.host.js`、新增 `lib/shared/recall-debug-schema.js`）+ 测试 1｜一版一件事：「代码在、话说不出口」六连之五
+
+### 行为变更
+
+- **注入调试面板能分辨「同题没重算」与「真的没命中」了**：`gated: true` 会到达界面（两者的 `outcome` 都是 `empty`，靠这个键分开）。
+- **被失效 / 待裁决矛盾挡掉的条目会列出来**：`validitySuppressed` 每条带 `file` / `reason` / `label` / 可选 `conflictId`。
+- `validitySuppressed` 声明为**可选**：短路与早期返回的分支不带这个键，写成必填会让整条调用被判坏 —— 那正是这一族缺陷的形态。
+
+### 顺带：契约面第二次拆模块
+
+- `recallDebugScoreSchema` / `recallDebugRecordSchema` / `recallDebugResultSchema` 搬到 `lib/shared/recall-debug-schema.js`。补完上面两个字段后 `typert.host.js` 到过 **1166 行**，超过 1160 那条守卫；拆完回 **1146 行**。
+
+### 新增测试
+
+- `test/schema-surface-test.mjs` **17 条（+4）**：带 `gated` 的记录过 schema 且值未被 strip、带 `validitySuppressed` 的记录过 schema 且两条条目（含 `conflictId`）都在。
+- 全量：**5505 passed / 0 failed**。
+
+---
+
+
 ## 2.15.10
 
 **主题：待办清单的右栏页签与开始页卡片没有图标 —— 补一枚内联 SVG。**
