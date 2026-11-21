@@ -38,6 +38,8 @@ import {
   writeCheckpoint,
 } from '../lib/memory/checkpoint.js'
 import { scanCheckpointOpen } from '../lib/memory/scan.js'
+import { symlink } from 'node:fs/promises'
+import { CHECKPOINT_ITEM_LIMIT } from '../lib/memory/scan.js'
 
 let pass = 0
 let fail = 0
@@ -536,6 +538,61 @@ console.log('== 12. scanCheckpointOpen：只读收集「未完成」 ==')
   const missing = await scanCheckpointOpen(join(world, 'no-such-root'))
   ok(missing.ok === true && missing.tasks.length === 0, '状态根下没有 tasks 目录 → 空列表，不是错误')
   ok((await scanCheckpointOpen(undefined)).ok === true, '不传 stateRoot 也不抛')
+}
+
+// ───────────────────── 12b. 2.15.2：形状闸门 / 上限 / 截断口径 ─────────────────────
+
+console.log('== 12b. 检查点读路径：闸门、体积、截断 ==')
+{
+  const root = join(world, 'agg2')
+  const tasksDir = join(root, TASKS_DIR_NAME)
+  const mkdirTask = async (id) => { await mkdir(join(tasksDir, id), { recursive: true }); return join(tasksDir, id, CHECKPOINT_FILE_NAME) }
+  const body = (todo) => [
+    '# 任务检查点', '', '- 任务：x', '- 项目：p', '- revision：1', '',
+    '## 目标与约束', '- 一件事',
+    '## 已完成与证据', '- 做了  验证：`ls`',
+    '## 未完成', todo,
+    '## 关键决定', '- 无', '## 记忆引用', '- 无', '## 待核实', '- 无', '',
+  ].join('\n')
+
+  // 1) 超过 20 条 → 截断标记
+  const many = Array.from({ length: 25 }, (_, i) => `- 第 ${i + 1} 件`).join('\n')
+  await (async () => { const f = await mkdirTask('task-many'); await writeFile(f, body(many), 'utf8') })()
+  const rMany = await scanCheckpointOpen(root)
+  const tMany = rMany.tasks.find((x) => x.taskId === 'task-many') || {}
+  ok(Array.isArray(tMany.items) && tMany.items.length === CHECKPOINT_ITEM_LIMIT, `条目超过上限时只给前 ${CHECKPOINT_ITEM_LIMIT} 条（实际 ${tMany.items && tMany.items.length}）`)
+  ok(rMany.truncated === true, '条目被截时 truncated 为 true（客户端据此提示「还有更多」）')
+
+  // 2) 体积超线 → 跳过并计入 skipped（用 300 KB 的普通文件）
+  const big = await mkdirTask('task-big')
+  await writeFile(big, body('- ' + 'x'.repeat(300 * 1024)), 'utf8')
+  const rBig = await scanCheckpointOpen(root)
+  ok(!rBig.tasks.some((x) => x.taskId === 'task-big'), '超过读取上限的检查点不读（不把整份吃进内存）')
+  ok(typeof rBig.skipped === 'number' && rBig.skipped >= 1, `被跳过的任务计入 skipped（实际 ${rBig.skipped}）`)
+
+  // 3) 符号链接 → 不跟随（Windows 上建文件符号链接要特权，建不出来就跳过这条）
+  let linkMade = false
+  try {
+    const target = await mkdirTask('task-target')
+    await writeFile(target, body('- 真身'), 'utf8')
+    const link = join(tasksDir, 'task-link', CHECKPOINT_FILE_NAME)
+    await mkdir(join(tasksDir, 'task-link'), { recursive: true })
+    await symlink(target, link, 'file')
+    linkMade = true
+    const rLink = await scanCheckpointOpen(root)
+    ok(!rLink.tasks.some((x) => x.taskId === 'task-link'), 'WORKING.md 是符号链接时**不读**（名字在目录里 ≠ 内容在目录里）')
+    ok(typeof rLink.skipped === 'number' && rLink.skipped >= 1, '链接被跳过时同样计入 skipped')
+  } catch (err) {
+    ok(true, `本机建不出文件符号链接（${err?.code ?? err}），这条按平台跳过`)
+  }
+
+  // 4) 一切正常时不给 skipped（避免「总有个数字」变成噪音）
+  const clean = join(world, 'agg-clean')
+  await mkdir(join(clean, TASKS_DIR_NAME, 'ok'), { recursive: true })
+  await writeFile(join(clean, TASKS_DIR_NAME, 'ok', CHECKPOINT_FILE_NAME), body('- 一件'), 'utf8')
+  const rClean = await scanCheckpointOpen(clean)
+  ok(rClean.skipped === undefined, '没有跳过时根本不带 skipped 字段')
+  ok(rClean.truncated === false, '没有截断时 truncated 为 false')
 }
 
 // ────────────────────────── 收尾 ──────────────────────────

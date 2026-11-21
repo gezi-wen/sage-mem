@@ -68,7 +68,8 @@ function makeRemote() {
     writeRaw: (name, content, opts) => { writes.push({ api: 'writeRaw', name, content, opts }); return wrap({ ok: true }) },
     checkpoints: () => wrap({
       ok: true,
-      truncated: false,
+      truncated: true,
+      skipped: 2,
       tasks: [{ taskId: 'task-a', project: '合成项目', revision: 2, items: ['把看板接上', '补一条断言'] }],
     }),
     getSettings: () => wrap({ experimental: { todoBoard: 1 } }),
@@ -214,6 +215,9 @@ async function main() {
   ok(!!cpHead && /合成项目 · task-a/.test(textOf(cpHead)), '带上项目名与任务 id')
   ok(byClass(treeCp, 'smem-todo-box').length === byClass(treeAfter, 'smem-todo-box').length,
     '检查点条目没有勾选框（只读，不冒充可勾）')
+  // 2.15.2：宿主说了「截断 / 跳过」就必须在界面上说出来。
+  ok(/还有未列出/.test(textOf(treeCp)), '宿主报告截断时界面明确说「还有未列出的」')
+  ok(/2 个任务读不出/.test(textOf(treeCp)), '宿主报告跳过时界面说出跳过了几个')
 
   console.log(`\n结果：${pass} passed, ${fail} failed`)
   process.exit(fail ? 1 : 0)

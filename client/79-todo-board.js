@@ -770,6 +770,10 @@
 					]);
 				})) : null,
 				open ? h("div", { key: "note", className: "smem-todo-cp-note" }, t("todo.cp.note")) : null,
+				// 2.15.2：宿主说了「被截断 / 有任务读不出来」就必须说出来 ——
+				// 只说「检查点里的未完成」而不提这两件事，等于把不完整的清单当完整的给。
+				props.truncated ? h("div", { key: "trunc", className: "smem-todo-cp-note" }, t("todo.cp.truncated")) : null,
+				props.skipped > 0 ? h("div", { key: "skip", className: "smem-todo-cp-note" }, t("todo.cp.skipped", { count: props.skipped })) : null,
 			]);
 		}
 
@@ -811,7 +815,12 @@
 				Promise.resolve(remote.checkpoints()).then(function (res) {
 					const data = unwrap(res);
 					if (!data || data.ok === false) { setCheckpoints(null); return; }
-					setCheckpoints(Array.isArray(data.tasks) ? data.tasks : []);
+					// 2.15.2：把「被截断」与「读不出来被跳过」也带上 —— 否则面板说的「完整」是假的。
+					setCheckpoints({
+						tasks: Array.isArray(data.tasks) ? data.tasks : [],
+						truncated: data.truncated === true,
+						skipped: typeof data.skipped === "number" ? data.skipped : 0,
+					});
 				}, function () { /* 读不到就不显示，别在清单旁边堆一条错误 */ });
 			}, [remote]);
 
@@ -1086,10 +1095,12 @@
 			const doneBlock = parsed.sections.find(function (sec) { return sec.kind === "done"; });
 			const doneBlockCount = doneBlock ? doneBlock.items.length : 0;
 			// 检查点区块的条目总数（只读，来自 tasks/*/WORKING.md）。
-			const cpTasks = (checkpoints || []).filter(function (task) {
+			const cpTasks = ((checkpoints && checkpoints.tasks) || []).filter(function (task) {
 				return task && Array.isArray(task.items) && task.items.length > 0;
 			});
 			const cpCount = cpTasks.reduce(function (n, task) { return n + task.items.length; }, 0);
+			const cpTruncated = !!(checkpoints && checkpoints.truncated);
+			const cpSkipped = (checkpoints && checkpoints.skipped) || 0;
 
 			return h("div", { className: "smem-todo" }, [
 				h("div", { key: "head", className: "smem-todo-head" }, [
@@ -1153,7 +1164,7 @@
 				err ? h("div", { key: "err", className: "smem-err" }, "⚠ " + err) : null,
 				notice ? h("div", { key: "ok", className: "smem-ok" }, "✓ " + notice) : null,
 				cpCount > 0
-					? h(TodoCheckpointBlock, { key: "cp", tasks: cpTasks, count: cpCount })
+					? h(TodoCheckpointBlock, { key: "cp", tasks: cpTasks, count: cpCount, truncated: cpTruncated, skipped: cpSkipped })
 					: null,
 				missing
 					? h("div", { key: "miss", className: "smem-todo-empty" }, t("todo.empty.file", { file: TODO_FILE }))
