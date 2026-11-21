@@ -56,5 +56,28 @@ console.log('== 2.15.6 · getSettings.limitDiagnostics ==')
   ok(bad.success === false, 'limitDiagnostics 给错类型时 schema 会拒（不是静默放行）')
 }
 
+// ── 2.15.7（M2）：memory/archiveCandidates 的 lockedUnknown / lockedError ──
+console.log('== 2.15.7 · archiveCandidates.lockedUnknown / lockedError ==')
+{
+  const base = {
+    count: 2,
+    candidates: [
+      { file: 'project_a.md', type: 'project', days: 40, limit: 30, reason: 'stale' },
+      { file: 'reference_b.md', type: 'reference', days: 61, limit: 60, reason: 'stale' },
+    ],
+    autoArchive: 'off',
+    thresholds: { project: 30, reference: 60, user: 0 },
+    locked: ['project_locked.md'],
+    lockedUnknown: false,
+    lockedError: '',
+  }
+  const okState = parse('sage-mem#memory/archiveCandidates', base)
+  ok(okState.success, '锁表可读时的返回过 schema', okState.success ? '' : JSON.stringify(okState.error?.issues?.slice(0, 3)))
+  ok(okState.success && okState.data.lockedUnknown === false, 'lockedUnknown 没被 strip（false 也在）')
+  const unknown = parse('sage-mem#memory/archiveCandidates', { ...base, lockedUnknown: true, lockedError: 'locked.json 不是合法 JSON' })
+  ok(unknown.success && unknown.data.lockedUnknown === true && /locked\.json/.test(unknown.data.lockedError || ''),
+    '锁表坏掉时 lockedUnknown / lockedError 都还在（「不知道」不会被渲染成「都没锁」）')
+}
+
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

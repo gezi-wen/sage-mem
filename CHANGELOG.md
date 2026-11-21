@@ -8,6 +8,25 @@
 ---
 
 
+## 2.15.7
+
+**主题（审查修复 M2/6）：`archiveCandidates` 一直在返回 `lockedUnknown` / `lockedError`，schema 只声明到 `locked`。**
+
+版本判定：2.15.7（PATCH）｜理由：补两条既有返回值的声明，无行为变化｜运行时源文件 1 + 测试 1｜一版一件事：「代码在、话说不出口」六连之二
+
+### 行为变更
+
+- **锁表不可读时，候选页能说出来了**：`lockedUnknown: true` + `lockedError` 的原因会到界面。修之前这两个键被 strict 校验剥掉，于是「不知道」被渲染成「都没锁」——而自动归档那边其实已经因为锁表未知而暂停（Q05 判据：未知 = 拒绝归档）。
+- 锁表正常时 `lockedUnknown: false`，界面无额外元素。
+
+### 新增测试
+
+- `test/schema-surface-test.mjs` **7 条（+3）**：可读态过 schema、`lockedUnknown: false` 不被 strip、未知态两键都在。
+- 全量：**5489 passed / 0 failed**。
+
+---
+
+
 ## 2.15.6
 
 **主题（审查修复 M1/6）：`getSettings` 一直返回 `limitDiagnostics`，`settingsSchema` 没声明它 —— 诊断被 strict 校验静默 strip。**
