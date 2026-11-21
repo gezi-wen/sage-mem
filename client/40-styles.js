@@ -409,6 +409,8 @@
 			".smem-todo-depth-select{width:auto;padding:0 2px;font-size:11.5px;}",
 			// 「搬进流水」是待删除块的主动作（清空是丢弃、这条是留档），给品牌色。
 			".smem-todo-archive{font-weight:600;}",
+			// 2.15.10：页签标题里的图标与文字垂直对齐。
+			".smem-todo-tab-title{display:inline-flex;align-items:center;gap:5px;}",
 			// 2.15.5：确认条独占一行，与「搬进流水」那颗按钮不在同一位置（双击打不到它）。
 			".smem-todo-confirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0 2px;border-top:1px dashed var(--dsw-alias-border-l1);}",
 			".smem-todo-confirm .smem-todo-archive{color:var(--dsw-alias-state-danger-primary,#ef4444);}",
@@ -423,4 +425,4 @@
 			".smem-todo-done-title{font-weight:600;}",
 		].join("\n");
 
- 
+  

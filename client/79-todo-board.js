@@ -1216,12 +1216,36 @@
 
 		// ── 注册与热开关 ──────────────────────────────────────────────────
 
+		/**
+		 * 待办清单的图标（2.15.10）。
+		 *
+		 * 内联 SVG、`currentColor`、无外链：右栏页签只有 16px，栅格图（`icon.png` 是插件卡片
+		 * 用的 35 KB 位图）在这里会糊。宿主给 guide 卡片传 `size`（22/26），页签标题按 14 传。
+		 *
+		 * @param {{size?: number, className?: string}} [props]
+		 */
+		function TodoGlyph(props) {
+			const size = props && typeof props.size === "number" ? props.size : 14;
+			return h("svg", {
+				viewBox: "0 0 16 16", width: size, height: size, fill: "none",
+				stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round",
+				className: props && typeof props.className === "string" ? props.className : undefined,
+				"aria-hidden": "true",
+			}, [
+				h("rect", { key: "f", x: 2.75, y: 2.25, width: 10.5, height: 11.5, rx: 2 }),
+				h("path", { key: "l1", d: "M5.25 6h3.5" }),
+				h("path", { key: "l2", d: "M5.25 8.75h2" }),
+				h("path", { key: "c", d: "M9.25 10.6l1.05 1.05 1.95-2.3" }),
+			]);
+		}
 		/** guide 条目（开始页那张卡片）。关掉开关时整条不给 —— 卡片随之消失。 */
 		function todoBoardGuideEntry() {
 			return {
 				id: TODO_GUIDE_ID,
 				order: 30,
 				title: function () { return t("todo.guide.title"); },
+			// 2.15.10：开始页那张卡片也用同一个图标（宿主把 size 传进来）。
+			icon: TodoGlyph,
 				description: function () { return t("todo.guide.desc"); },
 			};
 		}
@@ -1285,7 +1309,11 @@
 						});
 						todoBoardTitleDispose = ctx.slots.inject("sidebar.right.pane.tab.title", function () {
 							return ctx.slots.register({ name: "sidebar.right.pane.tab.title", key: TODO_TAB_ID }, function () {
-								return h("span", null, t("todo.tabTitle"));
+							return h("span", { className: "smem-todo-tab-title" }, [
+							// 2.15.10：页签标题带图标 —— 宿主只给一个 span 的位置，图标得自己画。
+							h(TodoGlyph, { key: "i", size: 14 }),
+							h("span", { key: "t" }, t("todo.tabTitle")),
+						]);
 							});
 						});
 					} catch (e) {
@@ -1412,6 +1440,7 @@
 			rememberOrigin: rememberTodoOrigin,
 			recallOrigin: recallTodoOrigin,
 			arrowIcon: todoArrowIcon,
+			glyph: TodoGlyph,
 			isEnabled: function () { return todoBoardEnabled; },
 			notify: todoBoardNotify,
 		};

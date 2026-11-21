@@ -265,6 +265,15 @@ ok(undoIcon && undoIcon.props.viewBox === '0 0 16 16' && undoIcon.props.stroke =
 ok(undoIcon && undoIcon.children[0].length === 2, `两个 path：基线弧 + 箭头（实际 ${undoIcon && undoIcon.children[0].length}）`)
 ok(redoIcon && redoIcon.children[0].map((n) => n.props.d).join('|') !== undoIcon.children[0].map((n) => n.props.d).join('|'),
   '重做是撤销的左右镜像（路径不同）')
+// 2.15.10：页签 / 开始页卡片用的「待办清单」图标（内联 SVG，跟随 currentColor）
+const glyphDefault = T.glyph({})
+ok(glyphDefault && glyphDefault.type === 'svg', '待办清单图标是内联 svg（不外链、不靠图标字体）')
+ok(glyphDefault.props.width === 14 && glyphDefault.props.height === 14, `默认 14px（右栏页签尺寸，实际 ${glyphDefault.props.width}）`)
+ok(glyphDefault.props.stroke === 'currentColor' && glyphDefault.props.viewBox === '0 0 16 16', 'viewBox 16 × 16、描边 currentColor')
+ok(glyphDefault.children[0].length === 4, `一个外框 + 两条行 + 一个勾（实际 ${glyphDefault.children[0].length} 个）`)
+const glyphBig = T.glyph({ size: 26 })
+ok(glyphBig.props.width === 26 && glyphBig.props.height === 26, '宿主传 size（开始页卡片 22/26）时按它画')
+ok(T.glyph({ size: 'x' }).props.width === 14, 'size 不是数字时回默认，不画出 NaN 宽度')
 
 // ── 8. 端到端一轮 ──────────────────────────────────────────────────────────
 console.log('== 8. 端到端：勾 → 读 → 取消 → 读 → 清空 ==')
