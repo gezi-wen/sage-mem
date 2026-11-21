@@ -126,6 +126,11 @@ async function main() {
   ok(select && select.props.value === '5', `默认 5 步（实际 ${select && select.props.value}）`)
   const opts = select ? findAll(select, (n) => n.type === 'option').map((n) => n.props.value) : []
   ok(opts.join(',') === '3,4,5', `可选 3 / 4 / 5（实际 ${opts.join('/')}）`)
+  const depthLabel = byClass(tree, 'smem-todo-depth-label')[0]
+  ok(!!depthLabel && /撤销上限/.test(textOf(depthLabel)), `步数标签是「撤销上限」，不会被读成一个动作（实际「${textOf(depthLabel || {})}」）`)
+
+  // 2.15.1：统计口径 ——「长期约束」不算未完成。
+  ok(/1 条未完成/.test(textOf(tree)), `统计条把约束排除在外（实际「${(textOf(tree).match(/\d+ 条未完成/) || ['?'])[0]}」）`)
 
   // ── 2. 组展开记忆 ──────────────────────────────────────────────────────
   console.log('\n── 2. 组展开状态记忆 ──')
@@ -173,8 +178,16 @@ async function main() {
   ok(!!clearBtn, '「清空全部」还在（两个动作并列，不互相顶掉）')
   ok(/搬进流水（1）/.test(textOf(archiveBtn)), `按钮上带条数（实际「${textOf(archiveBtn)}」）`)
 
+  // 2.15.1：两步确认 —— 第一次点击只进确认态，绝不写盘。
   writes.length = 0
-  await archiveBtn.props.onClick()
+  archiveBtn.props.onClick()
+  const treeConfirm = await mini.settle(B.Board, props)
+  ok(writes.length === 0, `第一次点击不写盘（实际写了 ${writes.length} 次）`)
+  const confirmBtn = byClass(treeConfirm, 'smem-todo-archive').filter((n) => /确认搬进流水/.test(textOf(n)))[0]
+  ok(!!confirmBtn, '第一次点击后按钮变成「确认搬进流水」')
+  ok(!!findButton(treeConfirm, '取消'), '确认态旁边有「取消」')
+
+  await confirmBtn.props.onClick()
   const treeAfter = await mini.settle(B.Board, props)
   const logWrite = writes.find((w) => w.api === 'writeRaw')
   const listWrite = writes.find((w) => w.api === 'writeFile')

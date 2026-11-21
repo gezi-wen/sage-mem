@@ -347,7 +347,10 @@
 					current.items.push(item);
 					// 插入点 = 本条之后：节尾最后一条的下方，不会被后面的空行 / 下一节吃掉。
 					current.insertAt = i + 1;
-					if (item.done) done += 1; else open += 1;
+					// 2.15.1：**「长期约束」不算未完成**。那一节的标题自己写着「不是待办」，
+					// 把它计入「N 条未完成」既骗人又和标题冲突（真机截图里 30 条里有 8 条是约束）。
+					// 已完成计数不受影响：待删除块里的条目本来就是 done。
+					if (item.done) done += 1; else if (current.kind !== "constraint") open += 1;
 					lastItem = item;
 					continue;
 				}
@@ -630,10 +633,23 @@
 			}
 			const sDraft = react.useState("");
 			const draft = sDraft[0], setDraft = sDraft[1];
+			// 2.15.1：「搬进流水」两步确认 —— 它不可撤销（流水那半撤不回来），
+			// 点一下就把记忆流水写掉、清单行删掉，不该是一次误触就能完成的动作。
+			const sConfirm = react.useState(false);
+			const confirming = sConfirm[0], setConfirming = sConfirm[1];
+			react.useEffect(function () {
+				// 块被清空 / 换了一份文件时，别让确认态悬着。
+				if (blockCountRaw() === 0) setConfirming(false);
+			}, [props.doneCount, sec.items.length]);
+			function blockCountRaw() {
+				return typeof props.doneCount === "number" ? props.doneCount : sec.items.length;
+			}
 			const openCount = sec.items.filter(function (it) { return !it.done; }).length;
 			const doneCount = sec.items.length - openCount;
 			// 「清空全部」清的是**整个块**（不是当前筛出来的这几条），所以按钮上的数字要取块的真实条数。
-			const blockCount = typeof props.doneCount === "number" ? props.doneCount : sec.items.length;
+			const blockCount = blockCountRaw();
+			// 2.15.1：待删除块里没有「未完成」，别画那个永远是 0 的「0 / N」。
+			const countText = isDone ? String(doneCount || blockCount) : String(openCount) + (doneCount > 0 ? " / " + String(doneCount) : "");
 			return h("section", { className: "smem-todo-group" + (isDone ? " smem-todo-group-done" : "") }, [
 				// 标题行是**行**不是按钮：右边还要放「清空全部」，按钮套按钮在浏览器里会互相吃掉。
 				h("div", { key: "head", className: "smem-todo-group-head" }, [
@@ -645,17 +661,35 @@
 					}, [
 						h("span", { key: "chev", className: "smem-todo-chev" }, collapsed ? "▸" : "▾"),
 						h("span", { key: "t", className: "smem-todo-group-title" }, sec.title || (isDone ? t("todo.doneGroup") : t(TODO_SECTION_FALLBACK))),
-						h("span", { key: "n", className: "smem-todo-count" }, String(openCount) + (doneCount > 0 ? " / " + String(doneCount) : "")),
+						h("span", { key: "n", className: "smem-todo-count" }, countText),
 					]),
 					isDone && blockCount > 0
+						? (confirming
+							? h("button", {
+								key: "archiveConfirm",
+								type: "button",
+								className: "smem-todo-mini smem-todo-archive smem-todo-del",
+								title: t("todo.action.archiveConfirm.title", { count: blockCount, file: TODO_LOG_FILE }),
+								disabled: props.busy,
+								onClick: function () { setConfirming(false); props.onArchive(sec); },
+							}, t("todo.action.archiveConfirm", { count: blockCount }))
+							: h("button", {
+								key: "archive",
+								type: "button",
+								className: "smem-todo-mini smem-todo-archive",
+								title: t("todo.action.archive", { count: blockCount, file: TODO_LOG_FILE }),
+								disabled: props.busy,
+								onClick: function () { setConfirming(true); },
+							}, t("todo.action.archive", { count: blockCount, file: TODO_LOG_FILE })))
+						: null,
+					isDone && blockCount > 0 && confirming
 						? h("button", {
-							key: "archive",
+							key: "archiveCancel",
 							type: "button",
-							className: "smem-todo-mini smem-todo-archive",
-							title: t("todo.action.archive", { count: blockCount, file: TODO_LOG_FILE }),
+							className: "smem-todo-mini",
 							disabled: props.busy,
-							onClick: function () { props.onArchive(sec); },
-						}, t("todo.action.archive", { count: blockCount, file: TODO_LOG_FILE }))
+							onClick: function () { setConfirming(false); },
+						}, t("todo.action.cancel"))
 						: null,
 					isDone && blockCount > 0
 						? h("button", {
