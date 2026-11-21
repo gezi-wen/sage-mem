@@ -536,6 +536,28 @@ group('11. 体检假阳性：非条目文件 / 代码里的双链 / 索引无 fr
   }
 }
 
+group('2.15.4 · 保留名的「另一个名字」在归档三入口也挡住')
+{
+  const arch = await import(new URL('memory/archive.js', LIB).href)
+  const { linkSync, writeFileSync: wf } = await import('node:fs')
+  // 造一条「名字看着普通、其实是索引本体」的硬链接（8.3 短名在 CI 上不可用，硬链接跨平台）。
+  wf(join(memDir, 'MEMORY.md'), '# 索引\n- 一条\n', 'utf8')
+  const aliasMem = join(memDir, 'harmless-name.md')
+  try { linkSync(join(memDir, 'MEMORY.md'), aliasMem) } catch (e) { console.log('  SKIP 建不出硬链接：' + (e.code || e)) }
+  const a = await arch.archiveMemory(memDir, 'harmless-name.md')
+  ok(a.ok === false && a.code === 'reserved', `归档入口拒绝保留名的别名（实际 ${JSON.stringify(a)}）`)
+  ok(existsSync(join(memDir, 'MEMORY.md')), '索引本体没被搬走（这才是这条闸门要保护的东西）')
+  ok(!existsSync(join(archiveDir, 'harmless-name.md')), '归档区里没有多出一份索引副本')
+
+  // 归档区里的别名：恢复与彻底删除同样拒绝
+  mkdirSync(archiveDir, { recursive: true })
+  const aliasArch = join(archiveDir, 'harmless-name.md')
+  try { linkSync(join(memDir, 'MEMORY.md'), aliasArch) } catch (e) { /* 同上，建不出来就跳过 */ }
+  const b = await arch.restoreMemory(memDir, 'harmless-name.md')
+  ok(b.ok === false && b.code === 'reserved', `恢复入口拒绝保留名的别名（实际 ${JSON.stringify(b)}）`)
+  const c = await arch.deleteArchivedMemory(memDir, 'harmless-name.md')
+  ok(c.ok === false && c.code === 'reserved', `彻底删除入口拒绝保留名的别名（实际 ${JSON.stringify(c)}）`)
+}
 rmSync(sandbox, { recursive: true, force: true })
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
