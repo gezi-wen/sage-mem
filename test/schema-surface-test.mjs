@@ -79,5 +79,30 @@ console.log('== 2.15.7 · archiveCandidates.lockedUnknown / lockedError ==')
     '锁表坏掉时 lockedUnknown / lockedError 都还在（「不知道」不会被渲染成「都没锁」）')
 }
 
+// ── 2.15.8（M3）：autodream 的 lastResult 里 continuations / retries / truncated ──
+console.log('== 2.15.8 · autodream.lastResult 的残篇标记 ==')
+{
+  const last = {
+    at: 1763712000000, atHuman: '2026-11-22 01:00', ok: true, apply: true,
+    touched: ['project_a.md'], changeCount: 1, problemsBefore: 3, problemsAfter: 1,
+    tokensIn: 12000, tokensOut: 800, runId: 'run-1', preflight: false,
+    continuations: 2, retries: 1, truncated: true,
+    report: '20261122-010000.md', snapshotId: 'snap-1',
+  }
+  // 整条 status 的夹具要铺 config / paths / steps，噪音太大；这里直接取内层 lastResult 的
+  // schema 验「残篇三键」，另用 key 清单钉住「不再漏声明」。
+  const unwrap = (s) => (typeof s?.unwrap === 'function' ? s.unwrap() : s)
+  const statusSchema = unwrap(invocation('sage-mem#autodream/status').result.schema)
+  const inner = unwrap(unwrap(statusSchema.shape.lastResult))
+  const keys = Object.keys(inner.shape || {})
+  ok(keys.includes('truncated') && keys.includes('continuations') && keys.includes('retries'),
+    'lastResult 的三个残篇标记都声明了', keys.join(','))
+  const one = inner.safeParse(last)
+  ok(one.success, '真实 lastResult 形状过 schema', one.success ? '' : JSON.stringify(one.error?.issues?.slice(0, 3)))
+  ok(one.success && one.data.truncated === true && one.data.continuations === 2 && one.data.retries === 1,
+    'truncated / continuations / retries 都没被 strip（残篇不会被显示成成功）',
+    one.success ? JSON.stringify({ t: one.data.truncated, c: one.data.continuations, r: one.data.retries }) : '')
+}
+
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
