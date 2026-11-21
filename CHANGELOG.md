@@ -8,6 +8,25 @@
 ---
 
 
+## 2.15.9
+
+**主题（审查修复 M4/6）：`setLocked` 的失败分支只回 `{ok:false, code, error}`，而 `lockResultSchema` 把 `file` / `locked` 写成必填 —— 锁表坏掉时整条调用被判坏。**
+
+版本判定：2.15.9（PATCH）｜理由：把三个字段改成可选并补 `code`，成功分支形状不变｜运行时源文件 1 + 测试 1｜一版一件事：「代码在、话说不出口」六连之四
+
+### 行为变更
+
+- **锁表不可读时，上锁 / 解锁的失败原因能到达界面了**：`code`（如 `lock_unknown`）与 `error`（「本次没有写入，也不会把它重置成空表」）都会保留。修之前 strict 校验按「必填字段缺失 = 坏结果」处理，界面只落进通用错误分支。
+- 成功分支一字未改（`{ok, file, locked}` 仍全在）。
+
+### 新增测试
+
+- `test/schema-surface-test.mjs` **13 条（+3）**：成功分支过 schema、失败分支过 schema、失败原因与错误码保留。
+- 全量：**5495 passed / 0 failed**。
+
+---
+
+
 ## 2.15.8
 
 **主题（审查修复 M3/6）：autodream 的 `lastResult` 里 `continuations` / `retries` / `truncated` 没进 schema —— 残篇被显示成完整成功。**

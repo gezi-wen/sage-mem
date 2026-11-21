@@ -104,5 +104,19 @@ console.log('== 2.15.8 · autodream.lastResult 的残篇标记 ==')
     one.success ? JSON.stringify({ t: one.data.truncated, c: one.data.continuations, r: one.data.retries }) : '')
 }
 
+// ── 2.15.9（M4）：memory/setLocked 的失败分支形状 ──────────────────────────
+console.log('== 2.15.9 · setLocked 的失败分支 ==')
+{
+  const success = parse('sage-mem#memory/setLocked', { ok: true, file: 'project_a.md', locked: true })
+  ok(success.success && success.data.locked === true, '成功分支过 schema')
+  const failure = parse('sage-mem#memory/setLocked', {
+    ok: false, code: 'lock_unknown', error: '锁表不可读（locked.json 不是合法 JSON），本次没有写入',
+  })
+  ok(failure.success, '失败分支也过 schema（不再因为缺 file/locked 被判坏）',
+    failure.success ? '' : JSON.stringify(failure.error?.issues?.slice(0, 3)))
+  ok(failure.success && /锁表不可读/.test(failure.data.error || '') && failure.data.code === 'lock_unknown',
+    '失败原因与错误码都保留（界面能说清「什么都没写」）')
+}
+
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
