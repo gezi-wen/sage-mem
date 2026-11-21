@@ -677,32 +677,17 @@
 						h("span", { key: "n", className: "smem-todo-count" }, countText),
 					]),
 					isDone && blockCount > 0
-						? (confirming
-							? h("button", {
-								key: "archiveConfirm",
-								type: "button",
-								className: "smem-todo-mini smem-todo-archive smem-todo-del",
-								title: t("todo.action.archiveConfirm.title", { count: blockCount, file: TODO_LOG_FILE }),
-								disabled: props.busy,
-								onClick: function () { setConfirming(false); props.onArchive(sec); },
-							}, t("todo.action.archiveConfirm", { count: blockCount }))
-							: h("button", {
-								key: "archive",
-								type: "button",
-								className: "smem-todo-mini smem-todo-archive",
-								title: t("todo.action.archive", { count: blockCount, file: TODO_LOG_FILE }),
-								disabled: props.busy,
-								onClick: function () { setConfirming(true); },
-							}, t("todo.action.archive", { count: blockCount, file: TODO_LOG_FILE })))
-						: null,
-					isDone && blockCount > 0 && confirming
 						? h("button", {
-							key: "archiveCancel",
+							key: "archive",
 							type: "button",
-							className: "smem-todo-mini",
-							disabled: props.busy,
-							onClick: function () { setConfirming(false); },
-						}, t("todo.action.cancel"))
+							className: "smem-todo-mini smem-todo-archive",
+							title: t("todo.action.archive", { count: blockCount, file: TODO_LOG_FILE }),
+							// 2.15.5：进入确认态后**原位那颗按钮只变灰、不再响应**。
+							// 之前是把确认按钮换到同一个位置 —— 双击的第二下正好落在确认上，
+							// 一次误触就把不可逆动作做完了。确认按钮现在固定在**下面一行**。
+							disabled: props.busy || confirming,
+							onClick: function () { setConfirming(true); },
+						}, t("todo.action.archive", { count: blockCount, file: TODO_LOG_FILE }))
 						: null,
 					isDone && blockCount > 0
 						? h("button", {
@@ -715,6 +700,26 @@
 						}, t("todo.action.clearDone", { count: blockCount }))
 						: null,
 				]),
+				// 确认条独占一行：位置与原按钮不同，双击打不到它。
+				isDone && blockCount > 0 && confirming
+					? h("div", { key: "confirm", className: "smem-todo-confirm" }, [
+						h("button", {
+							key: "yes",
+							type: "button",
+							className: "smem-btn smem-btn-primary smem-todo-mini smem-todo-archive",
+							title: t("todo.action.archiveConfirm.title", { count: blockCount, file: TODO_LOG_FILE }),
+							disabled: props.busy,
+							onClick: function () { setConfirming(false); props.onArchive(sec); },
+						}, t("todo.action.archiveConfirm", { count: blockCount })),
+						h("button", {
+							key: "no",
+							type: "button",
+							className: "smem-todo-mini",
+							disabled: props.busy,
+							onClick: function () { setConfirming(false); },
+						}, t("todo.action.cancel")),
+					])
+					: null,
 				collapsed ? null : h("div", { key: "list", className: "smem-todo-list" }, sec.items.length === 0
 					? [h("div", { key: "empty", className: "smem-todo-empty" }, isDone ? t("todo.empty.done") : t("todo.empty.section"))]
 					: sec.items.map(function (it) {

@@ -184,9 +184,14 @@ async function main() {
   archiveBtn.props.onClick()
   const treeConfirm = await mini.settle(B.Board, props)
   ok(writes.length === 0, `第一次点击不写盘（实际写了 ${writes.length} 次）`)
-  const confirmBtn = byClass(treeConfirm, 'smem-todo-archive').filter((n) => /确认搬进流水/.test(textOf(n)))[0]
-  ok(!!confirmBtn, '第一次点击后按钮变成「确认搬进流水」')
-  ok(!!findButton(treeConfirm, '取消'), '确认态旁边有「取消」')
+  // 2.15.5：确认按钮**换到另一行**（`.smem-todo-confirm`），原位那颗只变灰不再响应 ——
+  // 否则双击的第二下正好落在确认上，一次误触就做完不可逆动作。
+  ok(byClass(treeConfirm, 'smem-todo-confirm').length === 1, '确认条独占一行（`.smem-todo-confirm`）')
+  const confirmBtn = byClass(byClass(treeConfirm, 'smem-todo-confirm')[0] || { children: [] }, 'smem-todo-archive')[0]
+  ok(!!confirmBtn && /确认搬进流水/.test(textOf(confirmBtn)), '确认按钮在确认条里')
+  const staleBtn = byClass(treeConfirm, 'smem-todo-archive').filter((n) => /搬进流水（1）/.test(textOf(n)))[0]
+  ok(!!staleBtn && staleBtn.props.disabled === true, '原位那颗「搬进流水」变灰（双击第二下落在它身上，不响应）')
+  ok(!!findButton(treeConfirm, '取消'), '确认条旁边有「取消」')
 
   await confirmBtn.props.onClick()
   const treeAfter = await mini.settle(B.Board, props)
