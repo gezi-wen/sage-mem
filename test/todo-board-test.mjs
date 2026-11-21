@@ -315,6 +315,13 @@ ok(openRound['甲'] === true && openRound['乙'] === false, '序列化 → 解�
 ok(T.groupKey(null) === '' && T.groupKey('甲') === '甲', '组键就是节标题原文（空标题共用一个兜底键）')
 ok(T.PREF_UNDO.includes('undoDepth') && T.PREF_OPEN.includes('openGroups'), '两个偏好键分开存在（改一个不会冲掉另一个）')
 
+// 2.15.3：撤销只在「文件仍是我们写出的那一版」时才允许 —— 否则整份快照会抹掉别人的改动。
+ok(T.undoAllowed('rev-a', 'rev-a') === true, '文件仍停在我们写的那一版 → 可以撤销')
+ok(T.undoAllowed('rev-b', 'rev-a') === false, '文件被别处改过 → 撤销作废（不覆盖别人的改动）')
+ok(T.undoAllowed('rev-b', null) === true, '拿不到「我们写的版本」（老宿主）→ 按旧行为放行')
+ok(T.undoAllowed(null, 'rev-a') === true, '读不到当前 revision → 没有判据可用，放行')
+ok(T.undoAllowed('', '') === true && T.undoAllowed('rev-a', '') === true, '空串当作「不知道」，与 null 同口径')
+
 // ── 10. 2.15.0：完成项留档（搬进流水） ────────────────────────────────────
 console.log('== 10. 完成项留档：正文照抄 + 去重 + 只在尾部追加 ==')
 ok(T.LOG_FILE === 'session-log.md', `留档落点是跨会话流水（实际 ${T.LOG_FILE}）`)
