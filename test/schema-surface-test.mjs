@@ -144,5 +144,26 @@ console.log('== 2.15.11 · recallDebug 的两个「为什么没进来」 ==')
     'validitySuppressed 没被 strip（被挡掉的条目连同 conflictId 都在）')
 }
 
+// ── 2.15.12（M6）：memory/audit 的 indexConflicts / indexFile ──────────────
+console.log('== 2.15.12 · audit 的索引变体与索引文件名 ==')
+{
+  const empty = (n) => Array.from({ length: n }, (_, i) => ({ file: `x${i}.md` }))
+  const report = {
+    dir: 'memory', fileCount: 124, skipped: 0, archivedCount: 128, indexEntries: 130,
+    problems: 1, dangling: [], unlisted: [], typeMismatch: [], crlf: [], brokenLinks: [],
+    archivedLinks: [], hashHazards: [], noFrontmatter: [], unreadable: [], strays: [],
+    validityHints: [], orphans: [], indexProposals: [], indexOversize: [],
+    indexConflicts: [{ file: 'MEMORY.md' }, { file: 'memory.md' }],
+    indexFile: 'MEMORY.md',
+  }
+  const r = parse('sage-mem#memory/audit', report)
+  ok(r.success, 'audit 报告过 schema', r.success ? '' : JSON.stringify(r.error?.issues?.slice(0, 3)))
+  ok(r.success && Array.isArray(r.data.indexConflicts) && r.data.indexConflicts.length === 2,
+    'indexConflicts 没被 strip（「索引有多份变体」终于有渲染位置）')
+  ok(r.success && r.data.indexFile === 'MEMORY.md', 'indexFile 也在（null 表示没有索引文件）')
+  const nul = parse('sage-mem#memory/audit', { ...report, indexFile: null })
+  ok(nul.success && nul.data.indexFile === null, '没有索引文件时 indexFile 是 null，不判坏')
+}
+
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

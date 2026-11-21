@@ -8,6 +8,25 @@
 ---
 
 
+## 2.15.12
+
+**主题（审查修复 M6/6）：`audit` 的 `indexConflicts` / `indexFile` 没进 schema —— 「索引有多份变体」这一类的徽标亮着，清单里却一行都没有。**
+
+版本判定：2.15.12（PATCH）｜理由：补两条既有字段的声明，无行为变化｜运行时源文件 1 + 测试 1｜一版一件事：「代码在、话说不出口」六连之六
+
+### 行为变更
+
+- **「索引有多份变体」终于有渲染位置**：这一类从 2.14.0 起就计入 `problems`，但 schema 没声明 `indexConflicts`，于是面板上徽标亮着、下面一条都没有；而模型侧的 `audit_memory` 工具看得见 —— 两处口径当场分叉。
+- **`indexFile` 也补上了**：本库实际使用的那一份索引文件名；没有索引文件时是 `null`。
+
+### 新增测试
+
+- `test/schema-surface-test.mjs` **21 条（+4）**：报告过 schema、`indexConflicts` 两条都在、`indexFile` 在、`indexFile: null` 不判坏。
+- 全量：**5509 passed / 0 failed**。
+
+---
+
+
 ## 2.15.11
 
 **主题（审查修复 M5/6）：`recallDebug` 的 `gated` 与 `validitySuppressed` 没进 schema —— 排查「为什么这条没进来」的两个主要线索永远为空。**
