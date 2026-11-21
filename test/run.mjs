@@ -174,6 +174,8 @@ const SUITES = [
   'todo-board-test.mjs',
   // 2.15.0：看板的**渲染层** —— 筛选、撤销步数、组展开记忆、搬进流水那颗按钮（读真渲染树）。
   'todo-board-render-test.mjs',
+  // 2.15.6 起：宿主真实返回值（含失败分支）逐条过 manifest schema —— 六处「代码在、话说不出口」。
+  'schema-surface-test.mjs',
   // 2.12.0：初始记忆**提示词**的正文判据（必写要点在场 / 不许出现个人信息与机制细节 /
   // 反向对照改一句必红）。这一版没有 host 侧代码，交付物就是这段文本本身。
   'initial-guide-test.mjs',
