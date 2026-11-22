@@ -2025,17 +2025,31 @@ async function main() {
     ok(all(tree, byClass('smem-card')).length === 0,
       `体检这一屏只有体检，不该再渲染文件列表卡片（实际 ${all(tree, byClass('smem-card')).length} 张）`)
 
-    // 底部那颗仓库引流角标：不占一屏、语气轻、点开是新标签页
-    // （2.5.0 从底部一行 `.smem-star` 收成右下角一枚 `.smem-star-corner` 角标）
-    const star = all(tree, (n) => n.props && n.props.className === 'smem-star-corner')[0]
-    ok(!!star, '面板角落有仓库引流角标')
-    ok(!!star && all(star, byClass('smem-star-glyph')).length === 1, '角标里有一颗 ★ 字形')
-    ok(!!star && all(star, (n) => n.type === 'button' && byClass('smem-star-x')(n)).length === 1,
-      '角标带一颗「×」（本次启动不再打扰）')
-    const starLink = all(tree, (n) => n.type === 'a' && n.props && String(n.props.href || '').indexOf('github.com/gezi-wen/sage-mem') >= 0)[0]
-    ok(!!starLink, '引流链接指向仓库', starLink ? String(starLink.props.href) : '没有链接')
-    ok(!!starLink && starLink.props.target === '_blank' && String(starLink.props.rel).indexOf('noreferrer') >= 0,
+    // 「点个★star」（2.16.0：从右下角常驻角标搬到头部状态行）。
+    // 三条从设计来的硬约束，逐条写成断言 —— 它们都是**容易被后来的人改掉**的那种：
+    //   ① 它是**链接**不是一次请求：没有关闭按钮（会说话的东西才需要关闭，一句灰字不需要）；
+    //   ② **不显示数量**（32 这个数告诉人的是「不太火」，社会证明反而是负的）；
+    //   ③ 角落那枚老角标**必须消失** —— 同一件事不摆第三个入口。
+    const starCta = all(tree, (n) => n.type === 'a' && byClass('smem-star-cta')(n))[0]
+    ok(!!starCta, '头部有「点个★star」链接')
+    const ctaText = treeText(starCta || {})
+    ok(ctaText.indexOf('点个★star') >= 0, `链接正文就是那几个字（实际：${ctaText}）`)
+    ok(!/[0-9]/.test(ctaText), `不显示星数（出现数字就说明又开始报数了：${ctaText}）`)
+    const starGlyph = all(starCta || {}, byClass('smem-star-glyph'))[0]
+    ok(!!starGlyph && treeText(starGlyph) === '★',
+      '★ 单独成一枚字形 —— 静止状态就靠它那点琥珀色被看见，不靠尺寸也不靠边框')
+    ok(!!starCta && all(starCta, (n) => n.type === 'button').length === 0,
+      '没有关闭按钮 —— 它是链接，不是一次请求')
+    ok(!all(tree, (n) => n.props && n.props.className === 'smem-star-corner')[0],
+      '2.16.0 起角落那枚角标不再渲染（旧形态不许回来）')
+    const starTip = all(starCta || {}, byClass('smem-star-tip'))[0]
+    // ⚠️ 末尾**故意没有右括号**，那是作者原话里的活人感。这条断言防的是「以后有人好心补上」。
+    ok(!!starTip && treeText(starTip) === '作者真的很想要★（真的',
+      `悬停浮窗与作者原话逐字一致（含故意缺的「）」，实际：${starTip ? treeText(starTip) : '没有浮窗'}）`)
+    ok(!!starCta && starCta.props.target === '_blank' && String(starCta.props.rel).indexOf('noreferrer') >= 0,
       '新标签页打开、带 noreferrer')
+    ok(!!starCta && String(starCta.props.href || '').indexOf('github.com/gezi-wen/sage-mem') >= 0,
+      '指向仓库', starCta ? String(starCta.props.href) : '没有链接')
   }
 
   // ── 8i. 2.14.0 记忆治理：孤儿归档件 + 索引瘦身提案（两项都不进 problems）──────────
@@ -2274,7 +2288,7 @@ async function main() {
     click(all(banner, (n) => n.type === 'button')[0])
     const after = await some.rt.settle(some.C, {})
     ok(!all(after, isBanner)[0], '点「×」→ 横幅消失（这次不看）')
-    ok(!!all(after, (n) => n.props && n.props.className === 'smem-star-corner')[0], '角落的仓库引流角标不受影响')
+    ok(!!all(after, byClass('smem-star-cta'))[0], '头部那枚「点个★star」不受横幅关闭影响')
   }
 
   // ── 8c. 锁定：按钮排在「编辑」与「归档」之间，锁上就拒绝归档 ──────────────
@@ -2929,10 +2943,15 @@ async function main() {
     const { comp: C } = await loadClient(rt, { memory: mem })
     let tree = await rt.settle(C, {})
 
-    // 15a 头部带：8 → ≤6 个直接子节点；不再有「当前 tab 名」「目录可读」文字
+    // 15a 头部带：8 → ≤6 个直接子节点；2.16.0 加「点个★star」后放到 ≤7。
+    // ⚠️ 放宽一档的代价必须被钉住：**多出来的那一个只能是那颗星**，否则这条守卫
+    // 就退化成「头部可以无限长」。以后想再往里塞东西，先想清楚要不要挤掉别的。
+    // 也不再出现「当前 tab 名」「目录可读」文字。
     const head = all(tree, byClass('smem-head'))[0]
     const headKids = (head.children || []).filter((x) => x !== null && x !== undefined && x !== false)
-    ok(headKids.length <= 6, `头部带直接子节点 ≤6（实际 ${headKids.length}）`)
+    ok(headKids.length <= 7, `头部带直接子节点 ≤7（实际 ${headKids.length}）`)
+    ok(all(head, (n) => byClass('smem-star-cta')(n)).length === 1,
+      '多出来的那一个就是「点个★star」—— 上限放宽只为一枚链接，不是给所有东西开门')
     ok(all(tree, byClass('smem-head-job')).length === 0, '删掉了重复的「当前 tab 名」')
     ok(treeText(head).indexOf('目录可读') < 0, '「目录可读」文字收进了状态点 title')
     ok(String((all(tree, byClass('smem-dot'))[0] || { props: {} }).props.title || '').indexOf('目录可读') >= 0,

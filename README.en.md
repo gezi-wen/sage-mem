@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.15.12`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.16.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -49,11 +49,16 @@ If it is useful to you, a Star is the most direct feedback.
 
 DSH has no native memory system. Every new session is a blank sheet: it does not remember who you are, where you got to yesterday, or what stage the project is at, so you have to brief it again every time.
 
-sage-mem adds that layer, like this: **write down the things worth remembering as cards, and store them on your own computer**. Before DSH hands the question to the model, the plugin picks out the few most relevant cards and **puts them in front of the model**.
+sage-mem adds that layer, like this: **write down the things worth remembering as cards, and store them on your own computer**. Before DSH hands the question to the model, the plugin picks out the few most relevant passages and **puts them in front of the model**.
 
 So the accurate statement is not "the model remembers you", but "**before it opens its mouth, somebody has handed it the relevant slips of paper**". Take the slips away and it is that amnesiac colleague again.
 
-A memory takes the form of one `.md` file per memory (YAML frontmatter + body): openable, editable and deletable in an editor, and manageable with git directly. **This memory stays in your own hands the whole time, not in some database.**
+What else comes with it:
+
+- **Passive and active**: besides picking memories and injecting them automatically, the model can go through the library itself — `search_memory` to search, `read_memory` to read a file line by line, `trim_memory` to cut a stale section into the archive. It judges which memory to trust by **freshness and citation discipline**, and lexical overlap is enough to reach one.
+- **The library shrinks itself**: while idle it tidies up (dreams), **trimming stale sections into the archive instead of deleting them**; writes go through a safety check and the library has a size policy. An outdated memory does not disappear, it just sinks into the archive.
+- **White box**: one `.md` file per memory (YAML frontmatter + body), openable, editable and deletable in an editor, and manageable with git directly. Four kinds (user / feedback / project / reference) plus custom tags (e.g. `#writing` `#release` `#research`, up to 20 per file). **This memory stays in your own hands the whole time, not in some database.**
+- **No extra services**: no database, no long-running worker, no port. On first use you can generate a memory-skeleton checklist and have the agent build it.
 
 ## Why Files, Not a Database
 

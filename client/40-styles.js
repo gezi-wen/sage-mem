@@ -318,22 +318,26 @@
 			".smem-plugin-card-note{font-size:12px;line-height:1.55;color:var(--dsw-alias-label-secondary,#6b7280);}",
 			".smem-plugin-card-err{font-size:12px;line-height:1.5;color:var(--dsw-alias-state-error-primary,#ef4444);overflow-wrap:anywhere;}",
 			// ── 底部一行仓库链接（引流，不抢视线）──
-			// ── 求 Star 的角标（2.5.0，D39）：不占正文位置，hover 才展开半句话 ──
-			// 2026-11-09 调（原话：「太不显眼了」）：既然它固定在右下角、不压任何内容，
-			// 就没必要靠 0.62 的透明度自我隐形 —— 那是给「怕打扰阅读」的按下去的做法，
-			// 而这一颗星本来就该被看见。现在：不透明、底色抬到 layer-2、字色从 tertiary 抬到 secondary、
-			// 加一层轻阴影让它离底；hover 才把「喜欢这个插件的话」展开（不常显，仍不占阅读视线）。
-			".smem-star-corner{position:fixed;right:16px;bottom:16px;z-index:20;display:flex;align-items:center;gap:6px;padding:6px 11px;border:1px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary,#6b7482);font-size:12.5px;font-weight:500;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.16);transition:border-color 220ms cubic-bezier(.2,0,0,1),background 220ms cubic-bezier(.2,0,0,1),box-shadow 220ms cubic-bezier(.2,0,0,1);}",
-			".smem-star-corner:hover{border-color:var(--dsw-alias-brand-primary,#4d76e6);color:var(--dsw-alias-label-primary);box-shadow:0 6px 18px rgba(0,0,0,.22);}",
-			".smem-star-glyph{font-size:13px;color:var(--dsw-alias-state-warn-primary,#d97706);transition:transform 220ms cubic-bezier(.2,0,0,1);}",
-			".smem-star-corner:hover .smem-star-glyph{transform:scale(1.12);}",
-			".smem-star-link{color:inherit;text-decoration:none;border-bottom:1px dashed transparent;}",
-			".smem-star-corner:hover .smem-star-link{border-bottom-color:currentColor;}",
-			".smem-star-more{max-width:0;overflow:hidden;white-space:nowrap;transition:max-width 220ms cubic-bezier(.2,0,0,1);}",
-			".smem-star-corner:hover .smem-star-more{max-width:180px;}",
-			".smem-star-x{border:0;background:transparent;color:inherit;cursor:pointer;font-size:11px;line-height:1;padding:0 1px;opacity:.7;font-family:inherit;}",
-			".smem-star-x:hover{opacity:1;}",
-			"@media (prefers-reduced-motion:reduce){.smem-star-corner,.smem-star-more{transition:none;}}",
+			// ── 「点个★star」（2.16.0）：一枚灰字链接，hover 才展开那句实话 ──
+			// 位置从「右下角常驻角标」搬到「头部状态徽标之后」（2026-11-22）。挪的理由不是
+			// 「太不显眼」——2.5.0 已经按那句话抬过一轮透明度与底色，再抬就是贴脸了。
+			// 真正的问题是**它不在用户做决定的位置上**：记忆面板是来干活的地方，
+			// 角落那枚小字得靠运气才被看见。现在它跟体检/冲突徽标排在同一行 —— 一开面板就在。
+			// 几何上**故意跟旁边那排徽标一模一样**（1px 实线 + 6px 圆角 + 11px 字 + 0/6 内距，
+			// 见 `.smem-tool-badge`）：用户把这一排当成「状态条」在读，一枚不描边的灰字
+			// 混在里面才叫不合规整。区别只留在两处 —— ★ 是琥珀色、hover 整枚变琥珀。
+			".smem-star-cta{display:inline-flex;align-items:center;gap:2px;position:relative;color:var(--dsw-alias-label-secondary,#5c6570);font-size:11px;line-height:18px;text-decoration:none;white-space:nowrap;padding:0 6px;border:1px solid var(--dsw-alias-border-l1,#e5e7eb);border-radius:6px;transition:color .16s,border-color .16s,background .16s;}",
+			".smem-star-cta:hover,.smem-star-cta:focus-visible{color:var(--dsw-alias-state-warn-primary,#d97706);border-color:var(--dsw-alias-state-warn-primary,#d97706);background:var(--dsw-alias-bg-layer-2,#f3f4f6);outline:none;}",
+			// ★ 常驻琥珀色：整串灰字里唯一的颜色。**这就是「存在感」的来源** ——
+			// 靠一点颜色，不靠尺寸、不靠边框、不靠闪烁。
+			".smem-star-glyph{color:var(--dsw-alias-state-warn-primary,#d97706);font-size:13px;line-height:1;}",
+			// 浮窗朝**下**展开：链接在面板最上面一行，朝上会被面板边缘裁掉。
+			// z-index 要高过列表（列表里有自己的 sticky 头）。
+			".smem-star-tip{position:absolute;top:calc(100% + 6px);left:0;z-index:30;padding:5px 9px;border:.5px solid var(--dsw-alias-border-l2,#e5e7eb);border-radius:8px;background:var(--dsw-alias-bg-layer-3,#2c2c2e);color:var(--dsw-alias-label-primary,#f9fafb);font-size:12px;line-height:17px;white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.22);opacity:0;pointer-events:none;transition:opacity .16s;}",
+			".smem-star-cta:hover .smem-star-tip,.smem-star-cta:focus-visible .smem-star-tip{opacity:1;}",
+			"@media (prefers-reduced-motion:reduce){.smem-star-cta,.smem-star-tip{transition:none;}}",
+			// 插件详情页那枚（2.16.0）：整张卡底部靠右，和折叠行一起常显。
+			".smem-plugin-card-star{margin:2px 0 0;display:flex;justify-content:flex-end;}",
 			// ── 冲突页签（2.0.0 矛盾检测）──
 			// 一屏里要同时看「两份正文对照 + 动作 + 后果」，所以独立成套类名，不复用文件卡片：
 			// 文件卡片的灰系 / 动作语义是「这条记忆怎么处置」，裁决是另一件事，混用会让

@@ -123,6 +123,10 @@
 						strokeLinecap: "round", strokeLinejoin: "round",
 					})),
 				]),
+				// 2.16.0：插件详情页这一枚（与记忆面板头部那枚同一个组件）。
+				// 会打开「插件」页看详情的人本来就在评估「这东西值不值得留」，
+				// 是天然的转化位，而且不打断任何事 —— 挂在折叠行下面常显，展开与否都在。
+				h("div", { className: "smem-plugin-card-star", key: "star" }, [h(StarLink, { key: "s" })]),
 				open ? h("div", { className: "smem-entry-body", key: "body" }, [
 					h("div", { className: "smem-plugin-card-note", key: "sub" }, t("entry.subtitle")),
 					h(EntryChooser, {

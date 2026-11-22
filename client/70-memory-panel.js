@@ -1288,6 +1288,10 @@
 					// 弹簧：把主操作顶到右边。**换行时它留在上一行**，主操作于是落到下一行、
 					// 左顶格 —— 这正是用 `margin-left:auto` 做不到的（那会把换行后的主操作
 					// 也推到最右，看起来像"跑出格子了"）。
+					// 2.16.0：「点个★star」排在状态徽标之后 —— 一开面板就在视野里。
+					// 它不是徽标（不带状态、不带计数），所以是链接；也不进右端操作组，
+					// 免得跟「刷新/添加」抢同一排按钮的位置。
+					h(StarLink, { key: "star" }),
 					h("span", { className: "smem-head-spacer", key: "sp" }),
 					h("span", { className: "smem-head-actions", key: "act" }, tab === "files" ? [
 						h("button", { type: "button", className: "smem-btn", key: "open", disabled: busy || !dirOk, title: t("header.openFolderTitle"), onClick: openMemoryFolder }, t("header.openFolder")),
@@ -1523,8 +1527,8 @@
 				promptFallback ? h(PromptFallbackModal, { key: "prompt-fallback", text: promptFallback, onClose: function () { setPromptFallback(null); } }) : null,
 				// 2.12.0：初始记忆提示词复制成功的提醒（下一棒在用户手里：粘进会话发给 agent）。
 				guideNotice ? h(InitialGuideNotice, { key: "guide-notice", onClose: function () { setGuideNotice(false); } }) : null,
-				// 底部一行仓库链接（四个 tab 都在，不抢视线）
-				h(StarLine, { key: "star-line" }),
+				// 2.16.0：底部那行仓库链接已搬到头部状态行（StarLink），
+				// 角落浮层不再渲染 —— 同一件事不摆第三个入口。
 			]);
 		}
 

@@ -668,41 +668,50 @@ h("span", { key: "sep", className: "smem-actions-sep", "aria-hidden": "true" }),
 		 * 跟问题一样染红会让人去「修」一条本来正确的链接 —— 那正是审计里那条分界线。
 		 */
 		/**
-		 * 右下角的「求 Star」角标（2.5.0，D39）。
+		 * 「点个★star」—— 面板头部状态行一枚，插件详情页一枚（2.16.0）。
 		 *
-		 * 1.0~2.4 是一行居中的正文：`⭐ 顺手留颗 Star，作者能高兴一整天` + `行，给你一颗 Star`。
-		 * 那套说辞两个问题 —— ①它**占正文位置**，四个页签底部各一行，读起来像广告；
-		 * ②「作者能高兴一整天」是求人，把读者放到施舍的位置上。
+		 * 沿革：1.0~2.4 是正文里一行居中的「⭐ 顺手留颗 Star，作者能高兴一整天」；
+		 * 2.5.0 改成右下角常驻角标（D39）；2.16.0 搬到头部。前两代各自不合用：
+		 * 正文那行**像广告**（四个页签底部各一行），角落那枚**没有存在感**
+		 * （2026-11-22 原话「角落浮层纯属没有存在感……不烦」）—— 记忆面板是用户
+		 * 来干活的地方，角落里一枚小字既不在视野里，也不在他做决定的位置上。
 		 *
-		 * 改成一个角落里的小东西：恒显一个星号 + `Star`，hover 才展开半句话，可关。
-		 * 关闭状态**只存这个模块的变量**：不落 localStorage（面板端口每次启动都变，
-		 * 存了也读不回来 —— sage-reminder 踩过），也不落设置（不为一个装饰件改宿主半身）。
-		 * 于是它的语义正好是「本次启动不再打扰」，下次打开 DSH 再说一次。
+		 * 现在它是一枚**链接**，不是一次**请求**：常驻在头部状态徽标之后，
+		 * 平时只是灰字，hover 才展开那句实话。
+		 * 三条别改：**不加数量**（32 这个数告诉人的是「不太火」，社会证明反而是负的）、
+		 * **不加关闭**（会说话的东西才需要关闭，一句灰字不需要）、**不弹窗**。
+		 *
+		 * ⚠️ `star.tip` 的正文是 `作者真的很想要★（真的` —— 左括号后面**故意没有右括号**，
+		 * 是作者原话里的活人感，不是笔误。别补 `）`，格式化时也别补。
 		 */
-		let starDismissed = false;
-
-		function StarLine() {
-			const s = react.useState(starDismissed);
-			const gone = s[0], setGone = s[1];
-			if (gone) return null;
-			return h("div", { className: "smem-star-corner", key: "star" }, [
-				h("span", { className: "smem-star-glyph", key: "g", "aria-hidden": "true" }, "★"),
-				h("a", {
-					key: "cta",
-					href: "https://github.com/gezi-wen/sage-mem",
-					target: "_blank",
-					rel: "noreferrer",
-					className: "smem-star-link",
-					title: t("star.aria"),
-				}, t("star.cta")),
-				h("span", { className: "smem-star-more", key: "more" }, t("star.hover")),
-				h("button", {
-					type: "button", key: "x", className: "smem-star-x",
-					title: t("star.dismiss"),
-					"aria-label": t("star.dismiss"),
-					onClick: function () { starDismissed = true; setGone(true); },
-				}, "×"),
-			]);
+		function StarLink() {
+			// 把 `★` 从文案里切出来单独染色（中文 `点个★star`、英文 `leave a ★` 都成立）。
+			// 为什么不用两三个 i18n 键拼：那句话是**一句话**，拆成「点个」+「star」之后
+			// 两种语言的语序会各说各的。这里是**显示层**的切分，不碰文案本身。
+			const cta = t("star.cta");
+			const at = cta.indexOf("★");
+			const parts = at < 0 ? [cta] : [cta.slice(0, at), "★", cta.slice(at + 1)];
+			return h("a", {
+				className: "smem-star-cta",
+				href: "https://github.com/gezi-wen/sage-mem",
+				target: "_blank",
+				rel: "noreferrer",
+				"aria-label": t("star.aria"),
+			}, parts.map(function (piece, i) {
+				// ⚠️ ★ 的颜色**必须写成行内 style**，不能只靠 `.smem-star-glyph` 那条类规则：
+				// 实测（2026-11-22）类规则在面板里会被父级链接的 color 盖住，★ 跟正文一样是灰的，
+				// 而"有存在感"全靠这一点琥珀色。行内声明在层叠里最后生效，值仍走同一个主题 token。
+				if (at >= 0 && i === 1) {
+					return h("span", {
+						className: "smem-star-glyph", key: "g", "aria-hidden": "true",
+						style: { color: "var(--dsw-alias-state-warn-primary,#d97706)" },
+					}, piece);
+				}
+				if (piece === "") return null;
+				return h("span", { key: "p" + i }, piece);
+			}).concat([
+				h("span", { className: "smem-star-tip", key: "tip", "aria-hidden": "true" }, t("star.tip")),
+			]));
 		}
 
 		/**

@@ -168,9 +168,9 @@
 			"card.purgeTitle": "从 archive/ 里彻底删掉，不可恢复（要留就先恢复）",
 			"card.purge": "彻底删除",
 
-			"star.cta": "Star",
-			"star.hover": "· 喜欢这个插件的话",
-			"star.dismiss": "不再显示（下次打开 DSH 还会出现）",
+			"star.cta": "点个★star",
+			// ⚠️ 左括号后面**故意没有右括号**（作者原话的活人感，2026-11-22）。别补「）」。
+			"star.tip": "作者真的很想要★（真的",
 			"star.aria": "在 GitHub 上给 gezi-wen/sage-mem 点一颗星",
 
 			"entry.title": "界面入口",
@@ -819,9 +819,9 @@
 			"card.purgeTitle": "Remove permanently from archive/, irreversible (restore first to keep it)",
 			"card.purge": "Delete permanently",
 
-			"star.cta": "Star",
-			"star.hover": "· if you like this plugin",
-			"star.dismiss": "Hide until next launch",
+			"star.cta": "leave a ★",
+			// Same unfinished parenthesis on purpose — it is how a person types, not a typo.
+			"star.tip": "the author really wants that star (really",
 			"star.aria": "Star gezi-wen/sage-mem on GitHub",
 
 			"entry.title": "Interface entries",
