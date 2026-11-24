@@ -23,6 +23,11 @@ import {
   renderReconcileList,
 } from '../lib/autodream/reconcile.js'
 import { buildAutodreamUserPrompt } from '../lib/autodream/prompt.js'
+import { AutodreamEngine } from '../lib/autodream.js'
+import { ledgerFileFor } from '../lib/memory/access.js'
+import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 let pass = 0
 let fail = 0
@@ -262,6 +267,79 @@ ok(
   })) === '',
   '没有候选 → 空串',
 )
+
+// ── 6. 真引擎接线：不是读源码，是让 AutodreamEngine 真的跑一趟 ─────────────
+// 上面第 5 节测的是纯逻辑；这一节证明**引擎真的会把名单传进 prompt**（DI 没断、`this.ctx` 与
+// `this.memoryDir` 都对得上）。两条断言互为反向对照：会话源出现、仅记忆目录不出现。
+console.log('\n[6] 真引擎接线（假 llm 捕获实际发出的 prompt）')
+
+const DAY_MS = 86400000
+
+function makeCapturingLlm() {
+  const seen = []
+  return {
+    seen,
+    llm: {
+      async *stream(options) {
+        seen.push(options)
+        yield { type: 'finish', reason: { kind: 'stop' } }
+      },
+    },
+  }
+}
+
+const firstPrompt = (seen) => seen[0]?.messages?.[0]?.content?.[0]?.text ?? ''
+
+async function engineWorld(source) {
+  const root = await mkdtemp(join(tmpdir(), 'ad-reconcile-'))
+  const memoryDir = join(root, 'memory')
+  const sessionsRoot = join(root, 'sessions')
+  await mkdir(memoryDir, { recursive: true })
+  const sess = join(sessionsRoot, 'proj', 'sess1')
+  await mkdir(sess, { recursive: true })
+  await writeFile(join(sess, 'session.v4.jsonl.zstd'), 'x', 'utf8')
+  // 正中靶心的候选：内容 30 天没动，但台账说 2 天前还在被注入
+  const oldFile = join(memoryDir, 'old.md')
+  await writeFile(oldFile, '---\nname: old\ntype: project\n---\n\n# Old\n\n旧说法\n', 'utf8')
+  const stale = new Date(Date.now() - 30 * DAY_MS)
+  await utimes(oldFile, stale, stale)
+  await mkdir(join(root, '.sage-mem'), { recursive: true })
+  await writeFile(
+    ledgerFileFor(memoryDir),
+    JSON.stringify({ v: 2, files: { 'old.md': { injected: Date.now() - 2 * DAY_MS } } }),
+    'utf8',
+  )
+  const { llm, seen } = makeCapturingLlm()
+  const ctx = {
+    get: (n) =>
+      n === 'llm' ? llm : n === 'agentDefaultModel' ? { currentSelection: () => ({ provider: 'p', model: 'm' }) } : undefined,
+    logger: { warn: () => {}, error: () => {} },
+  }
+  const engine = new AutodreamEngine(ctx, { memoryDir, sessionsRoot })
+  await engine.load()
+  await engine.setConfig({ enabled: true, trigger: 'auto', minHours: 1, minSessions: 1, apply: false, source })
+  engine.state.lastRunAt = 0
+  await engine.persist()
+  return { engine, seen, root }
+}
+
+{
+  const withSess = await engineWorld('memory+sessions')
+  const r1 = await withSess.engine.run({ reason: '对账接线测试', force: true })
+  const p1 = firstPrompt(withSess.seen)
+  ok(r1.ok === true, '（前提）真引擎这趟跑成功', JSON.stringify(r1).slice(0, 300))
+  ok(p1.includes('## 阶段 2.5 — 对账'), '真引擎：会话源 → prompt 里真的带阶段 2.5')
+  ok(p1.includes('old.md'), '真引擎：名单里点名了那条「还在注入但 30 天没改」的记忆')
+
+  const onlyMem = await engineWorld('memory')
+  const r2 = await onlyMem.engine.run({ reason: '对账接线测试', force: true })
+  const p2 = firstPrompt(onlyMem.seen)
+  ok(r2.ok === true, '（前提）仅记忆目录这趟也跑成功', JSON.stringify(r2).slice(0, 300))
+  ok(!p2.includes('阶段 2.5'), '真引擎：仅记忆目录 → prompt 里没有阶段 2.5')
+
+  await rm(withSess.root, { recursive: true, force: true }).catch(() => {})
+  await rm(onlyMem.root, { recursive: true, force: true }).catch(() => {})
+}
 
 console.log(`\n结果：${pass} passed, ${fail} failed`)
 process.exit(fail === 0 ? 0 : 1)
