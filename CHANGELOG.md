@@ -8,6 +8,45 @@
 ---
 
 
+## 2.17.1
+
+**主题：清三笔债 —— 界面快照闸接进自动测试、宿主兼容死字段删掉、两个撞线的文件按缝拆开。**
+
+版本判定：2.17.1（PATCH）｜理由：三件都是纯维护（一处闸静默失效、一处假承诺、两处结构性阻塞），**零行为变更、零新增对外面**｜为什么不拆成两版：拆开会让中间态变成「只清了闸、文件仍然撞线」的半修发布，对用户没有增量价值；三件又都只是维护性改动，也算不上 MINOR。理由记于此。
+
+### 行为变更
+
+无。用户可见的行为、设置项、记忆格式、注入链、面板文案一律未动。
+
+### 三笔债
+
+1. **界面快照闸接进 `npm test`**（原先靠人记得跑）
+   - `_client-snapshot.mjs` → **`client-snapshot-test.mjs`**，登记进 `run.mjs` 的 SUITES。
+   - 为什么改口径：它已经不是第一次静默失效 —— 2026-11-03 那次（注释点名了一个不存在的文件，3 屏红约一周）与 2.16.0 那次（星标入口改了三个屏的渲染树，发布时跳过发布清单第 2.5 步，基线停了两版）。两次机制相同：**这道闸不在自动检查里，就等于没有**。
+   - 基线这次一并重生成（`files-list` / `autodream-settings` / `audit` 三屏从 2.16.0 起就过期）。经 v2.16.0 代码复跑确认：那三屏的哈希与本次一致 —— 变化来自 2.16.0 的星标入口，不是 2.17.0。
+   - 代价：每次 `npm test` 多起一遍 `client-render-test --preview`（几秒）。
+2. **删掉 `package.json` 的 `dsh.compatibility`**（死字段）
+   - 0.2.1-alpha.4 起宿主的兼容闸门只看 `engines.dsh`，这个字段在 `@deepseek-ai/*` 全树 grep 不到任何读取点。
+   - 留着不是「无害」：它让人以为「补一行 = 验过一次」。README 的兼容表保留（对读者仍有参考价值），但身份从「声明」降级为「历史记录」，并在表头写明了这一点。
+   - 加了一条**反向守卫**：`release-test` 断言这个字段不许回来，同时断言 `engines.dsh` 必须在。
+3. **两个撞线的文件按缝拆开**（按缝切，不是为凑行数硬切）
+   - `lib/typert.host.js` **1154 → 517 行**：70 个 zod schema 搬到 `lib/typert/schemas.js`，manifest 留下。两截之间只有「manifest 引用 schema」一条依赖、反向没有。
+   - `lib/index.js` **996 → 875 行**：`getSettings` / `setSettings`（140 行）搬到 `lib/settings.js`。这两个方法的合并与校验判据本来就住在 `settings.js`（`parseUiPatch` / `pendingExperimental` / `parseExperimentalPatch`），原来是一处概念散在两个文件。
+   - 现在 `lib/index.js` 余 125 行、`lib/typert.host.js` 余 643 行 —— 下一个 remote 方法不必先拆模块了。
+
+### 新增测试
+
+- `client-snapshot-test.mjs` 从「发布清单里的手动一步」变成 SUITES 里的一条（6 条断言）。
+- `release-test` 加两条负向守卫：`dsh.compatibility` 不许回来、`engines.dsh` 必须在。
+
+### 实测
+
+- 全量 `npm test`：**5613 passed / 0 failed**（2.17.0 是 5608，差额来自快照套件并入）。
+- 拆分前后设置面 109 条断言（`panel-api-test`）逐条不变；40 条 typert invocation、四个 Gateway 类的位置与 `sourceLocation` 一律未动。
+- 开发中踩了一个坑并修掉，记在这里免得重犯：为清理组合根的失效 import 我写了个「未使用 import 探针」，它的负向后顾把 `.` 也排除了，于是 `[...RESERVED_FILES]` 里的展开运算符被当成名字的一部分 → 误判「未使用」→ 删掉后 17 个套件在运行时炸 `ReferenceError`。**量具自己会造假**：回滚那次清理，改用「只搬不改」的做法。
+
+---
+
 ## 2.17.0
 
 **主题：压缩前记忆提醒 —— 在宿主把上下文压成摘要之前，先把「该跨会话留下的东西」写下来。**

@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.17.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.17.1`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -623,7 +623,7 @@ sage-mem is a pure DSH plugin and declares its host requirement through **`engin
 
 **Verified on DSH Go (the Android client).** After installing from the in-app plugin market, the settings section and sidebar panel render normally and the `sidebar.panellist` island opens; the memory directory keeps sage-mem's default `~/.sage-mem/memory`, no extra adaptation needed. 2.1.1 fixes the invisible primary-button label on the phone host (foreground token fallback).
 
-Version-by-version compatibility record:
+Version-by-version compatibility record (**historical list, not a declaration** — since 2.17.1 `package.json` no longer carries `dsh.compatibility`: hosts after 0.2.1-alpha.4 only read `engines.dsh`, so a row in this table cannot make the plugin compatible; adding one only makes people believe "one row = one verified run"):
 
 | DSH version | Status |
 | --- | --- |

@@ -93,7 +93,9 @@ group('4. 辅助脚本文档里点名的 test 文件必须存在（2026-11-03 �
   // `_` 开头的辅助脚本不在 SUITES 里，所以「它还能不能跑」没有任何守卫看着。
   // 它们的注释里常写「用 node test/xxx.mjs 跑」—— 改名 / 删文件之后字面量会漂，
   // 而漂了没人报。快照守卫就这样断了约一周：点名的 client-snapshot-test.mjs 根本不存在，
-  // 而它自己（_client-snapshot.mjs）被这里的 isHelper 规则排除在登记检查之外。
+  // 而它自己（当时叫 _client-snapshot.mjs）被这里的 isHelper 规则排除在登记检查之外。
+  // 2.17.1 起那个文件已改回本名 `client-snapshot-test.mjs` 并登记进 SUITES —— 它不再是辅助脚本，
+  // 本组现在守的是**剩下的**那批 `_` 前缀辅助（快照那条事故的两道防复发之一仍在这里）。
   const REF = /(?:^|[\s`'"(])test\/([A-Za-z0-9_$.-]+\.mjs)/gm
   const helperFiles = onDisk.filter((n) => isHelper(n) && n !== RUNNER)
   const broken = []

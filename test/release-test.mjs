@@ -174,30 +174,34 @@ group('5. 版本一致性：package.json ↔ CHANGELOG ↔ 双语 README')
 }
 
 // ── 3. 兼容表对拍（COMP-01） ────────────────────────────────────
-group('6. 兼容表：双语 README ↔ package.json.dshReleases')
+group('6. 兼容表：双语 README 逐行相同 + package.json 不许再补死字段')
 {
-  // 同一份声明被手抄了三遍（package.json + 中英 README）。1.6.1 之前它已经漂移过一次：
-  // 本机实跑用的 DSH 0.2.1-rc.1 根本不在表里。这里让三份互相对拍。
+  // 同一份声明曾被手抄了三遍（package.json + 中英 README）。1.6.1 之前它已经漂移过一次：
+  // 本机实跑用的 DSH 0.2.1-rc.1 根本不在表里。
+  //
+  // **2.17.1 起 `package.json.dsh.compatibility.dshReleases` 被删掉了** —— 它是死字段：
+  // 0.2.1-alpha.4 起宿主的兼容闸门只看 `engines.dsh`（`dsh-app-boot` 里 grep 不到任何读取点），
+  // 写进这个字段**不会**让插件变成 compatible，只会让人以为「补一行 = 验过一次」。
+  // README 的兼容表保留（对读者仍有参考价值），但它的身份从「声明」降级为「历史记录」——
+  // 所以这里改成：双语互相对拍（防两份 README 自己漂），外加一条负向守卫（防有人把死字段补回来）。
   const readmeRows = (md) => {
     const out = new Map()
     for (const m of md.matchAll(/^\|\s*([0-9][0-9A-Za-z.\-]*)\s*\|\s*(compatible)\s*\|\s*$/gm)) out.set(m[1], m[2])
     return out
   }
-  const want = new Map(Object.entries(pkg.dsh?.compatibility?.dshReleases ?? {}))
   const en = readmeRows(readRoot('README.en.md'))
   const zh = readmeRows(readRoot('README.md'))
   const diff = (a, b) => [...new Set([...a.keys(), ...b.keys()])]
     .filter((k) => a.get(k) !== b.get(k))
     .map((k) => `${k}: ${a.get(k) ?? '—'} / ${b.get(k) ?? '—'}`)
 
-  ok(want.size >= 5, `package.json.dshReleases 有足够多的行（实际 ${want.size}）`)
-  ok(en.size >= 5 && diff(en, want).length === 0,
-    `README.en.md 兼容表 = package.json.dsh.compatibility.dshReleases（差 ${diff(en, want).length} 行）`,
-    diff(en, want).slice(0, 4).join('；'))
-  ok(zh.size >= 5 && diff(zh, want).length === 0,
-    `README.md 兼容表 = 同一份声明（差 ${diff(zh, want).length} 行）`,
-    diff(zh, want).slice(0, 4).join('；'))
-  ok(diff(en, zh).length === 0, '双语兼容表逐行相同', diff(en, zh).slice(0, 4).join('；'))
+  ok(en.size >= 5 && diff(en, zh).length === 0,
+    `双语兼容表逐行相同（差 ${diff(en, zh).length} 行）`, diff(en, zh).slice(0, 4).join('；'))
+  // 负向守卫：死字段不许回来。要回来必须先证明宿主的闸门真的读它（那时连这条一起改）。
+  ok(pkg.dsh?.compatibility === undefined,
+    'package.json 里没有 dsh.compatibility（0.2.1-alpha.4 起宿主只认 engines.dsh，写了是假承诺）')
+  ok(typeof pkg.engines?.dsh === 'string' && pkg.engines.dsh.length > 0,
+    'engines.dsh 存在（这才是宿主真正读的那一条）')
 }
 
 console.log('')

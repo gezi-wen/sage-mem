@@ -60,6 +60,6 @@
 1. `npm test` 全绿（含 build-fresh / client-render-test / release-test / structure-test / suite-registry-test / **todo-board-render-test**）；
 2. 脱敏：工作区文件 + 全部 git 历史 + 提交信息 + 发布物，四查 + **逐行通读**；
 3. 版本面：`package.json` ↔ CHANGELOG 最新节 ↔ 双语 README 锚点 ↔ tag，四处同号；
-4. `node test/_client-snapshot.mjs`：界面快照比对（有意改界面才 `--update`，并把原因写进 CHANGELOG）；
+4. 界面快照：`npm test` 已覆盖比对（`client-snapshot-test.mjs`，2.17.1 起）；**有意改界面**才 `node test/client-snapshot-test.mjs --update`，并把原因写进 CHANGELOG；
 5. 发布：push tag，等 CI 绿；Release 用 `.release-notes.md` 当正文；
 6. 装机与记忆：更新 `project_sage-mem.md` 的发布面段落。

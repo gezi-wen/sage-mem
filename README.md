@@ -14,7 +14,7 @@
 
 > File-based cross-session memory for DeepSeek Harness — every memory is a plain markdown file you can open, edit and delete. No database, no worker, no port.
 
-**当前发布版本：`2.17.0`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
+**当前发布版本：`2.17.1`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
 [契约冻结](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)。
 
 如果它对你有用，给个 Star 是最直接的反馈。
@@ -627,7 +627,7 @@ sage-mem 是纯 DSH 插件，用 `package.json` 的 **`engines.dsh`** 声明宿�
 
 **已在 DSH Go（Android 客户端）上验证可用**：从 App 内插件市场安装后，设置分区与侧栏面板正常、`sidebar.panellist` 岛屿可打开；记忆目录用 `SAGE_MEM_DIR` 默认的 `~/.sage-mem/memory` 即可，不需要额外适配。2.1.1 修掉了手机宿主上主按钮文字不可见的问题（前景令牌兜底）。
 
-逐版本兼容记录：
+逐版本兼容记录（**历史清单，不是声明** —— 2.17.1 起 `package.json` 不再带 `dsh.compatibility`：0.2.1-alpha.4 之后的宿主只看 `engines.dsh`，那张表写了也不会让插件真的 compatible，补进去只会让人以为「补一行 = 验过一次」）：
 
 | DSH 版本 | 状态 |
 | --- | --- |

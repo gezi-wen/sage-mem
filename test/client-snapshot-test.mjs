@@ -1,16 +1,25 @@
 #!/usr/bin/env node
 /**
- * 界面快照守卫（1.5.2 新增）。
+ * 界面快照守卫（1.5.2 新增；2.17.1 起是**正式套件**）。
  *
  * 为什么要有它：1.5.2 把筛选条从 Section 里抽成独立组件，之后还要继续拆 Section。
  * 「界面一个像素都没变」这句话不能只靠人看 —— 这里把 3 屏（文件列表 / 自动做梦·设置 / 体检）
  * 的真渲染树序列化成 HTML，取 sha256 存进 `test/fixtures/client-snapshots.json`。
  * 纯结构搬移必须保持哈希不变；**有意改界面**的版本用 `--update` 重生成（并把这句写进 CHANGELOG）。
  *
- * ⚠️ 它**不挂进 npm test**：跑一次要再起一遍 client-render-test（几秒），且它的正常状态是
- * 「等一次有意改界面才变」。它是**发布清单**的一步（`docs/release-checklist.md` 第 2.5 步）：
- *     node test/_client-snapshot.mjs            # 比对
- *     node test/_client-snapshot.mjs --update   # 改完界面后重生成
+ * ## 2.17.1：从「手动一步」改成 SUITES 里的一条
+ *
+ * 原来它是 `_client-snapshot.mjs`，注释写着「**不挂进 npm test**」，理由是跑一次要再起一遍
+ * client-render-test、多花几秒。那个理由在 **两次静默失效** 之后站不住了：
+ *
+ *   - 2026-11-03：它的注释点名 `client-snapshot-test.mjs`，而那个文件根本不存在，
+ *     基线停在 10-27 —— 3 屏全红约一周没人发现（见 CHANGELOG 那条「快照守卫断链」）。
+ *   - 2.16.0：星标入口从右下角搬到头部状态行，改了三个屏的渲染树，发布时跳过了
+ *     发布清单第 2.5 步 —— 基线一路停到 2.17.0 才发现。
+ *
+ * 两次的机制一样：**这道闸不在自动检查里，就等于没有**。所以改名去掉 `_`（它不再是
+ * 「不登记的辅助脚本」）、登记进 `run.mjs`。代价是每次 `npm test` 多几秒，换来的是
+ * 「有意改界面必须当场 `--update` 并在 CHANGELOG 说明」变成硬要求，而不是靠人记得。
  *
  * 产物来自 client-render-test.mjs 的 `--preview`（与 README 出图共用同一份屏定义）：
  * 只认 manifest 的 id，不按下标取 —— 插一屏不会让别的屏静默换内容。

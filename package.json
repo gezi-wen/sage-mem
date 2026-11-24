@@ -1,7 +1,7 @@
 {
   "name": "sage-mem",
   "description": "Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.",
-  "version": "2.17.0",
+  "version": "2.17.1",
   "type": "module",
   "main": "lib/index.js",
   "icon": "./icon.png",
@@ -37,25 +37,6 @@
       "inject": [
         "@deepseek-ai/dsh-client-locale"
       ]
-    },
-    "compatibility": {
-      "dsh": ">=0.1.2-rc.1",
-      "dshReleases": {
-        "0.1.2-rc.1": "compatible",
-        "0.1.3-alpha.1": "compatible",
-        "0.1.3-alpha.2": "compatible",
-        "0.1.5-rc.1": "compatible",
-        "0.1.6-alpha.1": "compatible",
-        "0.1.6-alpha.2": "compatible",
-        "0.1.7-rc.1": "compatible",
-        "0.1.7-rc.2": "compatible",
-        "0.2.0-rc.1": "compatible",
-        "0.2.0-rc.2": "compatible",
-        "0.2.1-rc.1": "compatible",
-        "0.2.1-rc.3": "compatible",
-        "0.2.1-rc.4": "compatible",
-        "0.2.1-rc.5": "compatible"
-      }
     }
   },
   "dependencies": {
