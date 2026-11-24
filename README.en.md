@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.17.1`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.18.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -408,6 +408,24 @@ The optional memory-consolidation feature (identifier `autodream`): it reads thr
 | Input source | Memory directory only / memory + session records | The latter decompresses session records (zstd) for targeted keyword search; the cost is that private conversations enter the model context, and the token cost is higher too |
 
 Automatic triggering runs on the plugin's own timer (checks the gates every 30 minutes by default). Consolidation **deliberately does not run through your session** — the tool set is given by the plugin, the step count is capped, and it is not written into your session records.
+
+### Reconciliation: checking old memories against sessions (2.18.0)
+
+When the input source is "memory + session records", consolidation first picks at most 5 memories **most likely to disagree with the present**. Two criteria must both hold:
+
+- **Still being injected recently** (it appeared in your context within the last 7 days) — so it is in service, not a dead file;
+- **But the content has not changed for a long time** (the file has not been written for 14+ days) — so the wording may be stale.
+
+"Still in use + long unchanged" is the dangerous combination: new facts cannot get in, while the old statement keeps showing up in every injection. For those 5, the model uses session records to check whether what they say still lines up:
+
+- **It lines up** → do nothing. **All five passing with not a single edit is a normal outcome of that run.**
+- **It does not line up** → fix the old wording at its source (not by appending "actually it is not like that")
+- **The whole entry is obsolete** → archiving is an option, but a reason is required
+- **It is merely missing new progress** → merge into the existing file, do not open a new one
+
+So it may occasionally touch an entry you never asked it to change — **that is reconciliation, not random editing**. This is also the first time the feature can notice "this was recorded wrong / has gone stale"; before this it could only notice "something is missing".
+
+**With "memory directory only" this whole stage disappears** (there are no sessions to check against, and a list without sessions would only make it guess). The list itself carries only file names and day counts, never the body text.
 
 ### The Consolidation Model Can Be Specified Separately
 

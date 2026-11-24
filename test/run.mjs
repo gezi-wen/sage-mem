@@ -27,6 +27,9 @@ const SUITES = [
   'ad-matrix.mjs',
   // 1.0.1：报告撞上单次输出上限时的「接着写」与残篇标注（真实事故：10-17 凌晨那份报告断在半句）。
   'autodream-continuation-test.mjs',
+  // 2.18.0：做梦会「对账」——挑几条「还在被注入、内容却很久没改」的记忆，拿会话去核对。
+  // 护栏：两个判据同时成立才算候选 / 非会话源一次都不扫 / 出错降级成空名单（不拖垮整趟）。
+  'autodream-reconcile-test.mjs',
   'rollback-guard-test.mjs',
   // 1.6.3：快照在多文件 / 大文件下的正确性与内存峰值回归（外部审查 PERF-01）。
   'snapshot-stress-test.mjs',
