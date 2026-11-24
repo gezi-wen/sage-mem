@@ -48,6 +48,9 @@ const SUITES = [
   'retrieval-test.mjs',
   // 2.9.0：MMR 去重重排（护栏：λ=0 等价关闭 / 候选 ≤ 名额原样 / 只挑不改）。
   'mmr-test.mjs',
+  // 2.17.0：压缩前记忆提醒（护栏：触发线与宿主引擎同一条公式 / 开关关=零测压 /
+  // 子代理不提醒 / 同档只发一次 / 压缩后复位）。
+  'precompact-test.mjs',
   // 1.6.4：检索诊断报告的可回归守卫（外部审查 RET-01 / OBS-01）。
   'retrieval-report-test.mjs',
   // 1.2.0：注入链拆成纯函数后的直接单测（不需要 new MemoryGateway）。
@@ -174,6 +177,8 @@ const SUITES = [
   'todo-board-test.mjs',
   // 2.15.0：看板的**渲染层** —— 筛选、撤销步数、组展开记忆、搬进流水那颗按钮（读真渲染树）。
   'todo-board-render-test.mjs',
+  // 2.17.0：压缩前提醒那张卡的渲染层 —— 开关写没写对设置、越界有没有先拦住、重挂载读不读回。
+  'precompact-render-test.mjs',
   // 2.15.6 起：宿主真实返回值（含失败分支）逐条过 manifest schema —— 六处「代码在、话说不出口」。
   'schema-surface-test.mjs',
   // 2.12.0：初始记忆**提示词**的正文判据（必写要点在场 / 不许出现个人信息与机制细节 /

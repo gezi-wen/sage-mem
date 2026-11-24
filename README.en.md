@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.16.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.17.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -468,6 +468,36 @@ The two things are moved **differently**, spelled out:
 | **Memories** | cross-session material accumulated in CC | sage-mem's `memory/` directory | One `.md` per memory, with frontmatter, filed under the four types `user` / `feedback` / `project` / `reference` |
 
 ⚠️ **The premise is that the shape matches.** The four-type division and the frontmatter are sage-mem's own conventions: if your memories in CC were already "one Markdown file per memory + frontmatter" (which is what ours were at the time), just copy them over; **if they were not** (if they were all piled into a single `CLAUDE.md`, say), you need to organize them first — and that job can perfectly well be handed to an agent: have it read the old material and lay it out as files under the four types.
+
+## Memory Reminder Before Compaction (experimental · 2.17.0)
+
+Late in a session the host condenses earlier turns into a summary — and the details it drops are gone for good. This switch makes sage-mem drop a reminder **before** that happens, so the model can write down what deserves to survive while it still remembers.
+
+Where: Settings → Memory management → Lab → "Memory reminder before compaction". **Off by default.**
+
+### The trigger is computed, not guessed
+
+The host exposes no "about to compact" event, but its criterion is public — and the plugin uses the **same metering service**:
+
+```
+trigger = min( window × 0.8 , window − output reservation − compaction headroom )
+```
+
+The window comes from `ctx.tokenMeter.contextPressure()`, the output reservation from this request's `maxTokens`, and the headroom plus 0.8 from `ctx.compaction.config` (engine defaults of 65536 / 0.8 when unset).
+
+For example: window `1048576`, output reservation `256000`, headroom `65536` → trigger = `1048576 − 256000 − 65536 = 727040` = **69.34%**, the same figure the dsh-context panel reports as "auto-compaction is expected to fire at 69.3% of the window". So a lead of 8 reminds at **61.3%** — both ends agree, rather than two competing estimates.
+
+### Lead time
+
+Default **8** (percentage points), configurable 3–20. Models with a large window and a large output reservation compact well below 80% (69% above), which is why the setting is "how many points early" rather than "remind at some absolute percentage" — the latter necessarily drifts once you switch models.
+
+### It only reminds, it never writes
+
+What to keep, and whether to keep anything, stays the model's call. The reminder says plainly that it can be ignored; if compaction happens on the very same step, the wording changes ("the details are already gone; if you cannot recall them, do not invent them").
+
+Each tier fires once per session and re-arms after a compaction; **subagent sessions are skipped** (their writes would pollute the main memory, and they rarely outlive the turn).
+
+**Cost**: when off it does nothing at all — it does not even measure the context. When on, each step reads a switch and a window projection (cheap); only past half the window does it take one precise measurement (on the same waterfall as the compaction engine, where the cache is already warm). **It cannot make the model comply** — it is a reminder, not a guarantee.
 
 ## To-do Board (experimental · since 2.11.0; wrapped up in 2.15.0)
 

@@ -41,8 +41,8 @@ console.log('== 2.15.6 · getSettings.limitDiagnostics ==')
     ui: { entry: 'sidebar', sidebarEntry: true },
     reserved: ['session-log.md'],
     reservedExtra: [],
-    experimental: { mmr: 0, todoBoard: 1 },
-    pendingExperimental: { mmr: 0, todoBoard: 1 },
+    experimental: { mmr: 0, todoBoard: 1, preCompact: 0, preCompactLead: 8 },
+    pendingExperimental: { mmr: 0, todoBoard: 1, preCompact: 0, preCompactLead: 8 },
     // Q04 的真实形态：坏设置 / 越界项 / 启动期告警各一条
     limitDiagnostics: ['settings.json 不是合法 JSON', 'maxResults 越界（1）', '启动期：SAGE_MEM_MAX_CHARS 非法'],
   }

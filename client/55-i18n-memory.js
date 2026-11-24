@@ -655,6 +655,24 @@
 			"todo.lab.onNotice": "已开启：右侧栏「+」里能看到待办清单",
 			"todo.lab.offNotice": "已关闭：卡片已移除，已打开的页签会显示为关闭态",
 			"todo.lab.rejected": "宿主拒绝了这次设置",
+
+			// ── 2.17.0：压缩前记忆提醒（实验性）────────────────────────
+			"pre.compact.title": "压缩前记忆提醒（实验性）",
+			"pre.compact.switch": "启用压缩前记忆提醒",
+			"pre.compact.switch.title": "上下文逼近自动压缩触发线时，往会话里放一条提醒",
+			"pre.compact.what1": "上下文快满时，宿主会自动把早先的对话压成摘要 —— 被压掉的具体细节，之后就没人看得见了。这个开关让 sage-mem 在压缩发生之前放一条提醒，让模型先把该跨会话留下的东西写下来。",
+			"pre.compact.what2": "它只提醒、不代写：写什么、写不写由模型自己判断；没有值得留的东西时，那条提醒会明说可以忽略。",
+			"pre.compact.what3": "触发线是算出来的，不是估的 —— 与压缩引擎（以及 dsh-context 面板上那个百分比）同一条公式。改完立刻生效，不用重启；关着的时候它连上下文都不测。",
+			"pre.compact.lead": "提前量",
+			"pre.compact.unit": "个百分点",
+			"pre.compact.hint.lead": "在宿主预估的触发线之前多少个点提醒。dsh-context 面板显示「69.3% 触发」时，提前量 8 就是在 61.3% 提醒。范围 3–20。",
+			"pre.compact.status.on": "已开启 · 提前 {value} 点",
+			"pre.compact.status.off": "关闭（默认）",
+			"pre.compact.notice.on": "已开启：下一次逼近压缩触发线时会提醒",
+			"pre.compact.notice.off": "已关闭",
+			"pre.compact.notice.lead": "提前量已保存为 {value} 个百分点",
+			"pre.compact.err.range": "提前量要是 3–20 的整数",
+			"pre.compact.err.noSettings": "宿主没有提供设置接口",
 		};
 
 		const EN = {
@@ -1301,6 +1319,24 @@
 			"todo.lab.onNotice": "On: the to-do board is in the right sidebar's + menu",
 			"todo.lab.offNotice": "Off: the card is gone; an open tab now shows the closed state",
 			"todo.lab.rejected": "The host rejected the setting",
+
+			// ── 2.17.0：pre-compaction memory reminder ──────────────────
+			"pre.compact.title": "Memory reminder before compaction (experimental)",
+			"pre.compact.switch": "Enable the pre-compaction reminder",
+			"pre.compact.switch.title": "Drops a reminder into the conversation as the context approaches the auto-compaction trigger",
+			"pre.compact.what1": "When the context fills up, the host condenses earlier turns into a summary — and the details it drops are gone for good. This switch makes sage-mem drop a reminder before that happens, so the model can write down what deserves to survive across sessions.",
+			"pre.compact.what2": "It only reminds; it never writes for you. What to keep (and whether to keep anything) stays the model's call, and the reminder says plainly that it can be ignored.",
+			"pre.compact.what3": "The trigger is computed, not guessed: it uses the same formula as the compaction engine (and the percentage dsh-context shows in its panel). Takes effect immediately, no restart; when off it does not even measure the context.",
+			"pre.compact.lead": "Lead time",
+			"pre.compact.unit": "percentage points",
+			"pre.compact.hint.lead": "How many points before the host's estimated trigger to remind. When dsh-context says \"fires at 69.3%\", a lead of 8 reminds at 61.3%. Range 3–20.",
+			"pre.compact.status.on": "On · {value} points early",
+			"pre.compact.status.off": "Off (default)",
+			"pre.compact.notice.on": "On: it will remind the next time the context approaches the trigger",
+			"pre.compact.notice.off": "Off",
+			"pre.compact.notice.lead": "Lead time saved as {value} percentage points",
+			"pre.compact.err.range": "Lead time must be an integer between 3 and 20",
+			"pre.compact.err.noSettings": "This host exposes no settings API",
 		};
 
 		/**
