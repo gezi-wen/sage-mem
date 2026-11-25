@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.19.1`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.20.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -744,7 +744,7 @@ No. Whether to store is judged by the model according to rules: nothing without 
 Open the memory directory; it is all Markdown. The 「记忆管理」(Memory management) page in the GUI can also browse, edit and delete.
 
 **Is it safe for several DSH instances to share one memory directory?**
-No. Serialized writes guarantee only **in-process** ordering; there is no file lock across processes — using two instances to write to the same directory at the same time can still lose one write. This is a known boundary.
+Three layers. ① **Individual memory-file writes are atomic and version-guarded** — a save that finds the file changed since it was read stops instead of silently overwriting the newer version. ② **sage-mem's own state files** (the lock table and access ledger) have their read-modify-write serialized since 2.20.0 by a short lease under the same state root, so two instances locking files or recording access no longer overwrite each other; this lock protects only sage-mem's own writes. ③ **This is not a transaction**: multi-file operations such as archiving and conflict arbitration can still stop mid-way; external editors, sync clients and git are outside the plugin's control, and lock exclusivity on network volumes is not promised. See `docs/decisions.md` D52 for the exact residual windows.
 
 **Can I do without autodream?**
 Yes, it is off by default. It and archiving are two different things: archiving is a deterministic rule (by idle days), calls no model and costs nothing.

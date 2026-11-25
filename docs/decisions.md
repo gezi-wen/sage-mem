@@ -1249,3 +1249,36 @@ tag 一致性校验、`npm publish --provenance` 与 dry-run 分支一律原地�
   `0 vulnerabilities`。所以**锁必须在无 `node_modules` 的环境生成或复核**，本次入库的是后者。
 - `npm ci` 会删掉整个 `node_modules` 再装 —— 这是特性，不是副作用：它保证装出来的树与锁一致。
   想保留现成的树就别跑它，而不是改成 `npm install`（那会按浮动范围重新解析，锁形同虚设）。
+
+## D52 · 跨进程状态写租约：只串行 sage-mem 自己的单文件 RMW（2.20.0）
+
+**问题**：`locked.json` 与 `access.json` 都是「读整份 → 改 → 覆盖写」。事务前只有进程内队列；
+两个 DSH 实例（本机 desktop/web 默认共用记忆目录）同时写时，后写者会静默盖掉先写者。锁表丢一条 =
+用户明明锁住的记忆以后可能被自动归档；台账丢一条 = `idleDays` 变小，归档阈值算错。
+
+**结论一：共享一把协议，不为状态文件另造一套锁。**
+`lib/shared/file-lease.js` 从 autodream 运行锁提取同一套不变量：`open(wx)` 创建、mtime 判过期、
+rename 抢占、双重复核（仍过期 + token 一致）、失败用 link 还回、释放只删自己的 token。
+autodream 锁与状态文件锁的差别只在参数：运行锁 2 小时、立即返回；状态租约 5 秒、最多等 300ms。
+`.stale-*` / `.released-*` 后缀与日志语义保持不变。
+
+**结论二：第一刀只包 `locked.json` + `access.json`，不扩大到全部状态。**
+两者共享同一 `stateRoot`，一把 `<stateRoot>/write.lock` 足够。`MEMORY.md` 在记忆目录里，
+与 `SAGE_MEM_STATE_DIR` 不同根时会出现「同一记忆目录、两把看不见彼此的锁」；settings/conflicts
+也有各自的半态窗口。这些留在后续独立版本，不在一版里假装解决。
+
+**结论三：台账的 batch 只能在拿到租约之后摘走。**
+`pending` 是内存里尚未落盘的观测。若先摘 batch 再抢锁，`lock_busy` 就要靠补偿并回；现在顺序是
+`扫 alive → 抢锁 → 摘 batch → 读盘合并 → 写 → release`，抢锁失败时 `pending` 根本没被动过。
+alive 快照在锁外（避免把 readdir 拖进临界区），持锁后对候选死键再逐个确认「根/archive 是否真的不存在」；
+不能拿 `use` 当时间水位——它是累加计数。
+
+**结论四：这不是事务，承诺必须写窄。**
+租约只覆盖 sage-mem 自身、同一本地卷、同一 stateRoot 的单文件 RMW。多文件序列仍可能停在中间态；
+外部编辑器、同步盘、git 不受控；网络卷上的 `open(wx)` 排他性未取证，不作承诺。
+即使持锁进程被长时间暂停超过 5 秒，TTL 锁也不是 fencing token —— 只用于短临界区，
+不宣称绝对串行。
+
+**验证**：`test/race-crossproc-test.mjs` 用真实子进程；两个进程各锁 60 个文件 → 120 条全在，
+各刷 30 个台账键 → 60 键全在，4 进程抢过期锁恰好 1 个赢。把同一测试复制到 2.19.1 父提交上实测：
+锁表只剩 61/120、台账只剩 30/60，证明测试确实能抓旧 bug。

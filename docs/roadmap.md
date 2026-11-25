@@ -1,4 +1,4 @@
-# sage-mem 路线图（2026-11-25 更新 · 2.19.0）
+# sage-mem 路线图（2026-11-25 更新 · 2.20.0）
 
 > **发布流程现状（已落地，不用再改）**：push `v*` tag → `.github/workflows/publish.yml`
 > （Trusted Publishing / OIDC，无 token、无 OTP、带 provenance）。tag 必须等于 `package.json` 版本。
@@ -93,6 +93,16 @@
 **明确不做**：改回临时摘 peer / `--legacy-peer-deps`（实测会把显式列出的 peer 也跳过，35 个套件成片红）；
 把发布步搬进可复用 workflow；用 `overrides` 掩盖 peer 代差（那只是把冲突压下去，两家各自的 peer 要求
 仍然对不上）。理由与实测细节见 `docs/decisions.md` D51。
+
+---
+
+## 2.20.0 · 跨进程状态写租约（MINOR）
+
+`locked.json` / `access.json` 的整份 RMW 由共享 `file-lease` 原语串行；autodream 运行锁同步迁移。
+只承诺同一本地卷、同一 stateRoot、sage-mem 自身写入；不是多文件事务。台账抢锁失败不摘 pending，
+dead-key 回收在锁内逐个确认文件不存在。证据：真实双进程 120/120、60/60、竞争恰好 1 胜；父提交实测 61/120、30/60。
+明确不做：把 `MEMORY.md` / settings / conflicts 顺手塞进本版；把 TTL 锁说成 fencing 事务；跨设备合并。
+详见 D52。
 
 ---
 

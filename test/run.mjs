@@ -34,6 +34,8 @@ const SUITES = [
   // 1.6.3：快照在多文件 / 大文件下的正确性与内存峰值回归（外部审查 PERF-01）。
   'snapshot-stress-test.mjs',
   'race-guards-test.mjs',
+  // 2.20.0：真实双进程写同一状态根。进程内队列测不出这一类覆盖。
+  'race-crossproc-test.mjs',
   // 2.1.3：自动整理的读时版本必须与读到的那份正文同源（外部审查 2026-10-31，Q01）。
   'review-211-q01-test.mjs',
   // 2.1.4：自动整理的三个模型可调用读取分支统一走 readVerified（外部审查 N03）。
