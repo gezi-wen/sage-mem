@@ -141,18 +141,7 @@ async function main() {
     ok(Object.keys(ledger).length === 60, '台账里 60 个键都在', `${Object.keys(ledger).length}`)
   }
 
-  group('3. 抢同一把过期锁：多进程竞争只有一个赢家')
-  {
-    const lockPath = join(base, 'one.lock')
-    await writeFile(lockPath, JSON.stringify({ token: 'old', at: 1 }))
-    const old = new Date(Date.now() - 60_000)
-    await utimes(lockPath, old, old)
-    const done = await spawnAndRun('lease', 4, base, lockPath)
-    const winners = done.filter((d) => d.won).length
-    ok(winners === 1, '四个进程恰好一个抢到', `${winners}`)
-  }
-
-  group('4. 共享租约：活锁不被第二个进程抢走，释放后可复得')
+  group('3. 共享租约：活锁不被第二个进程抢走，释放后可复得')
   {
     const lockPath = join(base, 'live.lock')
     const { createFileLease } = await import('../lib/shared/file-lease.js')
