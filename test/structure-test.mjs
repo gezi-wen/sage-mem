@@ -159,7 +159,10 @@ group('4. typert 契约：40 条 invocation 仍指 lib/index.js')
 // 与第 2 组的分工：那组管「谁能认识谁」（依赖方向），本组管「能不能碰环境」（纯度）。
 group('5. 纯逻辑层：判据与切分不许 import fs')
 {
-  const PURE = ['memory/size-policy.js', 'memory/trim-plan.js']
+  // 2.19.0 加入 `autodream/session-search-policy.js`：搜索的覆盖率口径、上限选择、
+  // 命中窗口与文案全在它里面，而它必须能对着字符串与假对象断言 —— 会话搜索那套账
+  // 之所以曾经算不清，就是因为「选谁 / 切多宽 / 怎么说」和 readdir / zstd 混在一个函数里。
+  const PURE = ['memory/size-policy.js', 'memory/trim-plan.js', 'autodream/session-search-policy.js']
   for (const rel of PURE) {
     const f = all.find((x) => x.rel === rel)
     ok(!!f, `${rel} 存在（守卫的靶子）`)
@@ -178,6 +181,12 @@ group('5. 纯逻辑层：判据与切分不许 import fs')
   ok(!!io && importsOf(io.src).some((i) => i.startsWith('node:')),
     '【反向对照】写盘的 trim-archive.js 允许 import node 内建（判据是「纯逻辑层」而不是「所有文件」）',
     io ? importsOf(io.src).join(',') : '文件不存在')
+  // 【反向对照】2.19.0：与纯策略同域的 **IO 适配层**必须真的带 node 内建，
+  // 否则「policy 是纯的」可能只是因为整条搜索都不碰盘（那就自相矛盾了）。
+  const searchIo = all.find((x) => x.rel === 'autodream/session-search.js')
+  ok(!!searchIo && importsOf(searchIo.src).some((i) => i.startsWith('node:')),
+    '【反向对照】session-search.js 是 IO 层，必须 import node 内建（纯的是 policy，不是整条搜索）',
+    searchIo ? importsOf(searchIo.src).join(',') : '文件不存在')
 }
 
 console.log(`\n结果：${pass} passed, ${fail} failed`)

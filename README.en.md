@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.18.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.19.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -405,7 +405,7 @@ The optional memory-consolidation feature (identifier `autodream`): it reads thr
 |---|---|---|
 | Trigger | Manual only / run automatically when conditions are met | Automatic mode goes through three levels of gating, **checking the cheapest first**: time gate (≥ N hours since last time, one read/write) → session gate (≥ M sessions with updates in between, one directory scan) → lock (against concurrency). A 10-minute scan throttle is sandwiched in between, so that while "the time gate passed but the session gate did not" it does not rescan for nothing every turn |
 | Mode of change | Report only / rewrite directly | In "report only" mode **the write tools are simply not attached for the model at all** — it is not constrained by a sentence saying "please do not write", it has no hands |
-| Input source | Memory directory only / memory + session records | The latter decompresses session records (zstd) for targeted keyword search; the cost is that private conversations enter the model context, and the token cost is higher too |
+| Input source | Memory directory only / memory + session records | The latter decompresses session records (zstd) for a targeted keyword search (not a full index: at most the **40** most recent v4 sessions enter the queue, and the first line of every result states how much was actually covered); the cost is that private conversations enter the model context, and the token cost is higher too |
 
 Automatic triggering runs on the plugin's own timer (checks the gates every 30 minutes by default). Consolidation **deliberately does not run through your session** — the tool set is given by the plugin, the step count is capped, and it is not written into your session records.
 
@@ -426,6 +426,19 @@ When the input source is "memory + session records", consolidation first picks a
 So it may occasionally touch an entry you never asked it to change — **that is reconciliation, not random editing**. This is also the first time the feature can notice "this was recorded wrong / has gone stale"; before this it could only notice "something is missing".
 
 **With "memory directory only" this whole stage disappears** (there are no sessions to check against, and a list without sessions would only make it guess). The list itself carries only file names and day counts, never the body text.
+
+### Session search now states how much it looked at (2.19.0)
+
+The `search_sessions` tool that consolidation holds is a **targeted keyword search**, not a full index. **The first line of every result is the coverage**:
+
+- **How much is reachable**: how many session transcripts it recognises, how many actually entered the queue (**40 is the queue cap**, not "always exactly 40"; nor does entering the queue guarantee being fully read — the first line is the authoritative number), and how many were fully searched / only partly readable / unreadable / not looked at because of the cap / never started because the output budget ran out.
+- **Each snippet is at most 500 characters and is centred on the keyword**: for an ordinary hit (the keyword itself no longer than the snippet cap) the match point is always inside the snippet; if the keyword is close to or longer than 500 characters, the window starts at the keyword. The old version cut 500 characters from the start of the line, so a keyword past the window produced a snippet that did not contain it at all.
+- **8000 is the character budget for the matching snippets** — not a hard cap on the whole output including that first line.
+- **Two axes are reported separately**: *input coverage* (did it look everywhere) and *output truncation* (were the snippets clipped). "Everything was read but each snippet was cut" and "only a few sessions were read" are different things, and `complete` / `truncated` each say one of them.
+- **A zero result has two phrasings**: only with complete coverage may it say "searched all N sessions, found nothing"; with incomplete coverage it must say "found nothing among the M sessions it actually read, with … remaining", and state plainly that **this does not mean the sessions do not mention it**.
+- **Old formats are reported, not read**: v3 and unversioned session transcripts are counted and appear in the coverage, but this version does not read them (that is left to a separate release).
+
+So reconciliation has one discipline: **with incomplete coverage, "found nothing" must not be used as counter-evidence that a memory is stale or should be archived**; explicit contrary evidence (a session stating another address or another conclusion) is still acted on as before.
 
 ### The Consolidation Model Can Be Specified Separately
 
