@@ -7,6 +7,34 @@
 
 ---
 
+## 2.19.1
+
+**主题：把「怎么把仓库装起来」收成一条命令、一份锁、一份声明。没有新功能。**
+
+版本判定：2.19.1（PATCH）｜理由：插件运行时代码与公开用法未变，改的是开发/CI 安装路径与锁定依赖：`devDependencies` 补齐四个与宿主共享实例的 dsh 包（精确版本）、`@deepseek-ai/dsh-skill-filesystem` 的 peer 从 `"*"` 收窄成 `">=0.1.2-rc.1"`、新增 `scripts/install-dev.mjs` 作为唯一安装入口、`package-lock.json` 入库｜一版一件事：安装可复现。
+
+### 行为变更
+
+- **没有新增或改变插件功能、工具面与返回、面板与设置项、remote 契约、会话搜索输出。** 锁内 `zod` 更新到 4.6.7，属于依赖解析变化，不宣称依赖内容与上一版逐字节相同。
+- 唯一可感知的差别在**装依赖**这一侧：`npm install` 之后不再需要任何额外参数，也不会再撞上以前那个 ERESOLVE（撞上时装出来的树是坏的，而 CI 早就用「临时摘 peer」绕开了它）。
+
+### 不变
+
+- `engines` 未动（`node >=18`、`dsh >=0.1.2-rc.1`）；除 `skill-filesystem` 外的三个 peer 范围一字未改；`dependencies` 仍只有 `zod`。
+- 装完之后照旧 `npm test`。CI 矩阵仍是 `18.x / 20.x / 24.x` × 2 遍（第二遍 `TZ=UTC`）。
+- 发布通道未动：`publish.yml` 的文件名、`permissions: id-token: write`、`npm@^11`、tag 一致性校验、`--provenance` 与 dry-run 分支全部原地保留。
+
+### 新增测试
+
+- `test/release-test.mjs` 新增第 7 组「安装入口只有一条」（静态、零网络）：两个 workflow 都必须调用 `scripts/install-dev.mjs`；两者都不得再出现 `package.json.ci-backup`、临时 `delete …peerDependencies`、`--no-save`、`--no-package-lock`、`--legacy-peer-deps`；`package-lock.json` 必须存在且不得出现在 `npm pack` 的清单里；两份 README 的安装命令必须一致。**没新建套件**（它本来就守在 `npm test` 里）。
+
+### 实测
+
+- **解析**：在没有 `node_modules` 的干净目录用 `npm install --package-lock-only --ignore-scripts` 解析同一份 `package.json`，得到 `cordis@4.0.4`、`typert-protocol@0.2.0-rc.1`、`client-locale@0.2.0-rc.1`、`skill-filesystem@0.2.0-rc.1`、`zod@4.6.7`、`react@18.3.1`，`0 vulnerabilities`，**锁里没有任何 `0.0.1-rc.x` 条目** —— 那条旧链不再被拉进来。对照：在已有 `node_modules` 的目录跑同一条命令，npm 会复用实际树（得到 `zod@4.4.3`，而该版本有一条 high 级公告），所以**锁必须在无 `node_modules` 的环境生成或复核**（见 D51 残留风险）。
+- 全量 `npm test`：在干净 worktree 中先跑 `node scripts/install-dev.mjs`（真实 `npm ci`），再跑全量，**101 套件，5800 passed / 0 failed**。其中安装静态守卫 `release-test.mjs` 为 33 条（新增第 7 组）。
+
+---
+
 ## 2.19.0
 
 **主题：`search_sessions` 会说清「我看了多少」—— 「没搜到」不再被当成「没有」。**

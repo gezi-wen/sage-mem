@@ -30,6 +30,7 @@
 ## 2. `npm test` 全绿（本机 + Linux CI）
 
 ```bash
+node scripts/install-dev.mjs   # 干净副本、或刚改过依赖（含 --refresh-lock）之后才需要
 npm test
 ```
 
@@ -37,8 +38,10 @@ npm test
   `npm test` 在三个版本上各跑两遍，第二遍 `TZ=UTC`）。
 - `npm test` 已包含 `test/release-test.mjs`：`npm pack --dry-run` 的白名单、`lib/` 运行时文件完整性、
   包内版本、双语 README 与 CHANGELOG 的当前版本、兼容表对拍。**发布物一致性不再靠人工目测。**
-- **干净副本**：复制仓库（排除 `node_modules` / `.git`）→ `npm install` → `npm test`。
-  仓库统一用 npm，没有 `pnpm-lock.yaml`（见 README「参与开发」）。
+- **干净副本**：复制仓库（排除 `node_modules` / `.git`）→ `node scripts/install-dev.mjs` → `npm test`。
+  安装只有一个入口，CI 与发布跑的是同一条命令；`package-lock.json` 是依赖树的权威
+  （见 README「参与开发」与 `docs/decisions.md` D51）。`npm ci` 会**重建 `node_modules`**，
+  所以干净副本这一步同时验证了锁本身能不能装。
 - **Linux CI 能逮到 Windows 上永远测不出来的缺陷**（区分大小写的卷）：保留名身份集合、
   路径分隔符语义、时区。本机一万遍全绿也不代表 CI 会绿。
 - 断言里不许出现「只在某个平台成立」的机制性断言 —— 写成**两个平台都必须满足的不变量**。

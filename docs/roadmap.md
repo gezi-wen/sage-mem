@@ -71,6 +71,31 @@
 
 ---
 
+## 2.19.1 · 开发安装统一（PATCH）
+
+没有人改功能，改的是「怎么把仓库装起来」。以前有两套写法：README 让人 `npm install`，CI 却在装之前
+**临时从 `package.json` 删掉** `@deepseek-ai/dsh-skill-filesystem` 这个 peer、手写五个版本号、
+装完再还原，`publish.yml` 又复制了一遍。结果是谁也复现不了谁，仓库里也没有锁。
+
+根因是声明：那个 peer 写的是 `"*"`，npm 对空范围走 `latest` 标签解析，而它的 `latest` 停在
+`0.0.1-rc.3` 那一代 —— 旧链的 `dsh-session` 要求 `dsh-typert-protocol@^0.0.1-rc.5`，与仓库自己声明的
+`>=0.1.2-rc.1` 落在同一个槽位、没有交集。修法是把声明补对，不是继续绕：
+
+- **两侧镜像**：四个与宿主共享实例的 dsh 包同时写进 `devDependencies`（**精确版本**）与
+  `peerDependencies`（范围），这是官方对「需要与宿主共享实例的包」的要求。
+- **收窄最后一个 peer**：`skill-filesystem` 从 `"*"` 改成 `">=0.1.2-rc.1"`，与另外两个同风格。
+- **单一入口**：`node scripts/install-dev.mjs`（默认 `npm ci`）—— 本地、`test.yml`、`publish.yml`
+  都是这一条；`--refresh-lock` 才重写锁，普通路径绝不改 `package-lock.json`。
+- **锁入库**：`package-lock.json` 成为依赖树的权威；`npm ci` 会核对它与 `package.json` 是否一致。
+- **发布步不抽 reusable workflow**：npm 的 Trusted Publishing 绑「仓库 + workflow 文件名」，
+  抽成 `workflow_call` 会让 provenance 身份变成调用方。只共用安装脚本，不共用发布步。
+
+**明确不做**：改回临时摘 peer / `--legacy-peer-deps`（实测会把显式列出的 peer 也跳过，35 个套件成片红）；
+把发布步搬进可复用 workflow；用 `overrides` 掩盖 peer 代差（那只是把冲突压下去，两家各自的 peer 要求
+仍然对不上）。理由与实测细节见 `docs/decisions.md` D51。
+
+---
+
 ## 3.0 · 跨设备（探索）
 
 不自研同步、不套邮局；Syncthing 可行但要常驻进程。目标：一份记忆在两台机器上可读、冲突可裁决。

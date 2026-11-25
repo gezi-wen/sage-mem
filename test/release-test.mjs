@@ -15,7 +15,7 @@
  * 而台账只能证明「在它之前跑过的套件」打出的 PASS。
  */
 import { spawnSync } from 'node:child_process'
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join, relative } from 'node:path'
 
@@ -202,6 +202,87 @@ group('6. 兼容表：双语 README 逐行相同 + package.json 不许再补死�
     'package.json 里没有 dsh.compatibility（0.2.1-alpha.4 起宿主只认 engines.dsh，写了是假承诺）')
   ok(typeof pkg.engines?.dsh === 'string' && pkg.engines.dsh.length > 0,
     'engines.dsh 存在（这才是宿主真正读的那一条）')
+}
+
+// ── 4. 安装入口只有一条（2.19.1 / D51） ─────────────────────────
+/**
+ * 为什么这条是**静态**的：安装的可复现性没法在单元测试里证明（那要装两遍），
+ * 但「有没有人把绕法写回去」可以。这一组盯的是**形状**：
+ *   - 两个 workflow 都必须调用同一个入口脚本；
+ *   - 都不许再出现「临时改 package.json 绕过 peer 解析」那一套；
+ *   - 锁存在、且不进 npm 包；
+ *   - 两份 README 的安装命令是同一条。
+ * 真正「装得起来、树对不对」由 CI 与干净副本验（见 `docs/release-checklist.md` 第 2 步）。
+ */
+group('7. 安装入口只有一条：两个 workflow 都走 scripts/install-dev.mjs')
+{
+  const ENTRY = 'scripts/install-dev.mjs'
+  const WORKFLOWS = ['.github/workflows/test.yml', '.github/workflows/publish.yml']
+  /** 每一条都是「绕开声明」的具体形态，不是风格偏好。 */
+  const BANNED = [
+    ['package.json.ci-backup', '临时备份 / 还原 package.json'],
+    ['--no-save', '--no-save（不改 package.json 就装依赖）'],
+    ['--no-package-lock', '--no-package-lock（绕过锁）'],
+    ['--legacy-peer-deps', '--legacy-peer-deps（实测让 35 个套件成片红）'],
+    [/delete\s+[\w$.]*peerDependencies/, '临时删 peerDependencies 再装'],
+  ]
+  const hits = (src) => BANNED
+    .filter(([needle]) => (needle instanceof RegExp ? needle.test(src) : src.includes(needle)))
+    .map(([, why]) => why)
+
+  ok(existsSync(join(ROOT, ENTRY)), `${ENTRY} 存在（唯一安装入口）`)
+
+  const missingEntry = []
+  const leftovers = []
+  for (const rel of WORKFLOWS) {
+    let src
+    try { src = readRoot(rel) } catch { ok(false, `${rel} 存在`); continue }
+    if (!src.includes(ENTRY)) missingEntry.push(rel)
+    for (const why of hits(src)) leftovers.push(`${rel}: ${why}`)
+  }
+  ok(missingEntry.length === 0, `两个 workflow 都调用 ${ENTRY}`, missingEntry.join('、'))
+  ok(leftovers.length === 0, 'workflow 里没有「临时改 package.json / 绕过锁」的旧绕法', leftovers.slice(0, 4).join('；'))
+
+  // 【反向对照】判据不是恒真：旧的安装行必须被抓到。
+  const ghostBad = 'cp package.json package.json.ci-backup && npm install --no-save --no-package-lock zod@4.4.3'
+  ok(hits(ghostBad).length >= 3, '【反向对照】旧安装行（备份 + --no-save + --no-package-lock）确实会被抓到', hits(ghostBad).join('；'))
+  ok(hits(`node ${ENTRY}`).length === 0, '【反向对照】新入口本身不会被误判', hits(`node ${ENTRY}`).join('；'))
+
+  // 锁：必须存在，而且不能被打进 npm 包（它是开发物，不是运行时产物）。
+  const lockPath = join(ROOT, 'package-lock.json')
+  ok(existsSync(lockPath), 'package-lock.json 存在（依赖树的权威，随仓库走）')
+  if (existsSync(lockPath)) {
+    let lock = null
+    try { lock = JSON.parse(readFileSync(lockPath, 'utf8')) } catch { /* 下面那条会红 */ }
+    ok(!!lock && typeof lock.packages === 'object', 'package-lock.json 可解析且含 packages 表')
+    // 与 package.json 的声明必须对得上（`npm ci` 就是这么判断的，这里提前一步）。
+    const rootEntry = lock?.packages?.[''] ?? {}
+    const canon = (o) => Object.keys(o ?? {}).sort().map((k) => [k, o[k]])
+    const same = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b))
+    const drift = ['dependencies', 'devDependencies', 'peerDependencies']
+      .filter((k) => !same(pkg[k] ?? {}, rootEntry[k] ?? {}))
+    ok(drift.length === 0, '锁里的根声明与 package.json 一致（否则 npm ci 会直接失败）', drift.join(' / '))
+  }
+
+  const { parsed } = dryRun()
+  const packed = (parsed?.files ?? [])
+    .map((f) => String(typeof f === 'string' ? f : f.path).replace(/\\/g, '/'))
+  ok(!!parsed && packed.length > 0 && !packed.includes('package-lock.json'),
+    'package-lock.json 不在 npm pack 清单里', parsed ? `条目 ${packed.length}` : 'npm pack --dry-run 没跑通')
+
+  // 两份 README 的安装命令必须是同一条（注释可以各用各的语言）。
+  const installLine = (md) => {
+    const m = md.match(/^\s*node scripts\/install-dev\.mjs.*$/m)
+    return m ? m[0].replace(/#.*$/, '').trim() : null
+  }
+  let zh = null
+  let en = null
+  try {
+    zh = installLine(readRoot('README.md'))
+    en = installLine(readRoot('README.en.md'))
+  } catch { /* 上面各组已判过存在性 */ }
+  ok(!!zh && !!en && zh === en,
+    '两份 README 的安装命令是同一条', `README.md=${zh} / README.en.md=${en}`)
 }
 
 console.log('')

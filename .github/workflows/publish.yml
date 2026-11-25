@@ -1,13 +1,15 @@
 # Trusted Publishing（OIDC）—— push 一个 v* tag 就发布，不需要 NPM_TOKEN、不需要 OTP。
 #
-# 为什么这样做（2026-11-17 决定）：
-#   npm 正在收紧「绕过 2FA 的 automation token」（账户变更 2026-08 起、直接发布 2027-01 起），
-#   网页创建带 bypass 的 token 已被策略拦；而交互式 `npm publish` 每次都要人按安全密钥。
-#   Trusted Publishing 让 npm 直接信任「这个仓库 + 这个 workflow」：CI 现场领一次性凭据，
-#   并给包附上 provenance 签名（谁、哪个 commit、哪个 workflow 构建的，可追溯）。
+# 机制：npm 直接信任「这个仓库 + 这个 workflow」这一对身份 —— CI 现场领一次性凭据，
+# 并给包附上 provenance 签名（谁、哪个 commit、哪个 workflow 构建的，可追溯）。
 #
 # 前置（一次性，已配好）：npmjs.com → 包 sage-mem → Settings → Trusted publishing
 #   Publisher: GitHub Actions / Repository: gezi-wen/sage-mem / Workflow: publish.yml
+#
+# ⚠️ 三件不许动的事（动了 OIDC 会认不出调用方，见 docs/decisions.md D51）：
+#   1. **不改这个文件名**（`publish.yml` 就是这个绑定的一部分）；
+#   2. **不把发布步抽成 reusable workflow**（`workflow_call`）—— 身份会变成调用方；
+#   3. **不删 `permissions: id-token: write`**，也不把它挪到 step 级。
 #
 # 两种触发：
 #   - push `v*` tag：正式发布（tag 必须与 package.json 的 version 完全一致）；
@@ -58,21 +60,11 @@ jobs:
           echo "tag=$TAG package=$PKG"
           [ "$TAG" = "$PKG" ] || { echo "::error::tag $TAG != package.json $PKG"; exit 1; }
 
-      # 与 test.yml 同一套装法（原因写在那边的注释里，两个 workflow 必须一致）：
-      # npm 7+ 会自动补装 package.json 里声明、下面没显式列出的 peer，
-      # 而 `@deepseek-ai/dsh-skill-filesystem` 整条 peer 链还在 0.0.1-rc.x 那一代，
-      # 与这里钉的 0.2.0-rc.1 同槽冲突 → ERESOLVE。安装前临时摘掉它、装完还原。
-      # 不要用 --legacy-peer-deps：它连显式列出的 peer 也一起跳过，测试会因模块缺失成片红。
+      # 与 test.yml 同一个安装入口、同一份 package-lock.json —— 发布前跑过的树
+      # 就是测试跑过的那棵树，不再靠「两个 workflow 各自维护一份版本号」对齐。
+      # （装错会让下一步 `npm test` 直接红，所以发布不会带着坏树走过去。）
       - name: Install
-        run: |
-          cp package.json package.json.ci-backup
-          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));delete p.peerDependencies['@deepseek-ai/dsh-skill-filesystem'];fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
-          npm install --no-save --no-package-lock \
-            zod@4.4.3 react@18.3.1 \
-            @deepseek-ai/cordis@4.0.4 \
-            @deepseek-ai/dsh-typert-protocol@0.2.0-rc.1 \
-            @deepseek-ai/dsh-client-locale@0.2.0-rc.1
-          mv package.json.ci-backup package.json
+        run: node scripts/install-dev.mjs
 
       - name: Test
         run: npm test

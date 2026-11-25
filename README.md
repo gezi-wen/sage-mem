@@ -14,7 +14,7 @@
 
 > File-based cross-session memory for DeepSeek Harness — every memory is a plain markdown file you can open, edit and delete. No database, no worker, no port.
 
-**当前发布版本：`2.19.0`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
+**当前发布版本：`2.19.1`** —— 顶部 npm 徽章是动态权威。**契约基线：`1.0.0`** —— 第一个稳定版，公开承诺、能力边界与「明确做不到」的清单冻结在
 [契约冻结](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md)。
 
 如果它对你有用，给个 Star 是最直接的反馈。
@@ -716,12 +716,14 @@ memory/ 目录（markdown 文件，4 类）
 ```bash
 git clone https://github.com/gezi-wen/sage-mem
 cd sage-mem
-npm install
-npm test          # 全部断言（含三条守卫）
+node scripts/install-dev.mjs   # 按 package-lock.json 安装（npm ci）
+npm test                       # 全部断言（含三条守卫）
 ```
 
 - 断言脚本只依赖 `node:` 内置模块，**不引测试框架**，各脚本手写 `ok()` 并以汇总行收尾。
-- 本仓库统一用 **npm** 安装 / 测试 / CI。不留 `pnpm-lock.yaml`：旧的锁在 fresh clone 里 `--frozen-lockfile` 装不动（它依赖的 workspace 文件未入库），留着只会误导。
+- **安装只有一个入口**：`scripts/install-dev.mjs`。CI 与发布用的是同一条命令，所以「本地装出来的树」和「CI 测出来的树」是同一棵。`npm ci` 会**重建 `node_modules`**，这是它可复现的来源。
+- **`package-lock.json` 是依赖树的权威**，它入库、跟着评审走；`package.json` 里只写范围与四个与宿主共享实例的 dsh 包的精确版本（同时声明在 `devDependencies` 与 `peerDependencies`，官方要求的两侧镜像）。不要手写 `npm install <包>@<版本>` —— 那样又会出现两套真相。
+- **有意改依赖时才刷新锁**：`node scripts/install-dev.mjs --refresh-lock`（只重写 lock，不动 `node_modules`、不改 `package.json`），并把 lock 的 diff 一起提交。
 - **三条守卫**盯的是「测试本身站不站得住」：`suite-registry-test.mjs`（有没有写了不跑的套件）、
   `contract-binding-test.mjs`（有没有说了不验的承诺）、`doc-consistency-test.mjs`（两份文档的定性是否逐行一致）。
 - CI 在 `ubuntu-latest` 上跑两遍（第二遍 `TZ=UTC`）—— 区分大小写的卷能逮到 Windows 上看不见的缺陷。

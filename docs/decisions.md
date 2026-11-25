@@ -1191,3 +1191,61 @@ v3 与无版本号的会话正文计入 `unrecognized` 并写进覆盖率，本�
 如果目录树在枚举与读取之间变化，`available` 与真实份数会短暂不一致（可接受：这是只读诊断，不是账本）。
 `partial` 的判据覆盖「帧解丢 / 跳帧重同步 / 尾部有没解析到的字节 / 这一份被输出上限截断」四种形态，
 但**不覆盖**「帧头完好、内容却已损坏」这种解码器自己都发现不了的情形。
+
+## D51 · 开发安装统一到一个入口：dev 镜像 + 锁 + 不抽 reusable publish（2.19.1）
+
+**问题**：安装这件事有两套写法，而且互不相认。README 让人 `npm install`；CI（`test.yml`）在装之前
+**临时从 `package.json` 删掉** `@deepseek-ai/dsh-skill-filesystem` 这个 peer、装五个手写版本号
+（`--no-save --no-package-lock`）、装完再 `mv` 还原；`publish.yml` 把同一段**逐字复制**了一份。
+仓库里还不留任何锁。于是：普通贡献者按 README 走没有一条已知能跑通的路径，而 CI 那套绕法
+在注释里，只有维护者知道。
+
+**根因不在那几行参数，在声明。**
+`peerDependencies` 里 `@deepseek-ai/dsh-skill-filesystem` 写的是 `"*"`。npm 对空范围走 `latest`
+标签解析，而这个包的 `latest` 停在 `0.0.1-rc.3`（同一族的 `next` 已经是 `0.2.2-rc.5`）。那条旧链
+自带一整套 `0.0.1-rc.x` 的兄弟包，其中 `dsh-sandbox → dsh-session@0.0.1-rc.5` 的 peer 要求
+`dsh-typert-protocol@^0.0.1-rc.5` —— 与仓库自己声明的 `>=0.1.2-rc.1`、与 CI 手钉的 `0.2.0-rc.1`
+落在**同一个槽位**上且没有交集。npm 7+ 会自动补装根 `peerDependencies`，所以这条链一定会被拉进来，
+ERESOLVE 当场发生、测试一条都没跑（账在 `test.yml` 与 CHANGELOG 2.4.1）。
+
+**结论一：与宿主共享实例的 dsh 包按官方口径两侧镜像，且 `devDependencies` 用精确版本。**
+官方（`develop/basic/publish`：「与 harness 自身的包一样，需要与宿主共享实例的 dsh 包同时声明在
+`peerDependencies` 与 `devDependencies` 中」）要求两处都写：peer 给宿主看范围，dev 供独立测试。
+本仓库此前只镜像了 `react`，另外四个只写了 peer —— 这正是「本地装不起来」的结构性原因。
+**dev 侧必须是精确版本，不能用 `^` 或 `>=`**：范围解析会取到最高版（`0.2.3-alpha.2`），而它要求
+`@deepseek-ai/cordis@~4.2.0-alpha.1`，与这一代要的 `~4.0.4` 又撞一次。
+
+**结论二：`skill-filesystem` 的 peer 从 `"*"` 收窄成 `">=0.1.2-rc.1"`**，与另外两个 dsh peer 同风格、
+与 `engines.dsh` 同代。不做的后果是解析会一直被当前的 `latest` 标签牵制 —— 标签指到哪一代，
+装出来的就是哪一代（本仓库这次就是被它带到 `0.0.1-rc.x`）。
+
+**结论三：装依赖只有一个入口 —— `scripts/install-dev.mjs`。**
+默认 `npm ci`（按锁装、会重建 `node_modules`）；`--refresh-lock` 才跑
+`npm install --package-lock-only`（只写锁，不动 `node_modules`、不改 `package.json` 的依赖声明）。
+本地、`test.yml`、`publish.yml` 三处都只写 `node scripts/install-dev.mjs`，不写第二套 npm 参数。
+脚本内三条硬约束：只用 `node:` 内建（Node ≥ 18）；Windows 上 `npm` 是 `npm.cmd`，必须经 `shell`
+且 `stdio: 'inherit'`（DSH 沙箱下 `pipe` 会 EPERM）；**npm 非零退出必须以同一个码透传** —— 安装失败
+回 0 会让下一步用一棵半死的树跑测试，那种红最难查。
+
+**结论四：`package-lock.json` 入库，成为依赖树的权威。**
+以前不留锁的理由是「pnpm 的锁在 fresh clone 里 `--frozen-lockfile` 装不动」，那是**pnpm 锁 + 未入库
+workspace 文件**的问题，不是「不该有锁」。现在：`dependencies` 只有 `zod`，dev 侧四个宿主包是精确钉版，
+锁额外固定的是 `zod` 与 `react` 的解析结果 —— 而正是这类浮动解析在 2026-11 用一个停在旧代的
+`latest` 标签制造了四个提交的 CI 红。代价：改依赖必须显式刷新锁，且 lock 的 diff 要一起评审。
+
+**结论五：`publish.yml` 复用安装步，但**不**抽成 reusable workflow。**
+安装能共用（同一个脚本、同一份锁，发布前跑过的树就是测试跑过的树）；**发布步不能共用**：
+npm 的 Trusted Publishing 绑的是「仓库 + workflow 文件名」（`publish.yml`），把发布步搬进
+`workflow_call` 之后，provenance 的身份会变成调用方，OIDC 认不出这个绑定。所以
+`publish.yml` 这个文件名、`permissions: id-token: write`、`npm install -g npm@^11`、
+tag 一致性校验、`npm publish --provenance` 与 dry-run 分支一律原地保留，只换安装段。
+
+**残留风险与已知边界**：
+- `devDependencies` 里那四个精确版本要跟着宿主升级一起改（**维护量没变，只是从 YAML 注释搬进了声明**）；
+  漏改的表现是 peer 告警或测试红，不再表现为「CI 装不上」。
+- **锁的生成受本机 `node_modules` 影响**，这一点实测过：在已有 `node_modules` 的仓库根跑
+  `npm install --package-lock-only`，得到的是 `zod@4.4.3`（npm 复用了实际树，输出 "up to date"）；
+  把同一份 `package.json` 放到没有 `node_modules` 的目录里跑**同一条命令**，得到 `zod@4.6.7` 且
+  `0 vulnerabilities`。所以**锁必须在无 `node_modules` 的环境生成或复核**，本次入库的是后者。
+- `npm ci` 会删掉整个 `node_modules` 再装 —— 这是特性，不是副作用：它保证装出来的树与锁一致。
+  想保留现成的树就别跑它，而不是改成 `npm install`（那会按浮动范围重新解析，锁形同虚设）。

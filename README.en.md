@@ -12,7 +12,7 @@
 
 **Cross-session memory for DeepSeek Harness — plain markdown files, no database, no worker.**
 
-**Current release: `2.19.0`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
+**Current release: `2.19.1`** — the npm badge above is the dynamic source of truth. **Contract baseline: `1.0.0`** — the first stable release, whose public commitments, the capability boundaries and the list of things it explicitly cannot do are frozen in the
 [frozen contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md).
 
 If it is useful to you, a Star is the most direct feedback.
@@ -712,12 +712,14 @@ Module boundaries (since 1.2.0):
 ```bash
 git clone https://github.com/gezi-wen/sage-mem
 cd sage-mem
-npm install
-npm test          # all assertions (including the three guards)
+node scripts/install-dev.mjs   # install from package-lock.json (npm ci)
+npm test                       # all assertions (including the three guards)
 ```
 
 - The assertion scripts depend only on `node:` built-in modules and **introduce no test framework**; each script hand-writes `ok()` and ends with a summary line.
-- This repository uses **npm** for install / test / CI. No `pnpm-lock.yaml` is kept: a stale one could not be frozen-installed from a fresh clone (its workspace file was untracked), so it was removed rather than left to mislead.
+- **There is exactly one install entry point**: `scripts/install-dev.mjs`. CI and the publish workflow run the same command, so "the tree you installed locally" and "the tree CI tested" are the same tree. `npm ci` **recreates `node_modules`** — that is where its reproducibility comes from.
+- **`package-lock.json` is the authoritative dependency tree**; it is committed and reviewed like code. `package.json` only carries ranges plus the four dsh packages that share instances with the host (declared in **both** `devDependencies` and `peerDependencies`, which is the two-sided mirroring the official docs ask for). Do not hand-write `npm install <pkg>@<version>` — that is how a second source of truth appears.
+- **Refresh the lock only when you meant to change dependencies**: `node scripts/install-dev.mjs --refresh-lock` (rewrites the lock only — it does not touch `node_modules` and does not edit `package.json`), and commit the lock diff with the change.
 - **Three guards** watch over "whether the tests themselves hold up": `suite-registry-test.mjs` (is there a suite that was written but never runs), `contract-binding-test.mjs` (is there a commitment that was made but never verified), `doc-consistency-test.mjs` (do the two documents characterize things identically line by line).
 - CI runs twice on `ubuntu-latest` (the second time with `TZ=UTC`) — a case-sensitive volume catches defects that are invisible on Windows.
 - When you change **user-visible behaviour**, please also update the corresponding line in the [contract](https://github.com/gezi-wen/sage-mem/blob/main/docs/1.0.0-contract.md) and the CHANGELOG; a commitment you cannot write an assertion for can only be marked "best-effort".
