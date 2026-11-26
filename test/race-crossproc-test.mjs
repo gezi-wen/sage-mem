@@ -9,7 +9,7 @@
  */
 
 import { fork } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, utimes, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -152,7 +152,36 @@ async function main() {
     ok(winners === 1, '四个进程恰好一个抢到', `${winners}`)
   }
 
-  group('4. 共享租约：活锁不被第二个进程抢走，释放后可复得')
+  group('4. 接管标记存在时，fast-path 不创建、不返回成功')
+  {
+    const lockPath = join(base, 'guarded.lock')
+    const marker = `${lockPath}.steal`
+    await writeFile(marker, JSON.stringify({ pid: process.pid, at: Date.now(), token: 'takeover-in-progress' }))
+    const { createFileLease } = await import('../lib/shared/file-lease.js')
+    const lease = createFileLease({ lockPath, staleMs: 10_000, waitMs: 0 })
+    const r = await lease.acquire()
+    ok(r.ok === false, '接管标记存在时 fast-path 不返回成功', JSON.stringify(r))
+    ok(!(await stat(lockPath).catch(() => null)), 'fast-path 没有留下锁文件')
+    await rm(marker, { force: true })
+    const again = await lease.acquire()
+    ok(again.ok === true, '接管标记清掉后可以正常拿锁')
+    await lease.release(again.token)
+  }
+
+  group('5. 死者的接管标记可以回收，不会把锁永久挡死')
+  {
+    const lockPath = join(base, 'dead-marker.lock')
+    const marker = `${lockPath}.steal`
+    await writeFile(marker, JSON.stringify({ pid: 9_999_999, at: Date.now(), token: 'dead-holder' }))
+    const { createFileLease } = await import('../lib/shared/file-lease.js')
+    const lease = createFileLease({ lockPath, staleMs: 10_000, waitMs: 0 })
+    const r = await lease.acquire()
+    ok(r.ok === true, '死者标记被回收后可以拿锁', JSON.stringify(r))
+    ok(!(await stat(marker).catch(() => null)), '回收后标记不残留')
+    await lease.release(r.token)
+  }
+
+  group('6. 共享租约：活锁不被第二个进程抢走，释放后可复得')
   {
     const lockPath = join(base, 'live.lock')
     const { createFileLease } = await import('../lib/shared/file-lease.js')
