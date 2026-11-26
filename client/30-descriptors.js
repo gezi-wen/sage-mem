@@ -46,6 +46,7 @@
 					invocation: { kind: "direct" },
 					parameters: [
 						{ name: "name", wire: "name", source: "json", codec: { mode: "strict", typeSymbol: "sage-mem/types#FileName", schema: strSchema, create: () => strSchema } },
+						{ name: "opts", wire: "opts", source: "json", acceptsUndefined: true, codec: { mode: "strict", typeSymbol: "sage-mem/types#DeleteOpts", schema: deleteOptsSchema, create: () => deleteOptsSchema } },
 					],
 					result: { mode: "strict", typeSymbol: "sage-mem/types#DeleteResult", schema: deleteSchema, create: () => deleteSchema },
 					sourceLocation: { "file": "lib/index.js", "line": 1, "column": 1 },

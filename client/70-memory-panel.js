@@ -48,6 +48,10 @@
 			}
 			const sDeleting = react.useState(null);
 			const deleting = sDeleting[0], setDeleting = sDeleting[1];
+			// 2.21.0：确认删除时把「列表上看到的那一版」存下来。不能在请求时现取 ——
+			// 弹框期间列表可能刷新，现取会把守卫悄悄升级成新版本，等于没守。
+			const sDeleteRevision = react.useState(null);
+			const deleteRevision = sDeleteRevision[0], setDeleteRevision = sDeleteRevision[1];
 			const sFormOpen = react.useState(false);
 			const formOpen = sFormOpen[0], setFormOpen = sFormOpen[1];
 			const sEditingFile = react.useState(null);
@@ -526,11 +530,16 @@
 			}
 
 			function confirmDelete(file) {
+				if (!deleteRevision) {
+					setError(t("error.deleteNoRevision"));
+					return;
+				}
 				setBusy(true); setError(null); setNotice("");
-				remote.deleteFile(file)
+				remote.deleteFile(file, { expectedRevision: deleteRevision })
 					.then(function (r) {
 						if (r && r.ok === false) { setError(r.error || t("error.deleteRejected")); return; }
 						setDeleting(null);
+						setDeleteRevision(null);
 						setNotice(t("notice.deleted", { file: file }));
 						load();
 					})
@@ -1215,7 +1224,7 @@
 				restoreFile: restoreFile, setArchDelete: setArchDelete, setArchEdit: setArchEdit, deleteArchivedFile: deleteArchivedFile,
 				expanded: expanded, onToggleExpanded: onToggleExpanded, deleting: deleting, archiving: archiving,
 				archiveReason: archiveReason, setArchiveReason: setArchiveReason,
-				setArchiving: setArchiving, setDeleting: setDeleting,
+				setArchiving: setArchiving, setDeleting: setDeleting, setDeleteRevision: setDeleteRevision,
 				confirmArchive: confirmArchive, toggleLock: toggleLock,
 				openEdit: openEdit, confirmDelete: confirmDelete,
 			});

@@ -398,10 +398,13 @@ function makeMemoryRemote(active, archived, raw) {
     },
     // 活跃记忆的「删除」（不是彻底删除归档件）：真宿主是 memory.deleteFile，直接抹掉这个文件。
     // 之前 fixture 里没有它，所以「删除」那条两段式确认一直没人验（2.5.0 补上）。
-    deleteFile(name) {
-      st.calls.push(['deleteFile', name])
+    deleteFile(name, opts) {
+      st.calls.push(['deleteFile', name, opts])
       const i = st.active.findIndex((x) => x.file === name)
       if (i < 0) return Promise.resolve({ ok: false, error: 'sage-mem: file not found: ' + name })
+      if (st.refuseActiveDelete) {
+        return Promise.resolve({ ok: false, code: 'stale_revision', error: 'sage-mem: 文件在确认之后被改过，没有删除' })
+      }
       st.active.splice(i, 1)
       return Promise.resolve({ ok: true, file: name })
     },
@@ -901,9 +904,9 @@ function typeInto(el, value) {
 // 假数据
 // ════════════════════════════════════════════════════════════════════════════
 const ACTIVE = [
-  { file: 'user_alpha.md', type: 'user', description: '甲：用户偏好', size: 1200, tags: ['用户'] },
-  { file: 'project_beta.md', type: 'project', description: '乙：进行中的项目', size: 3400, tags: ['项目', 'dsh'] },
-  { file: 'reference_gamma.md', type: 'reference', description: '丙：外部资料指针', size: 800, tags: ['参考'] },
+  { file: 'user_alpha.md', type: 'user', description: '甲：用户偏好', size: 1200, tags: ['用户'], revision: 'sha256:aaaaaaaaaaaa' },
+  { file: 'project_beta.md', type: 'project', description: '乙：进行中的项目', size: 3400, tags: ['项目', 'dsh'], revision: 'sha256:bbbbbbbbbbbb' },
+  { file: 'reference_gamma.md', type: 'reference', description: '丙：外部资料指针', size: 800, tags: ['参考'], revision: 'sha256:cccccccccccc' },
 ]
 const ARCHIVED = [
   // revision 是 2.1.6（外部审查 Q07）起的内容身份：面板的「彻底删除」必须把它原样交回宿主。
@@ -1624,7 +1627,27 @@ async function main() {
       tree = await rt.settle(C, {})
       const dCall = mem.st.calls.find((c) => c[0] === 'deleteFile')
       ok(!!dCall && dCall[1] === 'project_beta.md', `确认后才调 deleteFile（${JSON.stringify(dCall)}）`)
+      ok(!!dCall && dCall[2] && dCall[2].expectedRevision === 'sha256:bbbbbbbbbbbb',
+        '删除带着确认时看到的内容版本（不是只交文件名）', JSON.stringify(dCall?.[2]))
       ok(treeText(tree).indexOf('已删除 project_beta.md') >= 0, '删除后有明确反馈')
+    }
+
+    // c2) 宿主发现内容版本已变：拒绝删除，文件仍在列表里
+    {
+      const rt = makeReact()
+      const mem = makeMemoryRemote(ACTIVE, ARCHIVED, RAW_ARCHIVED)
+      mem.st.refuseActiveDelete = true
+      const { comp: C } = await loadClient(rt, { memory: mem })
+      let tree = await rt.settle(C, {})
+      click(btn(cardOf(tree, 'project_beta.md'), '删除')[0])
+      tree = await rt.settle(C, {})
+      click(btn(modalOf(tree), '确认删除')[0])
+      tree = await rt.settle(C, {})
+      const dCall = mem.st.calls.find((c) => c[0] === 'deleteFile')
+      ok(!!dCall && dCall[2]?.expectedRevision === 'sha256:bbbbbbbbbbbb',
+        '被拒绝的删除同样带着确认版本', JSON.stringify(dCall?.[2]))
+      ok(treeText(tree).indexOf('文件在确认之后被改过') >= 0, '界面显示宿主的拒绝原因')
+      ok(!!cardOf(tree, 'project_beta.md'), '拒绝后文件仍在列表里（没有假装删掉）')
     }
 
     // d) 回滚：模态标题写明哪个回滚点，正文写明作用范围

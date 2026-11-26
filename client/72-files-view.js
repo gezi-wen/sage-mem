@@ -2,7 +2,7 @@
 		// 只负责「按状态/筛选把卡片摆出来 + 四种空态」；状态、筛选语义、动作回调全部由 Section 传。
 		// 抽出的判据：它是 Section 里最大的一块纯渲染，而卡片组件（Card / ArchivedCard）本来就在 50 共享层。
 		function FilesView(props) {
-			const { loading, totalCount, openAdd, createIndexSkeleton, statusFilter, setStatusFilter, items, archiveItems, filtered, setTypeFilter, setTagFilter, setQuery, busy, restoring, archDelete, archEdit, archLoad, archSaving, archText, setArchText, openArchEdit, saveArchEdit, cancelArchEdit, restoreFile, setArchDelete, setArchEdit, deleteArchivedFile, expanded, onToggleExpanded, deleting, archiving, archiveReason, setArchiveReason, setArchiving, setDeleting, confirmArchive, toggleLock, openEdit, confirmDelete } = props;
+			const { loading, totalCount, openAdd, createIndexSkeleton, statusFilter, setStatusFilter, items, archiveItems, filtered, setTypeFilter, setTagFilter, setQuery, busy, restoring, archDelete, archEdit, archLoad, archSaving, archText, setArchText, openArchEdit, saveArchEdit, cancelArchEdit, restoreFile, setArchDelete, setArchEdit, deleteArchivedFile, expanded, onToggleExpanded, deleting, archiving, archiveReason, setArchiveReason, setArchiving, setDeleting, setDeleteRevision, confirmArchive, toggleLock, openEdit, confirmDelete } = props;
 			let filesView;
 			if (loading && totalCount === 0) {
 				filesView = h("div", { className: "smem-skeleton", key: "loading", "data-loading": "1" }, [0, 1, 2].map(function (i) {
@@ -71,8 +71,8 @@
 						// 拆件后它不在本函数作用域，点击即 ReferenceError: setExpanded is not defined。
 						onToggle: onToggleExpanded,
 						onEdit: openEdit,
-						onAskDelete: function (file) { setDeleting(file); setArchiving(null); },
-						onCancelDelete: function () { setDeleting(null); },
+						onAskDelete: function (file, revision) { setDeleting(file); setDeleteRevision(revision || null); setArchiving(null); },
+						onCancelDelete: function () { setDeleting(null); setDeleteRevision(null); },
 						onConfirmDelete: confirmDelete,
 					});
 				}));

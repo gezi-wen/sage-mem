@@ -347,7 +347,7 @@
 							disabled: props.busy || item.locked === true,
 							onClick: function () { props.onAskArchive(item.file); },
 						}, t("card.archive")),
-						h("button", { type: "button", className: "smem-btn smem-btn-danger-ghost", key: "del", onClick: function () { props.onAskDelete(item.file); } }, t("card.delete")),
+						h("button", { type: "button", className: "smem-btn smem-btn-danger-ghost", key: "del", onClick: function () { props.onAskDelete(item.file, item.revision); } }, t("card.delete")),
 					]),
 					// 两个确认框都是**模态**（2.5.0）：DOM 里留在卡片内只是为了「状态跟着这一行走」，
 					// 视觉上是全屏一层 —— 列表被滚出视野时，按下去那一刻看到的东西还在眼前。

@@ -3,11 +3,12 @@
 		const isStrArr = (v) => { if (!Array.isArray(v)) throw new Error("expected string array"); for (const x of v) isStr(x); };
 		// 字段必须与宿主 `lib/typert.host.js` 的 fileSchema **同宽**（strict 会剥掉未声明字段）：
 		// 少了 tags / locked，列表页的「按标签筛」与「锁定」按钮就永远拿到 undefined。
-		const fileSchema = parseSchema({ "file": isStr, "type": isStr, "description": isStr, "size": isNum, "tags": isStrArr, "locked": isBool });
+		const fileSchema = optionalFields(parseSchema({ "file": isStr, "type": isStr, "description": isStr, "size": isNum, "tags": isStrArr, "locked": isBool }), { "revision": isStr });
 		const listSchema = { fields: fileSchema.fields, parse(v) { if (!Array.isArray(v)) throw new Error("expected array"); v.forEach((f) => fileSchema.parse(f)); return v; } };
 		const readSchema = withOptional(parseSchema({ "name": isStr, "content": isStr }), ["revision"]);
 		const writeSchema = optionalFields(parseSchema({ "ok": isBool, "file": isStr }), { "error": isStr, "code": isStr, "revision": isStr });
-		const deleteSchema = optionalFields(parseSchema({ "ok": isBool }), { "error": isStr });
+		const deleteSchema = optionalFields(parseSchema({ "ok": isBool }), { "file": isStr, "error": isStr, "code": isStr, "keptAt": isStr });
+		const deleteOptsSchema = optionalFields(parseSchema({}), { "expectedRevision": isStr });
 		// `archived` 每颗星都有（活动星是 false）；archivedAt / archivedReason 只对归档星出现，
 		// 且旧版 autodream 归档的文件没有它们 —— 所以是 optional（与宿主 manifest 一致）。
 		const starmapStarSchema = withOptional(

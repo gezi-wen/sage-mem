@@ -45,6 +45,7 @@ const SUITES = [
   'q-fixes-093.mjs',
   'q-fixes-094.mjs',
   'q-fixes-095.mjs',
+  'delete-guard-test.mjs',
   // 2.19.0：搜索覆盖度 —— `search_sessions` 的「没找到」必须分清「看完了没有」与「没看全」。
   // 纯策略（Selection / 窗口 / 文件桶 / coverage 派生 / 首行渲染）与 IO 适配分两层钉住；
   // 放在 q-fixes-095 之后：那一份钉的是 zstd 多帧与 limit 的老行为，本份钉的是覆盖率与新窗口。

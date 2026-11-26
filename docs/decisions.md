@@ -1302,3 +1302,21 @@ Node20 CI 实际红过一次；本地 10 轮里也能复现 2 轮。
 另外启动两个真实 DSH 宿主，共用同一 `SAGE_MEM_STATE_DIR`，各锁 40 个文件，连跑 3 轮均 80/80。
 这条修的是 **2.20.0 自己的缺陷**，不改对外保证范围；TTL 非 fencing、不同 stateRoot 不互见、
 多文件非事务三条边界仍照旧。
+
+## D54 · 删除活动记忆必须绑定内容身份（2.21.0）
+
+**问题**：`deleteFile(name)` 只按名字 `unlink`。用户在列表里确认的是「这一版」，但从弹框打开到确认之间，
+模型或另一个会话完全可能把同名文件写成新版本。删除删除的是新版本，不可恢复。
+
+**决定**：复用归档删除已有的「先接管、再核对」原语 `takeOverSource`。
+1. `listFiles` 返回正文字节 sha256 revision（与 `readFile` / 写协议同一算法）。
+2. 面板在点删除时把 revision 与文件名一起存进删除状态；确认时传
+   `deleteFile(name, { expectedRevision })`。**请求时现取 revision 是错的**——列表刷新后会把守卫悄悄升级成新版本。
+3. 宿主先把目标 rename 到 `.deleting-*` 私有名，再读私有实物的 revision；对不上就 `returnSource` 用 link 还回，
+   原名为空时恢复；原名已被新写入占住则保留私有副本并返回 `keptAt`，绝不删除未确认内容。
+4. 旧调用不传 opts 仍兼容删除，但留 warn；公开保证只覆盖新面板 + 新宿主。
+
+**为什么不做「读 revision → unlink」**：那是 check-then-delete，和归档删除 2026-10-31 修的 Q07 是同一个窗口。
+名字必须与 inode/内容解耦，判据只能来自接管到手的实物。
+
+**测试**：`delete-guard-test.mjs` 12 条 + `client-render-test` 的请求/拒绝断言；`.deleting-*` 纳入 audit strays。
