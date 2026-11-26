@@ -17,6 +17,7 @@
 import { mkdtemp, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { createHash } from 'node:crypto'
 
 const LIB = new URL('../lib/', import.meta.url)
 const { AutodreamEngine } = await import(new URL('autodream.js', LIB).href)
@@ -50,6 +51,17 @@ async function world() {
 }
 
 const exists = async (p) => (await stat(p).catch(() => null)) !== null
+const sha256 = (s) => createHash('sha256').update(Buffer.from(s, 'utf8')).digest('hex')
+
+async function writeRunManifest(engine, snap, changes) {
+  const runDir = join(engine.runsRoot, snap.id)
+  await mkdir(runDir, { recursive: true })
+  await writeFile(
+    join(runDir, 'manifest.json'),
+    JSON.stringify({ runId: snap.id, changes, archive: { mode: 'off', archived: [] } }, null, 2),
+    'utf8',
+  )
+}
 
 console.log('== G-1a：记忆目录读不动时，快照必须出声（不能静默返回空快照）==')
 {
@@ -144,6 +156,53 @@ console.log('== G-2b：运行前不存在的文件，不会被回滚激活 ==')
   const rb = await engine.rollback({ snapshotId: snap.id, scope: 'files' })
   ok(rb.ok === true && rb.restored === 0, '不去动它（restored=0）', JSON.stringify(rb))
   ok(!(await exists(join(memoryDir, 'project_new.md'))), '运行前不存在的文件没有被激活到顶层')
+}
+
+console.log('== G-3a：运行结束后没再改 → 文件级回滚正常写回 ==')
+{
+  const { memoryDir, engine } = await world()
+  const snap = await engine.snapshot('20261009-200400-run4', 'run')
+  const RUN_WROTE = '---\nname: a\ntype: project\n---\n\n# A\n\n整理这趟写下的版本\n'
+  await writeFile(join(memoryDir, 'a.md'), RUN_WROTE, 'utf8')
+  await writeRunManifest(engine, snap, [{
+    seq: 1, file: 'a.md', op: 'update',
+    before: { exist: true, bytes: 44, sha256: 'old' },
+    after: { exist: true, bytes: Buffer.byteLength(RUN_WROTE), sha256: sha256(RUN_WROTE) },
+  }])
+  const rb = await engine.rollback({ snapshotId: snap.id, scope: 'files' })
+  ok(rb.ok === true && rb.restored === 1 && rb.skipped === 0, '版本对得上时正常恢复', JSON.stringify(rb))
+  ok((await readFile(join(memoryDir, 'a.md'), 'utf8')).includes('原文'), '内容回到运行前那一版')
+}
+
+console.log('== G-3b：运行结束后被手改 → 拒绝覆盖，新内容保住 ==')
+{
+  const { memoryDir, engine } = await world()
+  const snap = await engine.snapshot('20261009-200500-run5', 'run')
+  const RUN_WROTE = '---\nname: a\ntype: project\n---\n\n# A\n\n整理这趟写下的版本\n'
+  const EXTERNAL = '---\nname: a\ntype: project\n---\n\n# A\n\n整理之后我自己补的新内容\n'
+  await writeFile(join(memoryDir, 'a.md'), EXTERNAL, 'utf8')
+  await writeRunManifest(engine, snap, [{
+    seq: 1, file: 'a.md', op: 'update',
+    before: { exist: true, bytes: 44, sha256: 'old' },
+    after: { exist: true, bytes: Buffer.byteLength(RUN_WROTE), sha256: sha256(RUN_WROTE) },
+  }])
+  const rb = await engine.rollback({ snapshotId: snap.id, scope: 'files' })
+  ok(rb.ok === true && rb.restored === 0 && rb.skipped === 1, '被外部改过的文件跳过', JSON.stringify(rb))
+  ok((await readFile(join(memoryDir, 'a.md'), 'utf8')) === EXTERNAL, '外部新内容逐字节保留')
+  const report = await readFile(join(memoryDir, 'autodream', rb.report), 'utf8').catch(() => '')
+  ok(report.includes('又被改过'), '报告写明跳过原因', report.slice(-300))
+}
+
+console.log('== G-3c：整目录回滚也守同一道闸（运行没改过的文件，快照后手改）==')
+{
+  const { memoryDir, engine } = await world()
+  const snap = await engine.snapshot('20261009-200600-run6', 'run')
+  const EXTERNAL = '---\nname: a\ntype: project\n---\n\n# A\n\n快照之后手改的新内容\n'
+  await writeFile(join(memoryDir, 'a.md'), EXTERNAL, 'utf8')
+  await writeRunManifest(engine, snap, [])
+  const rb = await engine.rollback({ snapshotId: snap.id, scope: 'all' })
+  ok(rb.ok === true && rb.skipped >= 1, '整目录回滚也跳过被手改的文件（其它未改文件仍可恢复）', JSON.stringify(rb))
+  ok((await readFile(join(memoryDir, 'a.md'), 'utf8')) === EXTERNAL, '外部新内容没有被快照覆盖')
 }
 
 console.log(`\n结果：${pass} passed, ${fail} failed`)
